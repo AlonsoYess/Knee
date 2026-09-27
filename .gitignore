@@ -1,0 +1,51 @@
+# Datos de OAI y archivos de trabajo restringidos
+data/
+datasets/
+raw/
+dicom/
+dicoms/
+images_oai/
+artifacts/
+outputs/
+runs/
+checkpoints/
+models/
+drive/
+*.dcm
+*.dicom
+*.ima
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+*.7z
+cohorte_oai_*
+documentacion_cohorte_OAI_*
+muestra_piloto_10_radiografias.csv
+auditoria_dicoms.csv
+
+# Credenciales y configuración local
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*credentials*.json
+*secrets*.json
+
+# Python y notebooks
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+*.egg-info/
+
+# Sistema y editores
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
