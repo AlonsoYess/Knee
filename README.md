@@ -10,6 +10,10 @@ La cohorte tabular está auditada. La inspección y descarga completa de radiogr
 
 Ver [Plan de implementación por fases](docs/PLAN_DE_IMPLEMENTACION.md). Cada fase incluye entregables, criterios de cierre y dependencias. El plan sigue el Capítulo III de la metodología y se actualizará con las decisiones y resultados realmente ejecutados.
 
+## Empezar la fase 0
+
+La [guía de arranque](docs/FASE_0.md) indica cómo organizar Drive y ejecutar la [libreta de Colab](notebooks/00_arranque_colab.ipynb). La auditoría compara el CSV de 21 columnas con el manifiesto y guarda recuentos agregados y huellas SHA-256. El [registro de decisiones](docs/DECISIONES.md) conserva los asuntos pendientes.
+
 ## Alcance del experimento
 
 - Unidad de análisis: rodilla con KL inicial 2 o 3; particiones agrupadas por participante.
