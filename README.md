@@ -4,7 +4,7 @@ Proyecto de tesis de Ingeniería de Sistemas: desarrollo y evaluación de un sis
 
 ## Estado
 
-La Fase 0 está cerrada técnicamente: la cohorte tabular fue auditada en local y en Colab, y sus evidencias privadas fueron verificadas en Drive. La inspección y descarga completa de radiografías, los recortes, las particiones definitivas, el entrenamiento y la evaluación del prototipo están pendientes. No se reportan métricas predictivas hasta completar los experimentos.
+La Fase 0 está cerrada técnicamente: la cohorte tabular fue auditada en local y en Colab, y sus evidencias privadas fueron verificadas en Drive. La Fase 1 ha comenzado con la reconciliación del piloto DICOM; la auditoría histórica quedó invalidada porque confundía paquetes descargados con adquisiciones únicas. La inspección completa de radiografías, los recortes, las particiones definitivas, el entrenamiento y la evaluación del prototipo siguen pendientes. No se reportan métricas predictivas hasta completar los experimentos.
 
 ## Plan de trabajo
 
@@ -21,6 +21,8 @@ La [estructura maestra de Drive y el inventario de fuentes](docs/02_ESTRUCTURA_D
 El [control de cambios metodológicos](docs/03_CONTROL_CAMBIOS_METODOLOGICOS.md), aprobado como versión 1.0, exige registrar y aprobar cualquier propuesta antes de aplicarla. Incluye una [plantilla controlada](docs/templates/SOLICITUD_CAMBIO_METODOLOGICO.md), un [registro JSON](configs/governance/methodology_change_log.json) y una validación automática que bloquea propuestas incompletas, no aprobadas o influenciadas por la prueba reservada.
 
 La [estrategia de modelos](docs/06_ESTRATEGIA_MODELOS.md) y su [registro ejecutable](configs/model_registry.json) conservan las líneas base del Capítulo III y preespecifican los candidatos modernos, sus puertas de elegibilidad y su selección exclusivamente en desarrollo. Su aprobación prepara el modelado, pero no adelanta el entrenamiento ni abre la prueba.
+
+El [paso 1 de la Fase 1](docs/07_FASE_1_PASO_1.md) define cómo reconciliar el manifiesto piloto con diez adquisiciones DICOM realmente únicas, auditar su integridad por contenido y conservar la evidencia individual únicamente en Drive. La libreta [`01_auditoria_piloto_dicoms.ipynb`](notebooks/01_auditoria_piloto_dicoms.ipynb) se limita a orquestar ese control.
 
 ## Empezar la fase 0
 

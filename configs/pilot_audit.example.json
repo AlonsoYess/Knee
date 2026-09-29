@@ -1,0 +1,7 @@
+{
+  "source_dir": "dicom/originales/piloto_v1",
+  "pilot_manifest_csv": "data/piloto/muestra_piloto_10_radiografias.csv",
+  "output_dir": "outputs/auditorias/fase_1/paso_1_piloto",
+  "expected_unique_studies": 10,
+  "strict_single_package_per_study": true
+}
