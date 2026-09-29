@@ -4,12 +4,13 @@
 
 | Campo | Valor |
 | --- | --- |
-| Estado | En curso; inventario inicial y lotes 1 y 2 verificados |
+| Estado | Completado; inventario final y lotes 1–20 verificados |
 | Fecha | 29 de septiembre de 2026 |
 | Revisión del inventario inicial | `ca52f0f9253b35a1318861cd3d89f5953cebcdad` |
 | Revisión ejecutada para el lote 1 | `6c093a9db9b20cb1ed7762616539e801bc04f618` |
 | Revisión ejecutada para el lote 2 | `51f91d780a2e39e1a07f9037dcfe4533f41bc9fa` |
-| Siguiente operación | Ejecutar el orquestador automático desde el primer lote pendiente |
+| Revisión ejecutada para los lotes 3–20 | `8c3be777d3fb3edfbbb82ff4aabb100d59ef4143` |
+| Siguiente operación | Iniciar el diseño controlado de separación bilateral y lateralidad |
 
 ## Resultado verificado
 
@@ -70,6 +71,23 @@ El segundo lote repitió el mismo procedimiento controlado y fue verificado ínt
 
 La ejecución utilizó la revisión registrada, no entrenó modelos y no abrió la prueba reservada.
 
+## Resultado final verificado de los lotes 3–20
+
+La ejecución automática procesó los dieciocho lotes pendientes sin fallos. La evidencia consolidada y el inventario final fueron contrastados directamente en Drive, junto con los veinte resúmenes de lote y las veinte carpetas canónicas.
+
+| Control final | Resultado |
+| --- | ---: |
+| Lotes ejecutados automáticamente | 18, numerados del 3 al 20 |
+| Lotes totales verificados | 20 |
+| Paquetes descargados y promovidos en los lotes 1–20 | 1,906 |
+| Paquetes canónicos del piloto | 10 |
+| Adquisiciones inspeccionadas y disponibles | 1,916 |
+| Pendientes de descarga o reemplazo | 0 |
+| Archivos inesperados | 0 |
+| Lotes con controles fallidos | 0 |
+
+Los lotes 1–19 contienen 100 paquetes cada uno y el lote 20 contiene 6, para un total de 1,906. Todos los paquetes esperados fueron encontrados, decodificados, seleccionados y copiados; no se registraron faltantes, ilegibles, duplicados, conflictos ni inesperados.
+
 Durante la primera autenticación se detectó un rechazo `401` porque el cliente de línea de comandos requiere la contraseña específica de NDA Tools, distinta del flujo web RAS/Login.gov con multifactor. Tras establecerla desde `Update Password`, la autenticación, consulta del paquete y descarga funcionaron correctamente. Esta incidencia no modificó datos ni metodología.
 
 La libreta se corrigió para que la celda de autenticación sea reejecutable, elimine siempre la credencial efímera y entregue diagnósticos saneados sin revelar usuario, identificador de paquete, rutas S3, ubicaciones temporales ni nombres de paquetes. Esta es una corrección operativa y de seguridad, no un cambio metodológico.
@@ -92,4 +110,4 @@ La asignación inicial a los veinte lotes queda congelada en un archivo privado.
 
 ## Estado del paso
 
-El inventario inicial y los lotes 1 y 2 están aprobados, pero el paso 2 sigue abierto hasta completar o documentar las 1,706 adquisiciones pendientes. La siguiente ejecución autorizable es el orquestador automático, que reanudará desde el lote 3 según el inventario actual y continuará hasta el lote 20 o hasta el primer fallo. Este avance no autoriza separación bilateral masiva, recortes, particiones, entrenamiento ni apertura de la prueba reservada.
+El paso 2 queda cerrado técnicamente con 1,916 adquisiciones disponibles, cero pendientes y cero archivos inesperados. Su acta pública se conserva en `11_CIERRE_FASE_1_PASO_2.md`. La siguiente actividad autorizada es preparar el paso 3: diseñar y validar la separación bilateral y la lateralidad sin consultar el desenlace. Este cierre no autoriza separación masiva, recortes, particiones, entrenamiento ni apertura de la prueba reservada.
