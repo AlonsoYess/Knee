@@ -25,7 +25,7 @@ Este archivo es el resumen publicable del control documental. El inventario priv
 | Plantilla de solicitud MCR | 1.0, aprobada | `docs/templates/SOLICITUD_CAMBIO_METODOLOGICO.md` | Verificado |
 | Registro de cambios MCR | 1.0, aprobado | `configs/governance/methodology_change_log.json` | Verificado |
 | Arquitectura reproducible | 1.1, aprobada | `docs/04_ARQUITECTURA_REPRODUCIBLE.md` | Verificado |
-| Notebook de cierre técnico en Colab | 1.0, aprobado para ejecución | `notebooks/00_arranque_colab.ipynb` | Verificado |
+| Notebook de cierre técnico en Colab | 1.1, aprobado para ejecución; ruta privada mediante secreto | `notebooks/00_arranque_colab.ipynb` | Verificado |
 
 ## Historial preservado
 
