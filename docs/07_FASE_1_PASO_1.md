@@ -45,4 +45,6 @@ Los resultados individuales, los paquetes y las huellas permanecen en Drive. El 
 
 ## Estado
 
-El código y la reconstrucción local están preparados. Drive contiene un solo paquete canónico por cada una de las diez adquisiciones esperadas y su inventario de tamaños fue verificado. Falta ejecutar la libreta contra esa copia privada para comprobar en Colab las huellas y el contenido DICOM, guardar el registro de ejecución y cerrar el paso. Hasta entonces, el paso permanece abierto y el entrenamiento continúa bloqueado.
+**Cerrado el 29 de septiembre de 2026.** La libreta fue ejecutada en Colab sobre el commit `f540a60f7399f7f97b4f196169c9f5109d017381`. Las evidencias privadas de Drive confirman diez entradas esperadas, diez paquetes canónicos, diez DICOM legibles, diez huellas únicas de paquete, DICOM y píxeles, cero duplicados y cero controles fallidos.
+
+El cierre público y sus límites están documentados en [`08_CIERRE_FASE_1_PASO_1.md`](08_CIERRE_FASE_1_PASO_1.md). Este resultado autoriza continuar con el inventario radiográfico del paso 2, pero no autoriza entrenamiento, procesamiento masivo sin control ni apertura de la prueba reservada.

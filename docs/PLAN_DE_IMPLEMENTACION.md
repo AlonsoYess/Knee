@@ -45,14 +45,14 @@ Diseñar con casos de desarrollo una regla verificable para separar las dos rodi
 
 ### Secuencia controlada de la Fase 1
 
-| Paso | Contenido | Criterio de cierre |
-| ---: | --- | --- |
-| 1 | Reconciliar el manifiesto piloto y auditar diez adquisiciones DICOM únicas por contenido. | Diez entradas esperadas, un paquete canónico legible por adquisición, diez huellas de píxeles distintas y evidencia privada reproducible en Drive. |
-| 2 | Consolidar el inventario de las adquisiciones basales de la cohorte y su descarga selectiva. | Cada ruta esperada queda clasificada como disponible, ausente, duplicada o ilegible, sin descargar imágenes ajenas a la cohorte. |
-| 3 | Diseñar y validar la separación bilateral y la lateralidad sin consultar el desenlace. | Regla determinista con casos de baja confianza y revisión visual documentada. |
-| 4 | Diseñar y validar la localización tibiofemoral y el recorte por rodilla. | Recorte reproducible, sin texto, bordes ni regla central, con parámetros versionados. |
-| 5 | Ejecutar el control radiográfico sobre la cohorte obtenida. | Manifiesto privado de aceptación, exclusión y motivo; originales y recortes trazables. |
-| 6 | Cerrar la Fase 1 y congelar la cohorte de imágenes utilizables. | Recuentos agregados, ejemplos desidentificados permitidos y autorización explícita para preparar las particiones de la Fase 2. |
+| Paso | Contenido | Criterio de cierre | Estado |
+| ---: | --- | --- | --- |
+| 1 | Reconciliar el manifiesto piloto y auditar diez adquisiciones DICOM únicas por contenido. | Diez entradas esperadas, un paquete canónico legible por adquisición, diez huellas de píxeles distintas y evidencia privada reproducible en Drive. | Cerrado; ejecución Colab y evidencias verificadas. |
+| 2 | Consolidar el inventario de las adquisiciones basales de la cohorte y su descarga selectiva. | Cada ruta esperada queda clasificada como disponible, ausente, duplicada o ilegible, sin descargar imágenes ajenas a la cohorte. | Pendiente. |
+| 3 | Diseñar y validar la separación bilateral y la lateralidad sin consultar el desenlace. | Regla determinista con casos de baja confianza y revisión visual documentada. | Pendiente. |
+| 4 | Diseñar y validar la localización tibiofemoral y el recorte por rodilla. | Recorte reproducible, sin texto, bordes ni regla central, con parámetros versionados. | Pendiente. |
+| 5 | Ejecutar el control radiográfico sobre la cohorte obtenida. | Manifiesto privado de aceptación, exclusión y motivo; originales y recortes trazables. | Pendiente. |
+| 6 | Cerrar la Fase 1 y congelar la cohorte de imágenes utilizables. | Recuentos agregados, ejemplos desidentificados permitidos y autorización explícita para preparar las particiones de la Fase 2. | Pendiente. |
 
 Los pasos 1 a 4 son desarrollo del control de imágenes; ninguno autoriza entrenamiento ni consulta de la prueba reservada.
 
