@@ -29,9 +29,9 @@ Este plan convierte el Capítulo III de la tesis en trabajo ejecutable con Codex
 | 3 | Estructura maestra de Drive e inventario de fuentes. | Cerrado. |
 | 4 | Mecanismo para registrar, evaluar y aprobar propuestas de cambio metodológico antes de aplicarlas. | Cerrado; versión 1.0 aprobada. |
 | 5 | Frontera reproducible GitHub–Colab–Drive: código central en `src/knee`, notebook de orquestación, pruebas y registro del commit. | Cerrado; arquitectura versión 1.0 aprobada. |
-| 6 | Ejecución completa en Colab con los archivos privados de Drive y verificación de las evidencias. | Pendiente. |
+| 6 | Ejecución completa en Colab con los archivos privados de Drive y verificación de las evidencias. | Cerrado; ejecución y evidencias verificadas. |
 
-La preparación o validación del entorno de Colab no corresponde al paso 4. Su posición se documentará en la secuencia antes de iniciarla; no se adelantará sustituyendo el control de cambios. La gobernanza de los pasos 1 a 4 está aprobada, pero la Fase 0 completa mantiene pendiente su criterio técnico de ejecución en Colab con Drive.
+La preparación o validación del entorno de Colab no corresponde al paso 4 y no sustituyó el control de cambios. Los seis pasos están cerrados y la Fase 0 cumplió su criterio técnico. El cierre está documentado en [`05_CIERRE_FASE_0.md`](05_CIERRE_FASE_0.md) y no autoriza entrenamiento ni apertura de la prueba reservada.
 
 ## Fase 1. Descarga selectiva y control radiográfico
 

@@ -2,11 +2,11 @@
 
 ## Estado y procedencia
 
-La gobernanza y los entregables documentales de los pasos 1 a 4 fueron aprobados por el investigador el 27 de septiembre de 2026. La arquitectura reproducible GitHub–Colab–Drive del paso 5 fue aprobada como versión 1.0 el 28 de septiembre de 2026. Estas aprobaciones no sustituyen la condición técnica de cierre de la fase: la ejecución local está comprobada y la ejecución equivalente en Colab con los archivos privados de Drive permanece pendiente como paso 6.
+La gobernanza y los entregables documentales de los pasos 1 a 4 fueron aprobados por el investigador el 27 de septiembre de 2026. La arquitectura reproducible GitHub–Colab–Drive del paso 5 fue aprobada como versión 1.0 el 28 de septiembre de 2026. El paso 6 se ejecutó posteriormente en Colab sobre el commit público `00255b76acb8f6151a839b0fe8d223c217957f68`, utilizando las fuentes privadas de Drive. Las evidencias fueron verificadas y la Fase 0 quedó cerrada técnicamente el 28 de septiembre de 2026.
 
 La cohorte auditada procede de una extracción autorizada de OAI. La identificación del paquete, la consulta de extracción y los archivos tabulares se conservan en almacenamiento restringido; no se copian a este repositorio público. El capítulo III especifica el criterio de selección y las fuentes OAI. El código de esta fase verifica los archivos recibidos sin recalcular ni modificar la cohorte.
 
-La ejecución local confirmó que los archivos privados coinciden en las verificaciones implementadas. Los recuentos exactos y las huellas permanecen en la auditoría privada. Esto comprueba la integridad tabular y del manifiesto; la lectura y calidad de todos los DICOM siguen pendientes.
+La ejecución local y la ejecución controlada en Colab confirmaron que los archivos privados coinciden en las verificaciones implementadas. Los recuentos exactos y las huellas permanecen en la auditoría privada. Esto comprueba la integridad tabular y del manifiesto; la lectura y calidad de todos los DICOM siguen pendientes para la Fase 1.
 
 ## Organización de Drive
 
@@ -40,6 +40,8 @@ python -m unittest discover -s tests -v
 
 Los reportes contienen recuentos y huellas, no identificadores ni rutas de participantes. Deben permanecer en Drive hasta confirmar que sus condiciones de publicación permiten compartirlos. No se considera que una ruta S3 pruebe que un DICOM fue descargado o sea utilizable.
 
-## Condición de cierre
+## Cierre técnico verificado
 
-Fase 0 cerrada cuando el repositorio ejecuta los controles localmente y en Colab con los archivos de Drive, sin diferencias de cohortes, y la bitácora registra la revisión exacta del código y las huellas. La ejecución local ya está comprobada; la ejecución en la cuenta Colab/Drive del investigador está pendiente. El cierre no autoriza entrenamiento ni apertura de la prueba reservada.
+La ejecución en Colab completó las pruebas automáticas, la validación del control de cambios, la auditoría de la cohorte y la generación de la bitácora sin errores. La auditoría y la bitácora privadas coinciden en sus recuentos agregados y huellas de entrada, y la bitácora identifica el mismo commit clonado por la libreta. Los detalles privados permanecen en Drive y el resumen publicable se conserva en [`05_CIERRE_FASE_0.md`](05_CIERRE_FASE_0.md).
+
+Con estas evidencias se cumple el criterio técnico de cierre de la Fase 0. Este cierre no autoriza entrenamiento, procesamiento masivo de DICOM ni apertura de la prueba reservada.

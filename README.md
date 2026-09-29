@@ -4,7 +4,7 @@ Proyecto de tesis de Ingeniería de Sistemas: desarrollo y evaluación de un sis
 
 ## Estado
 
-La cohorte tabular está auditada. La inspección y descarga completa de radiografías, los recortes, las particiones definitivas, el entrenamiento y la evaluación del prototipo están pendientes. No se reportan métricas predictivas hasta completar los experimentos.
+La Fase 0 está cerrada técnicamente: la cohorte tabular fue auditada en local y en Colab, y sus evidencias privadas fueron verificadas en Drive. La inspección y descarga completa de radiografías, los recortes, las particiones definitivas, el entrenamiento y la evaluación del prototipo están pendientes. No se reportan métricas predictivas hasta completar los experimentos.
 
 ## Plan de trabajo
 
@@ -14,7 +14,7 @@ El [contrato de alcance y matriz de trazabilidad](docs/00_ALCANCE_Y_TRAZABILIDAD
 
 Las [reglas metodológicas invariables](docs/01_REGLAS_INVARIABLES.md) convierten ese alcance en un catálogo auditable. Su versión legible por código está en [`configs/governance/scope_contract.json`](configs/governance/scope_contract.json) y cuenta con pruebas para detectar cambios silenciosos. El paso 2 está aprobado como versión 1.0, pero no autoriza entrenamiento.
 
-El [inventario documental](docs/INVENTARIO_DOCUMENTAL.md) es el resumen público de las versiones y respaldos verificados. Las ubicaciones exactas, identificadores, enlaces y huellas se conservan únicamente en el inventario privado de Drive.
+El [inventario documental](docs/INVENTARIO_DOCUMENTAL.md) es el resumen público de las versiones y respaldos verificados. El [acta pública de cierre de la Fase 0](docs/05_CIERRE_FASE_0.md) registra los controles superados sin revelar datos privados. Las ubicaciones exactas, identificadores, enlaces y huellas se conservan únicamente en el inventario privado de Drive.
 
 La [estructura maestra de Drive y el inventario de fuentes](docs/02_ESTRUCTURA_DRIVE_Y_FUENTES.md) distinguen las fuentes académicas rectoras, el contexto histórico y los archivos técnicos privados. El [registro público resumido](configs/governance/source_registry.json) conserva roles, autoridad, sensibilidad y estado de verificación sin exponer nombres exactos, rutas, tamaños, huellas ni enlaces privados.
 

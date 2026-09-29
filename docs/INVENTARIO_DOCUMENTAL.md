@@ -5,9 +5,9 @@
 | Campo | Valor |
 | --- | --- |
 | Estado | Activo |
-| Versión | 1.0 pública |
+| Versión | 1.2 pública |
 | Fecha de corte | 28 de septiembre de 2026 |
-| Ámbito | Artefactos rectores y respaldos de los pasos 1 a 5 de la Fase 0 |
+| Ámbito | Artefactos rectores, ejecución y cierre de los pasos 1 a 6 de la Fase 0 |
 | Inventario exacto | Privado en Google Drive autorizado |
 
 Este archivo es el resumen publicable del control documental. El inventario privado conserva nombres de archivo completos, enlaces, identificadores de Drive, tamaños, huellas SHA-256 y ubicación exacta de cada versión. Esa evidencia no se replica en GitHub.
@@ -26,6 +26,7 @@ Este archivo es el resumen publicable del control documental. El inventario priv
 | Registro de cambios MCR | 1.0, aprobado | `configs/governance/methodology_change_log.json` | Verificado |
 | Arquitectura reproducible | 1.1, aprobada | `docs/04_ARQUITECTURA_REPRODUCIBLE.md` | Verificado |
 | Notebook de cierre técnico en Colab | 1.1, aprobado para ejecución; ruta privada mediante secreto | `notebooks/00_arranque_colab.ipynb` | Verificado |
+| Acta pública de cierre técnico | 1.0, cerrada | `docs/05_CIERRE_FASE_0.md` | Evidencias privadas verificadas |
 
 ## Historial preservado
 
@@ -41,8 +42,8 @@ Se verificaron copias privadas del README principal, README del prototipo, plan 
 - los metadatos de Drive indican que los archivos verificados no están compartidos públicamente;
 - los doce archivos fuente únicos fueron controlados mediante el inventario privado;
 - las pruebas locales incluyen contratos de gobernanza y del notebook de Colab;
-- los pasos 1 a 5 están aprobados y versionados;
-- la ejecución técnica equivalente en Colab/Drive del paso 6 continúa pendiente;
+- los pasos 1 a 6 están cerrados y versionados;
+- la ejecución técnica en Colab/Drive terminó correctamente y sus dos evidencias privadas fueron contrastadas;
 - no se ejecutó entrenamiento ni se abrió el conjunto de prueba reservado.
 
 El inventario público se ampliará solo con información necesaria para reproducibilidad y gobierno. Credenciales, identificadores individuales, rutas privadas, huellas de fuentes restringidas y enlaces privados nunca se publicarán.
