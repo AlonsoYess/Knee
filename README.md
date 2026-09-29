@@ -4,7 +4,7 @@ Proyecto de tesis de Ingeniería de Sistemas: desarrollo y evaluación de un sis
 
 ## Estado
 
-La Fase 0 está cerrada técnicamente: la cohorte tabular fue auditada en local y en Colab, y sus evidencias privadas fueron verificadas en Drive. La Fase 1 ha comenzado y su paso 1 está cerrado: el piloto DICOM fue reconciliado y auditado con diez adquisiciones únicas. La inspección completa de radiografías, los recortes, las particiones definitivas, el entrenamiento y la evaluación del prototipo siguen pendientes. No se reportan métricas predictivas hasta completar los experimentos.
+La Fase 0 está cerrada técnicamente: la cohorte tabular fue auditada en local y en Colab, y sus evidencias privadas fueron verificadas en Drive. La Fase 1 ha comenzado y su paso 1 está cerrado: el piloto DICOM fue reconciliado y auditado con diez adquisiciones únicas. El paso 2 está en curso: se prepararon el inventario maestro, los controles de integridad y la cola reanudable de descarga selectiva para las 1,916 adquisiciones basales. La inspección completa de radiografías, los recortes, las particiones definitivas, el entrenamiento y la evaluación del prototipo siguen pendientes. No se reportan métricas predictivas hasta completar los experimentos.
 
 ## Plan de trabajo
 
@@ -23,6 +23,8 @@ El [control de cambios metodológicos](docs/03_CONTROL_CAMBIOS_METODOLOGICOS.md)
 La [estrategia de modelos](docs/06_ESTRATEGIA_MODELOS.md) y su [registro ejecutable](configs/model_registry.json) conservan las líneas base del Capítulo III y preespecifican los candidatos modernos, sus puertas de elegibilidad y su selección exclusivamente en desarrollo. Su aprobación prepara el modelado, pero no adelanta el entrenamiento ni abre la prueba.
 
 El [paso 1 de la Fase 1](docs/07_FASE_1_PASO_1.md) define cómo reconciliar el manifiesto piloto con diez adquisiciones DICOM realmente únicas, auditar su integridad por contenido y conservar la evidencia individual únicamente en Drive. Su [acta pública de cierre](docs/08_CIERRE_FASE_1_PASO_1.md) registra la ejecución verificada. La libreta [`01_auditoria_piloto_dicoms.ipynb`](notebooks/01_auditoria_piloto_dicoms.ipynb) se limita a orquestar ese control.
+
+El [paso 2 de la Fase 1](docs/09_FASE_1_PASO_2.md) verifica el contrato de 1,916 adquisiciones basales, distingue una descarga pendiente de una ausencia real, audita por contenido los paquetes ya disponibles y genera lotes privados para descarga selectiva. La libreta [`02_inventario_adquisiciones.ipynb`](notebooks/02_inventario_adquisiciones.ipynb) orquesta el módulo versionado sin incluir datos privados ni lógica científica duplicada.
 
 ## Empezar la fase 0
 
