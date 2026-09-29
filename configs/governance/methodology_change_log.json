@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "registry_version": "1.0",
+  "registry_version": "1.1",
   "status": "approved_control_mechanism",
   "date": "2026-09-27",
   "governing_document": "docs/03_CONTROL_CAMBIOS_METODOLOGICOS.md",
@@ -88,6 +88,82 @@
         ],
         "verification": "Scope contract tests pass; estimated KL output is marked removed from scope.",
         "remaining_action": "Researcher will update chapter I Word document."
+      }
+    },
+    {
+      "id": "MCR-2026-002",
+      "title": "Ampliar de forma preespecificada los candidatos radiograficos y la fusion multimodal",
+      "record_kind": "prospective",
+      "registered_at": "2026-09-28",
+      "proponent": "researcher",
+      "impact_class": "M3",
+      "status": "implementada_y_verificada",
+      "affected_rules": ["INV-MOD-001", "INV-FUS-001", "INV-TST-001", "INV-REP-001"],
+      "problem": "DenseNet121 y ViT-B/16 conservan valor como comparadores, pero por si solos no representan el conjunto actual de estrategias reproducibles de transferencia para radiografias musculoesqueleticas. El presupuesto de Colab permite una evaluacion mas amplia, aunque el tamano muestral exige limitar y preespecificar los candidatos.",
+      "proposed_change": "Mantener los modelos comprometidos como lineas base y agregar un registro cerrado de candidatos modernos: ConvNeXt V2 Tiny, DINOv3 ViT-S/16 y SKELEX para la rama radiografica; concatenacion y fusion intermedia con compuertas o FiLM para el escenario multimodal. Evaluar como analisis complementario una variante bilateral con atencion cruzada usando el mejor codificador elegible. Seleccionar y promover modelos solo con predicciones fuera de pliegue del desarrollo agrupadas por participante; conservar cerrada la prueba reservada.",
+      "evidence": [
+        "La literatura directamente relacionada demuestra viabilidad de combinar radiografia basal y datos clinicos para progresion de artrosis, pero no garantiza que toda fusion multimodal mejore al modelo radiografico.",
+        "SKELEX publica codigo y pesos de un modelo fundacional especifico para radiografias musculoesqueleticas; ConvNeXt V2 y DINOv3 publican implementaciones y pesos preentrenados reproducibles.",
+        "La evidencia de progresion a 48 meses respalda evaluar informacion bilateral con atencion cruzada, pero esta entrada adicional debe permanecer complementaria para no sustituir silenciosamente el escenario principal por rodilla.",
+        "La disponibilidad de computo no elimina el riesgo de sobreajuste ni de sesgo por multiples comparaciones en una cohorte de tamano moderado."
+      ],
+      "alternatives": [
+        {
+          "name": "Conservar solo DenseNet121 y ViT-B/16",
+          "decision": "rejected",
+          "reason": "Es reproducible, pero desaprovecha representaciones auto-supervisadas y especializadas disponibles antes del entrenamiento."
+        },
+        {
+          "name": "Probar sin limite toda arquitectura disponible",
+          "decision": "rejected",
+          "reason": "Aumenta comparaciones, costo de trazabilidad y riesgo de seleccionar ruido del desarrollo sin aportar una hipotesis arquitectonica clara."
+        },
+        {
+          "name": "Comparacion cerrada por etapas con lineas base y candidatos modernos",
+          "decision": "selected",
+          "reason": "Aprovecha el presupuesto sin sacrificar comparabilidad, reproducibilidad ni proteccion de la prueba."
+        }
+      ],
+      "impact": {
+        "chapter_1": "none",
+        "chapter_2": "Actualizar posteriormente antecedentes tecnologicos solo con fuentes finalmente utilizadas.",
+        "chapter_3": "Actualizar antes de la entrega final las familias candidatas, la seleccion por etapas y la fusion intermedia, sin cambiar poblacion, predictores principales ni desenlace.",
+        "objectives": "none",
+        "hypotheses": "none",
+        "cohort_and_outcome": "none",
+        "comparisons_and_statistics": "Amplia candidatos dentro de desarrollo; mantiene escenarios, particiones, AP primaria, contrastes confirmatorios y prueba unica.",
+        "prototype": "Consumira exclusivamente el paquete de inferencia finalmente congelado; no agrega grado KL ni otra salida.",
+        "time_compute_data": "Aumenta ensayos de factibilidad y ajuste fino; requiere registrar GPU, VRAM, tiempo, pesos de origen y licencia.",
+        "bias_or_leakage": "Riesgo de seleccion multiple controlado por registro cerrado, misma validacion agrupada, promocion predefinida y prohibicion de consultar la prueba."
+      },
+      "test_block_consulted_before_decision": false,
+      "approval": {
+        "decision": "aprobada",
+        "approved_by": "researcher",
+        "date": "2026-09-28",
+        "approved_scope": "Agregar todos los candidatos considerados necesarios por la evaluacion tecnica, usando las mejores tecnicas reproducibles y Colab Pro, sin salir del alcance multimodal longitudinal ni abrir la prueba reservada.",
+        "conditions": [
+          "DenseNet121 y ViT-B/16 permanecen como lineas base obligatorias.",
+          "Los candidatos adicionales quedan cerrados en un registro versionado antes de entrenar.",
+          "SKELEX y DINOv3 requieren verificacion documentada de acceso, licencia, pesos e integracion antes de ser elegibles.",
+          "El analisis bilateral es complementario y depende de lateralidad y pares validos confirmados en la Fase 1.",
+          "No se autoriza entrenamiento ni apertura de la prueba mediante esta decision."
+        ]
+      },
+      "implementation": {
+        "applied": true,
+        "applied_at": "2026-09-28",
+        "artifacts": [
+          "configs/model_registry.json",
+          "configs/governance/scope_contract.json",
+          "docs/01_REGLAS_INVARIABLES.md",
+          "docs/06_ESTRATEGIA_MODELOS.md",
+          "docs/PLAN_DE_IMPLEMENTACION.md",
+          "docs/DECISIONES.md",
+          "tests/test_model_registry.py",
+          "tests/test_scope_contract.py"
+        ],
+        "verification": "Registry, scope and methodological guardrail tests pass; the reserved test remains closed and training_authorized remains false."
       }
     }
   ]

@@ -1,9 +1,9 @@
 {
   "schema_version": "1.0",
-  "contract_version": "1.0",
+  "contract_version": "1.2",
   "status": "approved_by_researcher",
-  "approval_date": "2026-09-27",
-  "approved_scope_contract_version": "1.1",
+  "approval_date": "2026-09-28",
+  "approved_scope_contract_version": "1.2",
   "sources": {
     "chapters_1_and_2": "SRC-THESIS-001",
     "chapter_3": "SRC-THESIS-002",
@@ -55,12 +55,29 @@
   },
   "model_families": {
     "clinical": ["regularized_logistic_regression", "xgboost", "mlp"],
-    "radiographic": ["densenet121", "vit_b_16"],
-    "multimodal_primary": "intermediate_fusion",
+    "radiographic": [
+      "densenet121",
+      "vit_b_16",
+      "convnext_v2_tiny",
+      "dinov3_vits16",
+      "skelex_vit_mae"
+    ],
+    "radiographic_mandatory_baselines": ["densenet121", "vit_b_16"],
+    "radiographic_modern_challengers": [
+      "convnext_v2_tiny",
+      "dinov3_vits16",
+      "skelex_vit_mae"
+    ],
+    "radiographic_complementary": "bilateral_cross_attention_with_selected_encoder",
+    "multimodal_primary": [
+      "intermediate_concatenation",
+      "intermediate_gated_film"
+    ],
     "multimodal_complementary": "late_fusion_fixed_mean_0.5_0.5"
   },
   "images": {
     "input_size": [224, 224],
+    "promoted_model_resolution_sensitivity": [384, 384],
     "region": "tibiofemoral",
     "laterality_specific": true
   },
@@ -78,6 +95,8 @@
     "primary_metric": "average_precision_score",
     "display_name": "PR-AUC (AP)",
     "computed_on": "development_out_of_fold_predictions",
+    "candidate_registry": "configs/model_registry.json",
+    "modern_candidate_promotion": "development_only_predefined_screening",
     "test_driven_selection_forbidden": true,
     "near_tie_ap_difference_below": 0.01,
     "tie_break_order": ["roc_auc", "brier_score"]
@@ -140,6 +159,13 @@
       "decision": "remove_estimated_kl_output_from_chapter_1_and_prototype",
       "chapter_1_word_update_pending": true,
       "chapter_1_word_update_owner": "researcher"
+    },
+    {
+      "id": "RES-MOD-001",
+      "date": "2026-09-28",
+      "decision": "expand_predefined_model_candidates_under_MCR-2026-002",
+      "chapter_3_word_update_pending": true,
+      "chapter_3_word_update_owner": "researcher"
     }
   ],
   "pending_blockers": ["PEND-DATA-001", "PEND-PILOT-001"],

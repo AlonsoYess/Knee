@@ -6,17 +6,17 @@
 | --- | --- |
 | Documento | Reglas metodológicas invariables y mecanismos de cumplimiento |
 | Estado | Aprobado por el investigador; vigente |
-| Versión | 1.0 |
-| Fecha de aprobación | 27 de septiembre de 2026 |
+| Versión | 1.2 |
+| Fecha de aprobación | 28 de septiembre de 2026 |
 | Paso | Fase 0, paso 2 |
 | Contrato rector | `docs/00_ALCANCE_Y_TRAZABILIDAD.md`, versión 1.1 |
 | Contrato ejecutable | `configs/governance/scope_contract.json` |
 | Destino de respaldo | Drive privado autorizado; ubicación exacta en el inventario privado |
-| Estado del respaldo | Versión 1.0 y contrato JSON 1.0 sincronizados, verificados y privados en Google Drive |
+| Estado del respaldo | Versión 1.2, contrato JSON 1.2 y registro de modelos 1.0 sincronizados y privados en Google Drive |
 
 ## 1. Finalidad
 
-Este documento traduce el alcance aprobado y el Capítulo III en reglas con identificadores estables. Su propósito es que cada fase futura pueda demostrar, mediante configuración, pruebas, bitácoras y artefactos, que continúa dentro de la tesis. No agrega un experimento, no cambia un modelo y no autoriza entrenamiento.
+Este documento traduce el alcance aprobado y el Capítulo III en reglas con identificadores estables. Su propósito es que cada fase futura pueda demostrar, mediante configuración, pruebas, bitácoras y artefactos, que continúa dentro de la tesis. La versión 1.1 incorpora la ampliación prospectiva aprobada en `MCR-2026-002`; no autoriza entrenamiento.
 
 Las reglas se dividen en tres clases:
 
@@ -37,8 +37,8 @@ Las reglas se dividen en tres clases:
 | `INV-CLIN-001` | Los predictores clínicos principales son edad, sexo e IMC de V00. | Mantiene la comparación prometida. Agregar variables al análisis principal requiere control de cambios. |
 | `INV-RAD-001` | La entrada radiográfica principal es el recorte tibiofemoral de la rodilla correspondiente obtenido de la radiografía bilateral PA con flexión fija de V00. | Conserva modalidad, visita, región anatómica y lateralidad. El manifiesto de recortes documentará su trazabilidad. |
 | `INV-COH-001` | Clínico, radiográfico y multimodal se comparan sobre la misma cohorte común y las mismas particiones. | Impide ventajas por muestras distintas. Cada tabla comparativa incluirá el mismo identificador de cohorte y partición. |
-| `INV-MOD-001` | El escenario clínico evalúa regresión logística, XGBoost y MLP; el radiográfico evalúa DenseNet121 y ViT-B/16. | Son las familias comprometidas en el Capítulo III. Una sustitución requiere aprobación previa. |
-| `INV-FUS-001` | La fusión intermedia es el enfoque multimodal principal; la fusión tardía es complementaria. | Evita reemplazar el contraste principal por el resultado complementario más favorable. |
+| `INV-MOD-001` | El escenario clínico evalúa regresión logística, XGBoost y MLP. El radiográfico conserva DenseNet121 y ViT-B/16 como líneas base obligatorias y agrega ConvNeXt V2 Tiny, DINOv3 ViT-S/16 y SKELEX como candidatos modernos registrados. | `MCR-2026-002` amplía candidatos sin cambiar cohorte, entrada, desenlace ni prueba. Ninguna arquitectura no registrada puede agregarse por resultados favorables. |
+| `INV-FUS-001` | La fusión intermedia es el enfoque multimodal principal y compara concatenación con compuertas o FiLM. La fusión tardía fija es complementaria. | Evita reemplazar el contraste principal por el resultado complementario más favorable y preespecifica las variantes principales. |
 | `INV-KLR-001` | La variante clínica que agrega KL basal es solo una referencia complementaria; no reemplaza al escenario clínico principal ni se incorpora silenciosamente al multimodal principal. | Preserva la pregunta sobre imagen más edad, sexo e IMC y evita una comparación circular o alterada. |
 | `INV-SPLIT-001` | La semilla de partición es 2026; el bloque 0 contiene aproximadamente 20 % de participantes y queda reservado como prueba. | Hace reproducible la separación y protege la evaluación final. El manifiesto deberá probar disyunción por participante. |
 | `INV-CV-001` | La selección se realiza exclusivamente en desarrollo mediante validación cruzada estratificada y agrupada de cinco pliegues. El bloque 0 no participa en ella. | Evita fuga y optimismo. Las asignaciones de pliegue serán persistidas y auditadas. |
@@ -61,11 +61,22 @@ Estas decisiones pueden mejorarse sin cambiar la pregunta de investigación, per
 - tasas de aprendizaje, tamaño de lote, regularización, número de capas descongeladas y eficiencia de ejecución;
 - hiperparámetros dentro del presupuesto predefinido y reducción justificada del espacio de búsqueda por capacidad de cómputo;
 - organización interna del código, automatización, formatos de artefactos y precisión mixta;
-- elección del candidato ganador dentro de cada familia comprometida, aplicando la regla de selección de desarrollo.
+- elección del candidato ganador dentro del registro cerrado, aplicando la regla de selección de desarrollo;
+- precisión mixta, acumulación de gradiente, calentamiento, programación cosenoidal, descongelamiento gradual y decaimiento de tasa por capas conforme al registro de modelos.
 
-Estas libertades no autorizan cambiar arquitectura comprometida, resolución, entradas principales, pérdida, estrategia de partición, métrica principal, calibración, umbral o contrastes. Cualquiera de esos cambios entra al proceso de aprobación de la sección 7.
+Estas libertades no autorizan agregar otra arquitectura, cambiar entradas principales, pérdida, estrategia de partición, métrica principal, calibración, umbral o contrastes. La sensibilidad a 384 × 384 está aprobada solo para candidatos promovidos dentro de desarrollo. Cualquier otra resolución o familia entra al proceso de aprobación de la sección 7.
 
-## 4. Decisión resuelta: salida de KL estimado
+## 4. Decisiones resueltas
+
+### 4.1 Estrategia de modelos
+
+| ID | Decisión | Fundamento | Consecuencia obligatoria |
+| --- | --- | --- | --- |
+| `RES-MOD-001` | Ampliar de forma cerrada los candidatos radiográficos y la fusión intermedia mediante `MCR-2026-002`. | Existen pesos y métodos modernos reproducibles, y el presupuesto permite evaluarlos; el tamaño de la cohorte exige limitar la búsqueda y proteger la prueba. | Aplicar `configs/model_registry.json`, mantener las líneas base, promover como máximo dos candidatos modernos solo con desarrollo y revisar licencias antes de cargar pesos. |
+
+La actualización del archivo Word del capítulo III permanece pendiente y será realizada posteriormente por el investigador. El código y la tesis final deberán describir únicamente los candidatos realmente ejecutados.
+
+### 4.2 Salida de KL estimado
 
 | ID | Decisión | Fundamento | Consecuencia obligatoria |
 | --- | --- | --- | --- |
@@ -84,7 +95,8 @@ La decisión fue tomada expresamente por el investigador el 27 de septiembre de 
 
 | Mecanismo | Función | Estado en este paso |
 | --- | --- | --- |
-| `configs/governance/scope_contract.json` | Fuente legible por código de los compromisos, decisiones y bloqueos. | Aprobado como versión 1.0. |
+| `configs/governance/scope_contract.json` | Fuente legible por código de los compromisos, decisiones y bloqueos. | Aprobado como versión 1.2. |
+| `configs/model_registry.json` | Define candidatos, elegibilidad, promoción, técnicas y prohibiciones del modelado. | Aprobado como versión 1.0 bajo `MCR-2026-002`; no autoriza entrenamiento. |
 | `tests/test_scope_contract.py` | Detecta eliminación o cambio silencioso de valores críticos. | Creado; debe aprobarse antes de cerrar el paso. |
 | Manifiesto privado de cohorte/particiones | Prueba unidad, lateralidad, elegibilidad, exclusiones y ausencia de cruce entre grupos. | Se construirá en fases 1 y 2. |
 | Registro de ejecución | Une código, datos, configuración, entorno, semillas y artefactos. | Estructura inicial existente; se ampliará antes de entrenar. |

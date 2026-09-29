@@ -94,8 +94,31 @@ class ScopeContractTest(unittest.TestCase):
         )
         self.assertEqual(calibration["threshold_rule"], "youden_index")
 
+    def test_approved_model_expansion_is_closed_and_traceable(self):
+        families = self.contract["model_families"]
+        self.assertEqual(
+            set(families["radiographic_mandatory_baselines"]),
+            {"densenet121", "vit_b_16"},
+        )
+        self.assertEqual(
+            set(families["radiographic_modern_challengers"]),
+            {"convnext_v2_tiny", "dinov3_vits16", "skelex_vit_mae"},
+        )
+        self.assertEqual(
+            set(families["multimodal_primary"]),
+            {"intermediate_concatenation", "intermediate_gated_film"},
+        )
+        self.assertEqual(
+            self.contract["selection"]["candidate_registry"],
+            "configs/model_registry.json",
+        )
+        self.assertEqual(
+            self.contract["images"]["promoted_model_resolution_sensitivity"],
+            [384, 384],
+        )
+
     def test_safety_gates_remain_closed(self):
-        self.assertEqual(self.contract["contract_version"], "1.0")
+        self.assertEqual(self.contract["contract_version"], "1.2")
         self.assertEqual(self.contract["status"], "approved_by_researcher")
         self.assertFalse(self.contract["training_authorized"])
         self.assertEqual(
@@ -114,6 +137,13 @@ class ScopeContractTest(unittest.TestCase):
         )
         self.assertTrue(kl_decision["chapter_1_word_update_pending"])
         self.assertEqual(kl_decision["chapter_1_word_update_owner"], "researcher")
+        model_decision = next(
+            item
+            for item in self.contract["resolved_decisions"]
+            if item["id"] == "RES-MOD-001"
+        )
+        self.assertTrue(model_decision["chapter_3_word_update_pending"])
+        self.assertEqual(model_decision["chapter_3_word_update_owner"], "researcher")
         self.assertFalse(self.contract["prototype"]["diagnostic_use"])
         self.assertFalse(
             self.contract["reporting"]["peruvian_population_generalization_allowed"]

@@ -20,6 +20,8 @@ La [estructura maestra de Drive y el inventario de fuentes](docs/02_ESTRUCTURA_D
 
 El [control de cambios metodológicos](docs/03_CONTROL_CAMBIOS_METODOLOGICOS.md), aprobado como versión 1.0, exige registrar y aprobar cualquier propuesta antes de aplicarla. Incluye una [plantilla controlada](docs/templates/SOLICITUD_CAMBIO_METODOLOGICO.md), un [registro JSON](configs/governance/methodology_change_log.json) y una validación automática que bloquea propuestas incompletas, no aprobadas o influenciadas por la prueba reservada.
 
+La [estrategia de modelos](docs/06_ESTRATEGIA_MODELOS.md) y su [registro ejecutable](configs/model_registry.json) conservan las líneas base del Capítulo III y preespecifican los candidatos modernos, sus puertas de elegibilidad y su selección exclusivamente en desarrollo. Su aprobación prepara el modelado, pero no adelanta el entrenamiento ni abre la prueba.
+
 ## Empezar la fase 0
 
 La [guía de arranque](docs/FASE_0.md) indica cómo organizar Drive y ejecutar la [libreta de Colab](notebooks/00_arranque_colab.ipynb). La libreta solo orquesta una revisión versionada del repositorio: monta Drive, instala el paquete, ejecuta sus pruebas y llama a los comandos de auditoría. La lógica científica permanece en `src/knee`. La auditoría compara el CSV de 21 columnas con el manifiesto y guarda recuentos agregados, huellas SHA-256 y el commit ejecutado. El [registro de decisiones](docs/DECISIONES.md) conserva los asuntos pendientes.

@@ -20,7 +20,7 @@ class MethodologyChangeControlTest(unittest.TestCase):
 
     def test_controlled_registry_is_valid_but_authorizes_no_new_change(self):
         self.assertEqual(validate_registry(self.registry), [])
-        self.assertEqual(self.registry["registry_version"], "1.0")
+        self.assertEqual(self.registry["registry_version"], "1.1")
         self.assertEqual(self.registry["status"], "approved_control_mechanism")
         self.assertEqual(
             self.registry["mechanism_approval"]["approved_by"],
@@ -30,17 +30,21 @@ class MethodologyChangeControlTest(unittest.TestCase):
             proposal_is_authorized(self.registry, "MCR-2026-001"),
             "A verified historical decision must not authorize another implementation.",
         )
+        self.assertFalse(
+            proposal_is_authorized(self.registry, "MCR-2026-002"),
+            "A verified prospective change must not authorize another implementation.",
+        )
         self.assertFalse(self.registry["training_authorized"])
 
     def test_approved_not_applied_is_the_only_authorization_state(self):
         registry = copy.deepcopy(self.registry)
         proposal = registry["proposals"][0]
-        proposal["id"] = "MCR-2026-002"
+        proposal["id"] = "MCR-2026-999"
         proposal["record_kind"] = "prospective"
         proposal["status"] = "aprobada_no_aplicada"
         proposal["implementation"] = {"applied": False}
         self.assertEqual(validate_registry(registry), [])
-        self.assertTrue(proposal_is_authorized(registry, "MCR-2026-002"))
+        self.assertTrue(proposal_is_authorized(registry, "MCR-2026-999"))
 
     def test_missing_researcher_approval_blocks_proposal(self):
         registry = copy.deepcopy(self.registry)

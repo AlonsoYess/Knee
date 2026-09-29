@@ -145,6 +145,10 @@ La herramienta `knee-change-check` validará el registro y, cuando se indique un
 
 Este antecedente no permite registrar retroactivamente futuros cambios como práctica ordinaria.
 
+## 8.1 Primera propuesta prospectiva aplicada
+
+`MCR-2026-002` registra la decisión del investigador del 28 de septiembre de 2026 de ampliar, antes del entrenamiento, los candidatos radiográficos y de fusión multimodal. La propuesta conserva las líneas base del Capítulo III, agrega un registro cerrado de modelos modernos, mantiene intactos población, predictores, desenlace, particiones, métricas y prueba reservada, y exige revisión de licencias y pesos. Esta decisión no autoriza entrenamiento: únicamente autoriza actualizar contrato, reglas, estrategia, configuración y pruebas que preparan las fases posteriores.
+
 ## 9. Condición de cierre de la Fase 0, paso 4
 
 El paso se cerrará cuando:

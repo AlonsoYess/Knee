@@ -65,7 +65,9 @@ Con semilla 2026, asignar participantes a cinco bloques aproximadamente equilibr
 
 **Cuándo:** 15 al 31 de octubre en el cronograma; puede solaparse con la fase clínica.
 
-**Trabajo:** hacer un ensayo corto en Colab Pro para medir tiempo, VRAM y tamaño de lote. Entrenar DenseNet121 y ViT-B/16 con pesos preentrenados, recortes de 224 × 224, primero con codificador congelado y después con ajuste fino acotado. Aplicar aumentos moderados solo en entrenamiento. Limitar la búsqueda a ocho configuraciones por codificador, máximo 60 épocas y parada temprana de ocho épocas, sujeto al presupuesto real registrado. Seleccionar por PR-AUC media agrupada en desarrollo; entrenar la configuración neuronal seleccionada con semillas 2026, 2027 y 2028.
+**Trabajo:** hacer un ensayo corto en Colab Pro para medir tiempo, VRAM y tamaño de lote. DenseNet121 y ViT-B/16 se mantienen como líneas base obligatorias a 224 × 224. El registro aprobado agrega ConvNeXt V2 Tiny, DINOv3 ViT-S/16 y SKELEX. Antes de cargar pesos se verifican licencia, acceso, riesgo de solapamiento de preentrenamiento, carga determinista y compatibilidad. Los candidatos modernos pasan primero por sonda lineal o codificador congelado; como máximo dos se promueven al ajuste fino controlado, sin eliminar las líneas base. Para los promovidos se permite una sensibilidad a 384 × 384 dentro de desarrollo.
+
+Aplicar aumentos radiográficamente seguros solo en entrenamiento después de congelarlos con el control visual de la Fase 1. Usar AdamW, precisión mixta, calentamiento y decaimiento cosenoidal; comparar descongelamiento gradual, decaimiento de tasa por capas y ajuste completo cuando corresponda. Mantener máximo 60 épocas y parada temprana de ocho épocas. Seleccionar por PR-AUC media agrupada en desarrollo y ejecutar finalistas neuronales con semillas 2026, 2027 y 2028. La variante bilateral con atención cruzada es complementaria y depende de que la Fase 1 confirme pares y lateralidad.
 
 **Entrega y cierre:** pesos y predicciones fuera de pliegue guardados fuera de GitHub, curvas, parámetros, consumo de recursos y verificación de que cada predicción de validación proviene de un codificador que no vio a ese participante.
 
@@ -73,7 +75,7 @@ Con semilla 2026, asignar participantes a cinco bloques aproximadamente equilibr
 
 **Cuándo:** 1 al 6 de noviembre en el cronograma.
 
-**Trabajo:** implementar la fusión intermedia de representación radiográfica y rama densa clínica (edad, sexo e IMC). Reutilizar por pliegue solo pesos visuales entrenados sin los participantes de validación de ese pliegue. Comparar, como análisis complementario, una fusión tardía con promedio fijo 0,5/0,5 de las probabilidades clínica y radiográfica. Mantener la misma cohorte y particiones en los tres escenarios principales. Limitar la búsqueda de fusión intermedia a ocho configuraciones y documentar si el presupuesto obliga a reducirla.
+**Trabajo:** implementar dos candidatos de fusión intermedia entre la representación radiográfica seleccionada y la rama clínica de edad, sexo e IMC: concatenación y compuertas o FiLM. Reutilizar por pliegue solo pesos visuales entrenados sin los participantes de validación de ese pliegue. Comparar, como análisis complementario, una fusión tardía con promedio fijo 0,5/0,5 de las probabilidades clínica y radiográfica. Mantener la misma cohorte y particiones en los tres escenarios principales. El registro cerrado y la selección por desarrollo, no el presupuesto disponible, limitan las variantes admisibles.
 
 **Entrega y cierre:** predicciones fuera de pliegue, selección del multimodal basada solo en desarrollo, comparación provisional y registro de todos los candidatos. Un resultado inferior del multimodal también se conserva y se reporta.
 
@@ -126,3 +128,4 @@ Revisar el prototipo con el traumatólogo mediante los casos autorizados y la fi
 | Resultado multimodal sin mejora | Reportar el contraste y las limitaciones sin cambiar modelos usando la prueba. |
 | Ausencia de datos peruanos longitudinales | Mantener la evaluación interna OAI y la valoración del especialista separadas; no llamarlas validación externa. |
 | Persistencia de la promesa de KL estimado en una versión documental | Aplicar `RES-KL-001`: retirar esa promesa sin añadir otro modelo; el investigador corregirá posteriormente el apartado 1.5.2 del Word. |
+| Pesos modernos con acceso o licencia incompatibles | Marcar el candidato como no elegible antes del cribado, conservar la evidencia y continuar con los candidatos autorizados restantes. |
