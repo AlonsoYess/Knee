@@ -24,6 +24,7 @@ PARAMETERS = {
     "expected_unique_studies": 2,
     "algorithm_version": "test_algorithm",
     "search_band": [0.40, 0.60],
+    "boundary_guard_fraction": 0.01,
     "vertical_analysis_band": [0.15, 0.85],
     "smoothing_fraction": 0.015,
     "intensity_weight": 0.70,
@@ -86,6 +87,26 @@ class BilateralSeparationTest(unittest.TestCase):
         result = estimate_bilateral_split(normalized, PARAMETERS)
         self.assertLess(abs(result["split_fraction"] - 0.5), 0.025)
         self.assertGreater(result["half_width_ratio"], 0.9)
+        self.assertFalse(result["boundary_guard_triggered"])
+
+    def test_search_boundary_candidate_requires_human_review(self):
+        rows, columns = 400, 600
+        profile = np.linspace(0.25, 0.85, columns, dtype=np.float32)
+        normalized = np.repeat(profile[np.newaxis, :], rows, axis=0)
+        normalized[:, 354:360] = 0.0
+        parameters = {
+            **PARAMETERS,
+            "smoothing_fraction": 0.001,
+            "intensity_weight": 1.0,
+            "gradient_weight": 0.0,
+            "center_penalty": 0.0,
+        }
+
+        result = estimate_bilateral_split(normalized, parameters)
+
+        self.assertTrue(result["boundary_guard_triggered"])
+        self.assertEqual(result["confidence_level"], "LOW")
+        self.assertEqual(result["technical_status"], "REVIEW_REQUIRED_BOUNDARY")
 
     def test_monochrome_one_is_inverted_only_in_the_working_copy(self):
         original = synthetic_bilateral()

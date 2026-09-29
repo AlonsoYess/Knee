@@ -16,6 +16,8 @@ El punto medio geométrico se conserva como referencia, pero no se acepta de for
 4. una penalización leve por alejarse del centro;
 5. controles de equilibrio entre los anchos resultantes, prominencia del valle y confianza.
 
+La primera ejecución del piloto mostró una separación visualmente aceptable cuyo punto candidato quedó prácticamente en el límite superior de la banda de búsqueda. Aunque la anatomía no fue cortada, la versión inicial la clasificó como confianza alta. Antes de congelar la regla se incorporó una guarda del 1 % del ancho total en ambos límites de la banda: todo corte dentro de esa zona se marca como `REVIEW_REQUIRED_BOUNDARY` y confianza `LOW`, sin modificar automáticamente la línea ni excluir el estudio. Esta mejora fortalece el control de incertidumbre previsto en la metodología; no cambia la población, la entrada, el desenlace ni la tarea predictiva.
+
 La imagen nativa y su profundidad se conservan. Para estimar la línea y generar la vista de control se crea una copia de trabajo normalizada entre los percentiles 1 y 99. `MONOCHROME1` se invierte solo en esa copia; `MONOCHROME2` no se invierte. El resultado de este paso son dos campos bilaterales potenciales, no los recortes articulares del paso 4.
 
 La literatura confirma que dividir radiografías bilaterales OAI por el centro es una referencia utilizada en trabajos previos, pero también muestra que la localización anatómica supervisada exige modelos y anotaciones adicionales. Un estudio reciente informa que una localización determinista basada en intensidad puede ser robusta y no requiere anotaciones ni entrenamiento. Estas fuentes respaldan la comparación técnica, pero no sustituyen nuestra validación piloto:
@@ -45,7 +47,7 @@ El comando `knee-bilateral-pilot`:
 2. crea alias `case_001` a `case_010` para que la revisión no muestre identificadores;
 3. estima una línea de separación con parámetros versionados;
 4. genera vistas PNG con la línea candidata y la correspondencia propuesta;
-5. clasifica la confianza como `HIGH` o `LOW`, sin convertir una confianza baja en exclusión automática;
+5. clasifica la confianza como `HIGH` o `LOW`; una línea cercana al límite de búsqueda se deriva obligatoriamente a revisión, sin convertir una confianza baja en exclusión automática;
 6. genera una planilla de revisión ciega y conserva por separado el mapa privado entre alias y adquisición;
 7. registra de forma explícita que no leyó el desenlace, no procesó masivamente, no entrenó y no abrió la prueba.
 
@@ -90,4 +92,4 @@ El paso 3 podrá cerrarse solo cuando:
 
 ## Estado
 
-**Preparado para ejecución del piloto en Colab.** El código, la configuración, las pruebas y la libreta están listos. El paso no está cerrado: falta ejecutar la libreta sobre los diez DICOM privados y revisar visualmente sus resultados.
+**Piloto ejecutado una vez y ajuste de control preparado.** Las diez líneas fueron visualmente aceptables y la lateralidad propuesta fue respaldada por marcadores o anatomía. Antes de congelar parámetros debe repetirse la libreta con `bilateral_split_v0.2_pilot`, que añade la guarda de límites detectada durante el piloto, y después registrar formalmente la revisión ciega. El paso permanece abierto; no se ha ejecutado procesamiento masivo, entrenamiento ni apertura de la prueba reservada.

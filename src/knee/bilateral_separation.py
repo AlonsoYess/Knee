@@ -37,6 +37,8 @@ PRIVATE_RESULT_FIELDS = (
     "image_left_width",
     "image_right_width",
     "half_width_ratio",
+    "search_boundary_distance_fraction",
+    "boundary_guard_triggered",
     "valley_prominence",
     "confidence_score",
     "confidence_level",
@@ -158,6 +160,13 @@ def estimate_bilateral_split(
     right_width = columns - split_column
     half_width_ratio = min(left_width, right_width) / max(left_width, right_width)
     midpoint_offset_fraction = abs(split_column - midpoint) / columns
+    split_fraction = split_column / columns
+    boundary_distance = min(
+        split_fraction - search_low,
+        search_high - split_fraction,
+    )
+    boundary_guard = float(parameters["boundary_guard_fraction"])
+    boundary_guard_triggered = boundary_distance <= boundary_guard
 
     minimum_ratio = float(parameters["minimum_half_width_ratio"])
     minimum_prominence = float(parameters["minimum_valley_prominence"])
@@ -174,20 +183,29 @@ def estimate_bilateral_split(
     high_confidence = (
         half_width_ratio >= minimum_ratio
         and confidence_score >= float(parameters["high_confidence_threshold"])
+        and not boundary_guard_triggered
     )
 
     return {
         "split_column": split_column,
-        "split_fraction": split_column / columns,
+        "split_fraction": split_fraction,
         "midpoint_column": int(round(midpoint)),
         "midpoint_offset_fraction": midpoint_offset_fraction,
         "image_left_width": left_width,
         "image_right_width": right_width,
         "half_width_ratio": half_width_ratio,
+        "search_boundary_distance_fraction": boundary_distance,
+        "boundary_guard_triggered": boundary_guard_triggered,
         "valley_prominence": valley_prominence,
         "confidence_score": confidence_score,
         "confidence_level": "HIGH" if high_confidence else "LOW",
-        "technical_status": "CANDIDATE_OK" if high_confidence else "REVIEW_REQUIRED",
+        "technical_status": (
+            "CANDIDATE_OK"
+            if high_confidence
+            else "REVIEW_REQUIRED_BOUNDARY"
+            if boundary_guard_triggered
+            else "REVIEW_REQUIRED"
+        ),
     }
 
 
@@ -292,6 +310,7 @@ def _validate_parameters(parameters: dict[str, Any]) -> None:
         "expected_unique_studies",
         "algorithm_version",
         "search_band",
+        "boundary_guard_fraction",
         "vertical_analysis_band",
         "smoothing_fraction",
         "intensity_weight",
@@ -315,6 +334,10 @@ def _validate_parameters(parameters: dict[str, Any]) -> None:
         raise ValueError("expected_unique_studies_must_be_positive")
     if int(parameters["max_preview_width"]) < 320:
         raise ValueError("max_preview_width_is_too_small_for_review")
+    search_low, search_high = (float(value) for value in parameters["search_band"])
+    boundary_guard = float(parameters["boundary_guard_fraction"])
+    if not 0.0 < boundary_guard < (search_high - search_low) / 2.0:
+        raise ValueError("invalid_boundary_guard_fraction")
 
 
 def prepare_bilateral_pilot(
@@ -442,6 +465,9 @@ def prepare_bilateral_pilot(
     successful = [record for record in records if not record["error_code"]]
     fractions = [float(record["split_fraction"]) for record in successful]
     confidences = Counter(str(record["confidence_level"]) for record in successful)
+    boundary_guard_trigger_count = sum(
+        bool(record["boundary_guard_triggered"]) for record in successful
+    )
     public_summary = {
         "status": "ready_for_blinded_review"
         if len(successful) == expected and failures == 0
@@ -451,6 +477,7 @@ def prepare_bilateral_pilot(
         "processed_unique_studies": len(successful),
         "technical_failures": failures,
         "confidence_counts": dict(sorted(confidences.items())),
+        "boundary_guard_trigger_count": boundary_guard_trigger_count,
         "split_fraction": {
             "minimum": min(fractions) if fractions else None,
             "median": float(np.median(fractions)) if fractions else None,
@@ -477,6 +504,7 @@ def prepare_bilateral_pilot(
         for key in (
             "algorithm_version",
             "search_band",
+            "boundary_guard_fraction",
             "vertical_analysis_band",
             "smoothing_fraction",
             "intensity_weight",
