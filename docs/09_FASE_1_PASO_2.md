@@ -36,9 +36,13 @@ La descarga se realizará con la cuenta autorizada del investigador en NDA. El m
 
 Cada lote se descargará primero al almacenamiento temporal de Colab. Antes de copiar un archivo a Drive, el proceso exigirá que el lote esté completo, que cada paquete contenga una imagen DICOM decodificable y que no existan rutas inesperadas, duplicados ni conflictos de contenido. Solo entonces se guardará bajo `dicom/originales/cohorte_v00/lote_NNN/`, se volverán a verificar las huellas y se actualizará el inventario. Los diez archivos ya aprobados del piloto no se descargarán de nuevo.
 
+La operación masiva se automatiza sin fusionar los lotes: el notebook `04_descarga_lotes_pendientes.ipynb` obtiene del inventario el primer lote realmente pendiente y repite secuencialmente el mismo ciclo atómico. Solicita la contraseña una sola vez, registra y limpia cada lote completado, y se detiene ante el primer fallo. Una nueva ejecución vuelve a calcular el inventario y continúa desde el primer lote pendiente, por lo que una desconexión de Colab no invalida los lotes ya aprobados. El notebook `03_descarga_selectiva_lote.ipynb` se conserva como alternativa controlada para ejecutar o diagnosticar un único lote.
+
 El usuario y el identificador de paquete se leerán de secretos de Colab. La contraseña se solicitará de forma oculta, permanecerá únicamente en un almacén efímero del entorno y será eliminada al terminar. No se pegarán ni persistirán credenciales en GitHub, Drive, notebooks, documentos o registros.
 
 La celda de autenticación puede reintentarse de forma segura dentro del mismo entorno: la carpeta temporal de registros se crea de manera idempotente. La salida ordinaria del cliente permanece oculta para no exponer rutas o identificadores; si el cliente falla, el notebook presenta únicamente un diagnóstico saneado que sustituye usuario, paquete, rutas S3, ubicaciones temporales y nombres de paquetes. Un rechazo `401` se distingue expresamente de un problema de autorización sobre el paquete.
+
+La ejecución automática genera además un registro consolidado privado con revisión Git, lotes pendientes al inicio, lotes completados, lote de detención si existiera y estado final. No guarda la contraseña ni el texto potencialmente sensible del error.
 
 Referencias operativas oficiales:
 

@@ -4,7 +4,7 @@ Proyecto de tesis de Ingeniería de Sistemas: desarrollo y evaluación de un sis
 
 ## Estado
 
-La Fase 0 está cerrada técnicamente: la cohorte tabular fue auditada en local y en Colab, y sus evidencias privadas fueron verificadas en Drive. La Fase 1 ha comenzado y su paso 1 está cerrado: el piloto DICOM fue reconciliado y auditado con diez adquisiciones únicas. El paso 2 está en curso: el inventario maestro de 1,916 adquisiciones fue ejecutado y verificado, y el primer lote de 100 paquetes fue descargado, auditado y promovido a Drive. El inventario registra 110 adquisiciones disponibles y 1,806 pendientes en los lotes 2 al 20. La inspección completa de radiografías, los recortes, las particiones definitivas, el entrenamiento y la evaluación del prototipo siguen pendientes. No se reportan métricas predictivas hasta completar los experimentos.
+La Fase 0 está cerrada técnicamente: la cohorte tabular fue auditada en local y en Colab, y sus evidencias privadas fueron verificadas en Drive. La Fase 1 ha comenzado y su paso 1 está cerrado: el piloto DICOM fue reconciliado y auditado con diez adquisiciones únicas. El paso 2 está en curso: el inventario maestro de 1,916 adquisiciones fue ejecutado y verificado, y los dos primeros lotes de 100 paquetes fueron descargados, auditados y promovidos a Drive. El inventario registra 210 adquisiciones disponibles y 1,706 pendientes en los lotes 3 al 20. La inspección completa de radiografías, los recortes, las particiones definitivas, el entrenamiento y la evaluación del prototipo siguen pendientes. No se reportan métricas predictivas hasta completar los experimentos.
 
 ## Plan de trabajo
 
@@ -26,7 +26,7 @@ El [paso 1 de la Fase 1](docs/07_FASE_1_PASO_1.md) define cómo reconciliar el m
 
 El [paso 2 de la Fase 1](docs/09_FASE_1_PASO_2.md) verifica el contrato de 1,916 adquisiciones basales, distingue una descarga pendiente de una ausencia real, audita por contenido los paquetes ya disponibles y genera lotes privados para descarga selectiva. La libreta [`02_inventario_adquisiciones.ipynb`](notebooks/02_inventario_adquisiciones.ipynb) orquesta el módulo versionado sin incluir datos privados ni lógica científica duplicada.
 
-El [avance verificado del paso 2](docs/10_AVANCE_FASE_1_PASO_2.md) documenta el inventario inicial y el mecanismo de descarga exacta con el cliente oficial de NDA. La libreta [`03_descarga_selectiva_lote.ipynb`](notebooks/03_descarga_selectiva_lote.ipynb) prepara un lote, descarga únicamente sus rutas S3, audita el contenido en almacenamiento temporal y solo promueve a Drive un lote completo y válido.
+El [avance verificado del paso 2](docs/10_AVANCE_FASE_1_PASO_2.md) documenta el inventario inicial y el mecanismo de descarga exacta con el cliente oficial de NDA. La libreta [`03_descarga_selectiva_lote.ipynb`](notebooks/03_descarga_selectiva_lote.ipynb) conserva la ejecución controlada de un lote. La libreta [`04_descarga_lotes_pendientes.ipynb`](notebooks/04_descarga_lotes_pendientes.ipynb) reanuda el inventario y procesa automáticamente todos los pendientes, manteniendo validación, evidencia y cierre independientes por lote y detención inmediata ante el primer fallo.
 
 ## Empezar la fase 0
 
