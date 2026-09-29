@@ -47,6 +47,8 @@ Se utilizará el cliente oficial `nda-tools` versión 0.7.0. Su comando `downloa
 
 La libreta `03_descarga_selectiva_lote.ipynb` implementa esta operación. El usuario y el identificador del paquete se suministran como secretos de Colab; la contraseña se solicita de forma oculta y se guarda únicamente en un almacén efímero que se elimina al terminar. Ninguna credencial se incorpora al repositorio, al notebook ni a Drive.
 
+La asignación inicial a los veinte lotes queda congelada en un archivo privado. Después de completar un lote, sus adquisiciones desaparecen de la cola pendiente, pero todos los lotes restantes conservan su número y composición originales. Esta regla evita omisiones o saltos ocasionados por una renumeración dinámica.
+
 ## Estado del paso
 
 El inventario inicial está aprobado, pero el paso 2 sigue abierto hasta completar o documentar los 1,906 pendientes. La siguiente ejecución autorizable es el lote 1. Este avance no autoriza separación bilateral masiva, recortes, particiones, entrenamiento ni apertura de la prueba reservada.

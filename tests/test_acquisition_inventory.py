@@ -151,6 +151,33 @@ class AcquisitionInventoryTest(unittest.TestCase):
         self.assertNotIn("image_10000001", public_text)
         self.assertEqual(len(rows), 3)
         self.assertEqual(rows[0]["src_subject_id"], "P1")
+        self.assertTrue((output / "plan_descarga_congelado_privado.csv").is_file())
+
+    def test_frozen_plan_keeps_batch_numbers_after_a_completed_lot(self):
+        write_archive(self.pilot / "image_10000001.tar.gz", dicom_bytes(1))
+        initial = build_inventory(
+            self.manifest,
+            [self.pilot, self.cohort],
+            expected_unique_acquisitions=3,
+            download_batch_size=1,
+        )
+        self.assertEqual(
+            [row["download_batch"] for row in initial["download_queue"]], [1, 2]
+        )
+
+        write_archive(self.cohort / "image_10000002.tar.gz", dicom_bytes(2))
+        updated = build_inventory(
+            self.manifest,
+            [self.pilot, self.cohort],
+            expected_unique_acquisitions=3,
+            download_batch_size=1,
+            batch_plan=initial["download_plan"],
+        )
+
+        self.assertEqual(len(updated["download_queue"]), 1)
+        self.assertEqual(updated["download_queue"][0]["download_batch"], 2)
+        self.assertEqual(updated["public_summary"]["remaining_batch_numbers"], [2])
+        self.assertEqual(len(updated["download_plan"]), 2)
 
     def test_manifest_mismatch_stops_before_file_audit(self):
         workbook = Workbook()

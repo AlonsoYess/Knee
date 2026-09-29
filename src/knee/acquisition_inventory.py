@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import csv
 import json
-import math
 import os
 from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor
@@ -62,6 +61,12 @@ DOWNLOAD_FIELDS = (
     "image_file",
     "local_status",
     "action_required",
+)
+DOWNLOAD_PLAN_FIELDS = (
+    "download_batch",
+    "inventory_index",
+    "acquisition_key",
+    "image_file",
 )
 UNEXPECTED_FIELDS = (
     "source",
@@ -236,12 +241,36 @@ def _classify(candidates: list[dict[str, Any]]) -> tuple[str, str, dict[str, Any
     return "DUPLICADO_PARCIALMENTE_ILEGIBLE", "REVISAR", selected
 
 
+def load_batch_plan(path: Path) -> list[dict[str, str]]:
+    with Path(path).open(newline="", encoding="utf-8-sig") as stream:
+        reader = csv.DictReader(stream, delimiter=";")
+        if not reader.fieldnames or not set(DOWNLOAD_PLAN_FIELDS).issubset(
+            reader.fieldnames
+        ):
+            raise ValueError("The frozen download plan has an invalid schema.")
+        rows = [
+            {name: str(row.get(name, "")).strip() for name in DOWNLOAD_PLAN_FIELDS}
+            for row in reader
+        ]
+    keys = [row["acquisition_key"] for row in rows]
+    urls = [row["image_file"] for row in rows]
+    if len(keys) != len(set(keys)) or len(urls) != len(set(urls)):
+        raise ValueError("The frozen download plan contains duplicate identities.")
+    for row in rows:
+        if not row["download_batch"].isdigit() or int(row["download_batch"]) < 1:
+            raise ValueError("The frozen download plan contains an invalid batch number.")
+        if canonical_package_key(row["image_file"]) != row["acquisition_key"]:
+            raise ValueError("The frozen plan key does not match its S3 URL.")
+    return rows
+
+
 def build_inventory(
     manifest_xlsx: Path,
     source_dirs: list[Path],
     expected_unique_acquisitions: int = 1916,
     download_batch_size: int = 100,
     workers: int = 4,
+    batch_plan: list[dict[str, str]] | None = None,
 ) -> dict[str, Any]:
     """Create a deterministic private inventory without reading outcome labels."""
     if download_batch_size < 1:
@@ -293,8 +322,42 @@ def build_inventory(
             download_queue.append(item)
         inventory.append(item)
 
-    for position, item in enumerate(download_queue):
-        item["download_batch"] = 1 + position // download_batch_size
+    expected_by_key = {row["acquisition_key"]: row for row in expected}
+    plan_by_key: dict[str, dict[str, str]] = {}
+    if batch_plan:
+        for row in batch_plan:
+            key = row["acquisition_key"]
+            if key not in expected_by_key:
+                raise ValueError("The frozen download plan contains an unexpected key.")
+            if row["image_file"] != expected_by_key[key]["image_file"]:
+                raise ValueError("The frozen download plan no longer matches the manifest.")
+            plan_by_key[key] = dict(row)
+
+    new_plan_rows: list[dict[str, str]] = []
+    unassigned: list[dict[str, Any]] = []
+    for item in download_queue:
+        planned = plan_by_key.get(str(item["acquisition_key"]))
+        if planned:
+            item["download_batch"] = int(planned["download_batch"])
+        else:
+            unassigned.append(item)
+    next_batch = max(
+        (int(row["download_batch"]) for row in plan_by_key.values()), default=0
+    )
+    for position, item in enumerate(unassigned):
+        item["download_batch"] = next_batch + 1 + position // download_batch_size
+        new_plan_rows.append(
+            {
+                "download_batch": str(item["download_batch"]),
+                "inventory_index": str(item["inventory_index"]),
+                "acquisition_key": str(item["acquisition_key"]),
+                "image_file": str(item["image_file"]),
+            }
+        )
+    frozen_plan = sorted(
+        [*plan_by_key.values(), *new_plan_rows],
+        key=lambda row: int(row["inventory_index"]),
+    )
 
     unexpected = [
         record for record in audited if str(record["manifest_key"]) not in expected_keys
@@ -308,6 +371,9 @@ def build_inventory(
     public_status = "attention_required" if attention or unexpected else (
         "complete" if not download_queue else "ready_for_selective_download"
     )
+    remaining_batches = sorted(
+        {int(row["download_batch"]) for row in download_queue}
+    )
     public_summary = {
         "status": public_status,
         "manifest_contract": contract,
@@ -316,7 +382,9 @@ def build_inventory(
         "local_status_counts": status_counts,
         "pending_download_or_replacement": len(download_queue),
         "download_batch_size": download_batch_size,
-        "download_batches": math.ceil(len(download_queue) / download_batch_size),
+        "download_batches": len(remaining_batches),
+        "remaining_batch_numbers": remaining_batches,
+        "first_pending_batch": remaining_batches[0] if remaining_batches else None,
         "unexpected_archives": len(unexpected),
         "training_executed": False,
         "reserved_test_opened": False,
@@ -329,6 +397,7 @@ def build_inventory(
         },
         "inventory": inventory,
         "download_queue": download_queue,
+        "download_plan": frozen_plan,
         "unexpected": unexpected,
         "archive_records": audited,
     }
@@ -360,6 +429,11 @@ def write_inventory(result: dict[str, Any], output_dir: Path) -> None:
         output_dir / "cola_descarga_selectiva_privada.csv",
         DOWNLOAD_FIELDS,
         result["download_queue"],
+    )
+    _write_csv(
+        output_dir / "plan_descarga_congelado_privado.csv",
+        DOWNLOAD_PLAN_FIELDS,
+        result["download_plan"],
     )
     _write_csv(
         output_dir / "archivos_inesperados_privado.csv",
@@ -402,6 +476,17 @@ def load_inventory_config(path: Path) -> dict[str, Any]:
     config.setdefault("expected_unique_acquisitions", 1916)
     config.setdefault("download_batch_size", 100)
     config.setdefault("workers", 4)
+    plan_value = config.get("download_plan_csv")
+    if plan_value:
+        if not isinstance(plan_value, str):
+            raise ValueError("download_plan_csv must be a relative path.")
+        config["download_plan_csv"] = _resolve_under_root(
+            root, plan_value, "download_plan_csv"
+        )
+    else:
+        config["download_plan_csv"] = (
+            config["output_dir"] / "plan_descarga_congelado_privado.csv"
+        )
     return config
 
 
@@ -410,12 +495,20 @@ def main() -> None:
     parser.add_argument("--config", required=True, type=Path)
     args = parser.parse_args()
     config = load_inventory_config(args.config)
+    batch_plan = None
+    if config["download_plan_csv"].is_file():
+        batch_plan = load_batch_plan(config["download_plan_csv"])
+    else:
+        legacy_queue = config["output_dir"] / "cola_descarga_selectiva_privada.csv"
+        if legacy_queue.is_file():
+            batch_plan = load_batch_plan(legacy_queue)
     result = build_inventory(
         config["manifest_xlsx"],
         config["source_dirs"],
         int(config["expected_unique_acquisitions"]),
         int(config["download_batch_size"]),
         int(config["workers"]),
+        batch_plan,
     )
     write_inventory(result, config["output_dir"])
     print(json.dumps(result["public_summary"], indent=2, ensure_ascii=False))

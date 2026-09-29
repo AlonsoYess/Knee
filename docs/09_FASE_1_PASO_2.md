@@ -27,7 +27,8 @@ Estos recuentos validan el contrato de entrada. No representan todavía la cohor
 
 6. Generar una cola privada solamente para las adquisiciones pendientes o que requieran reemplazo.
 7. Dividir la cola, en orden determinista, en lotes operativos de 100 elementos. El tamaño de lote es ajustable, solo organiza la transferencia y no modifica la muestra ni la metodología.
-8. Volver a ejecutar la misma auditoría después de cada lote. Una adquisición deja automáticamente la cola cuando su paquete legible aparece en una de las carpetas controladas.
+8. Congelar la asignación adquisición–lote antes de la primera descarga. Las adquisiciones completadas salen de la cola, pero las restantes conservan su número original y nunca se renumeran.
+9. Volver a ejecutar la misma auditoría después de cada lote. Una adquisición deja automáticamente la cola cuando su paquete legible aparece en una de las carpetas controladas.
 
 ## Descarga autorizada
 
@@ -51,6 +52,7 @@ La ejecución crea, dentro de `outputs/auditorias/fase_1/paso_2_inventario/`:
 - `resumen_inventario_publico.json`: solo recuentos agregados y estado del proceso;
 - `inventario_adquisiciones_privado.csv`: una fila por adquisición, con estado, rutas y huellas;
 - `cola_descarga_selectiva_privada.csv`: pendientes ordenados y agrupados por lote;
+- `plan_descarga_congelado_privado.csv`: asignación inmutable de las 1,906 adquisiciones pendientes iniciales a sus lotes;
 - `auditoria_archivos_privada.csv`: detalle técnico de cada paquete encontrado;
 - `archivos_inesperados_privado.csv`: archivos ubicados en las carpetas controladas que no pertenecen al manifiesto;
 - `metadatos_inventario_privado.json`: huella del manifiesto y raíces inspeccionadas;
