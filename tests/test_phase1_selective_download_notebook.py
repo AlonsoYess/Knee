@@ -35,10 +35,12 @@ class Phase1SelectiveDownloadNotebookTest(unittest.TestCase):
         self.assertNotIn("NDA_PASSWORD", self.code)
 
     def test_batch_is_audited_before_drive_promotion(self):
+        freeze_at = self.code.index("'knee.acquisition_inventory'")
         prepare_at = self.code.index("'prepare'")
         download_at = self.code.index("downloadcmd =")
         promote_at = self.code.index("'promote'")
-        inventory_at = self.code.index("'knee.acquisition_inventory'")
+        inventory_at = self.code.rindex("'knee.acquisition_inventory'")
+        self.assertLess(freeze_at, prepare_at)
         self.assertLess(prepare_at, download_at)
         self.assertLess(download_at, promote_at)
         self.assertLess(promote_at, inventory_at)
