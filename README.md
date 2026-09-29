@@ -4,7 +4,7 @@ Proyecto de tesis de Ingeniería de Sistemas: desarrollo y evaluación de un sis
 
 ## Estado
 
-La Fase 0 está cerrada técnicamente: la cohorte tabular fue auditada en local y en Colab, y sus evidencias privadas fueron verificadas en Drive. La Fase 1 ha comenzado y su paso 1 está cerrado: el piloto DICOM fue reconciliado y auditado con diez adquisiciones únicas. El paso 2 está en curso: el inventario maestro de 1,916 adquisiciones fue ejecutado y verificado; registra 10 disponibles y 1,906 pendientes organizadas en 20 lotes de descarga selectiva. La inspección completa de radiografías, los recortes, las particiones definitivas, el entrenamiento y la evaluación del prototipo siguen pendientes. No se reportan métricas predictivas hasta completar los experimentos.
+La Fase 0 está cerrada técnicamente: la cohorte tabular fue auditada en local y en Colab, y sus evidencias privadas fueron verificadas en Drive. La Fase 1 ha comenzado y su paso 1 está cerrado: el piloto DICOM fue reconciliado y auditado con diez adquisiciones únicas. El paso 2 está en curso: el inventario maestro de 1,916 adquisiciones fue ejecutado y verificado, y el primer lote de 100 paquetes fue descargado, auditado y promovido a Drive. El inventario registra 110 adquisiciones disponibles y 1,806 pendientes en los lotes 2 al 20. La inspección completa de radiografías, los recortes, las particiones definitivas, el entrenamiento y la evaluación del prototipo siguen pendientes. No se reportan métricas predictivas hasta completar los experimentos.
 
 ## Plan de trabajo
 

@@ -38,6 +38,8 @@ Cada lote se descargará primero al almacenamiento temporal de Colab. Antes de c
 
 El usuario y el identificador de paquete se leerán de secretos de Colab. La contraseña se solicitará de forma oculta, permanecerá únicamente en un almacén efímero del entorno y será eliminada al terminar. No se pegarán ni persistirán credenciales en GitHub, Drive, notebooks, documentos o registros.
 
+La celda de autenticación puede reintentarse de forma segura dentro del mismo entorno: la carpeta temporal de registros se crea de manera idempotente. La salida ordinaria del cliente permanece oculta para no exponer rutas o identificadores; si el cliente falla, el notebook presenta únicamente un diagnóstico saneado que sustituye usuario, paquete, rutas S3, ubicaciones temporales y nombres de paquetes. Un rechazo `401` se distingue expresamente de un problema de autorización sobre el paquete.
+
 Referencias operativas oficiales:
 
 - [NDA Download Manager User Guide](https://nda.nih.gov/static/docs/NDA_Download_Manager_User_Guide_v0.1.39.pdf)

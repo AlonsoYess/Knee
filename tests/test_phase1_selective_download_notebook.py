@@ -34,6 +34,15 @@ class Phase1SelectiveDownloadNotebookTest(unittest.TestCase):
         self.assertIn("shutil.rmtree(keyring_root", self.code)
         self.assertNotIn("NDA_PASSWORD", self.code)
 
+    def test_authentication_cell_is_safe_to_retry_and_sanitizes_failures(self):
+        self.assertIn("nda_log_dir.mkdir(parents=True, exist_ok=True)", self.code)
+        self.assertIn("capture_output=True", self.code)
+        self.assertIn("text=True", self.code)
+        self.assertIn("diagnostic.replace(str(nda_username), '<NDA_USERNAME>')", self.code)
+        self.assertIn("re.sub(r's3://\\S+', 's3://<RUTA_PRIVADA>'", self.code)
+        self.assertIn("'STATUS 401' in diagnostic", self.code)
+        self.assertIn("credential_stored", self.code)
+
     def test_batch_is_audited_before_drive_promotion(self):
         freeze_at = self.code.index("'knee.acquisition_inventory'")
         prepare_at = self.code.index("'prepare'")
