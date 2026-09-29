@@ -4,7 +4,7 @@ Proyecto de tesis de Ingeniería de Sistemas: desarrollo y evaluación de un sis
 
 ## Estado
 
-La Fase 0 está cerrada técnicamente. En la Fase 1 están cerrados los pasos 1 y 2: el piloto DICOM fue reconciliado con diez adquisiciones únicas y la descarga selectiva completó las 1,916 adquisiciones basales esperadas. El inventario final registra 1,916 disponibles, cero pendientes y cero archivos inesperados; los veinte lotes y sus evidencias fueron verificados en Drive. El siguiente trabajo es diseñar y validar la separación bilateral y la lateralidad sin consultar el desenlace. Los recortes masivos, las particiones definitivas, el entrenamiento y la evaluación del prototipo siguen pendientes. No se reportan métricas predictivas hasta completar los experimentos.
+La Fase 0 está cerrada técnicamente. En la Fase 1 están cerrados los pasos 1 y 2: el piloto DICOM fue reconciliado con diez adquisiciones únicas y la descarga selectiva completó las 1,916 adquisiciones basales esperadas. El inventario final registra 1,916 disponibles, cero pendientes y cero archivos inesperados; los veinte lotes y sus evidencias fueron verificados en Drive. El paso 3 ya dispone de código, configuración y libreta para validar en el piloto la separación bilateral y la lateralidad sin consultar el desenlace; todavía falta ejecutar y revisar visualmente las diez vistas antes de cerrarlo. Los recortes masivos, las particiones definitivas, el entrenamiento y la evaluación del prototipo siguen pendientes. No se reportan métricas predictivas hasta completar los experimentos.
 
 ## Plan de trabajo
 
@@ -29,6 +29,8 @@ El [paso 2 de la Fase 1](docs/09_FASE_1_PASO_2.md) verifica el contrato de 1,916
 El [avance verificado del paso 2](docs/10_AVANCE_FASE_1_PASO_2.md) documenta el inventario inicial y el mecanismo de descarga exacta con el cliente oficial de NDA. La libreta [`03_descarga_selectiva_lote.ipynb`](notebooks/03_descarga_selectiva_lote.ipynb) conserva la ejecución controlada de un lote. La libreta [`04_descarga_lotes_pendientes.ipynb`](notebooks/04_descarga_lotes_pendientes.ipynb) reanuda el inventario y procesa automáticamente todos los pendientes, manteniendo validación, evidencia y cierre independientes por lote y detención inmediata ante el primer fallo.
 
 El [cierre verificado del paso 2](docs/11_CIERRE_FASE_1_PASO_2.md) registra el inventario final completo, la verificación de los veinte lotes y el mantenimiento de los bloqueos de entrenamiento y prueba reservada. Autoriza preparar el paso 3 de control radiográfico, no iniciar entrenamiento.
+
+El [protocolo del paso 3](docs/12_FASE_1_PASO_3.md) define una separación bilateral determinista, proporcional a la resolución y con control de confianza. La libreta [`05_validacion_separacion_bilateral.ipynb`](notebooks/05_validacion_separacion_bilateral.ipynb) prepara diez vistas seudonimizadas y una planilla de revisión ciega. El paso seguirá abierto hasta validar visualmente la línea y la lateralidad y congelar los parámetros; no autoriza el procesamiento masivo.
 
 ## Empezar la fase 0
 

@@ -5,9 +5,9 @@
 | Campo | Valor |
 | --- | --- |
 | Estado | Activo |
-| Versión | 1.3 pública |
+| Versión | 1.4 pública |
 | Fecha de corte | 29 de septiembre de 2026 |
-| Ámbito | Artefactos rectores, cierre de la Fase 0 y pasos 1 y 2 de la Fase 1 |
+| Ámbito | Artefactos rectores, cierre de la Fase 0 y preparación del paso 3 de la Fase 1 |
 | Inventario exacto | Privado en Google Drive autorizado |
 
 Este archivo es el resumen publicable del control documental. El inventario privado conserva nombres de archivo completos, enlaces, identificadores de Drive, tamaños, huellas SHA-256 y ubicación exacta de cada versión. Esa evidencia no se replica en GitHub.
@@ -32,6 +32,7 @@ Este archivo es el resumen publicable del control documental. El inventario priv
 | Protocolo y avance del inventario radiográfico | Cerrados | `docs/09_FASE_1_PASO_2.md`, `docs/10_AVANCE_FASE_1_PASO_2.md` | Evidencias privadas verificadas |
 | Acta pública de cierre de la Fase 1, paso 2 | 1.0, cerrada | `docs/11_CIERRE_FASE_1_PASO_2.md` | Inventario, lotes y registros privados verificados |
 | Notebooks de inventario y descarga selectiva | Ejecutados | `notebooks/02_inventario_adquisiciones.ipynb`, `notebooks/03_descarga_selectiva_lote.ipynb`, `notebooks/04_descarga_lotes_pendientes.ipynb` | Copias aprobadas verificadas |
+| Protocolo y notebook de separación bilateral | Preparados; ejecución piloto pendiente | `docs/12_FASE_1_PASO_3.md`, `notebooks/05_validacion_separacion_bilateral.ipynb` | Código y copia controlada; evidencias visuales aún pendientes |
 
 ## Historial preservado
 
@@ -50,6 +51,7 @@ Se verificaron copias privadas del README principal, README del prototipo, plan 
 - los pasos 1 a 6 están cerrados y versionados;
 - la ejecución técnica en Colab/Drive terminó correctamente y sus dos evidencias privadas fueron contrastadas;
 - las 1,916 adquisiciones basales están disponibles y legibles, la cola está vacía y los veinte lotes conservan evidencia verificable;
+- el paso 3 cuenta con una entrada ciega al desenlace, parámetros candidatos, pruebas y una libreta limitada a las diez adquisiciones del piloto;
 - no se ejecutó entrenamiento ni se abrió el conjunto de prueba reservado.
 
 El inventario público se ampliará solo con información necesaria para reproducibilidad y gobierno. Credenciales, identificadores individuales, rutas privadas, huellas de fuentes restringidas y enlaces privados nunca se publicarán.
