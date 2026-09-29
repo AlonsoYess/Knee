@@ -1,6 +1,6 @@
 # Plan de implementación por fases
 
-Este plan convierte el Capítulo III de la tesis en trabajo ejecutable con Codex, GitHub, Google Drive y Colab Pro. Las fechas son las del cronograma metodológico y deberán ajustarse a los tiempos reales de descarga y al calendario académico. La cohorte tabular auditada al 23 de septiembre de 2026 contiene 2 778 rodillas de 1 916 participantes (473 progresoras y 2 305 no progresoras); esas cifras son el punto de partida, no el tamaño definitivo después del control de imágenes.
+Este plan convierte el Capítulo III de la tesis en trabajo ejecutable con Codex, GitHub, Google Drive y Colab Pro. Las fechas son las del cronograma metodológico y deberán ajustarse a los tiempos reales de descarga y al calendario académico. La cohorte tabular auditada es el punto de partida, no el tamaño definitivo después del control de imágenes. Sus recuentos exactos permanecen en la auditoría privada.
 
 ## Reglas que rigen todas las fases
 
@@ -16,25 +16,38 @@ Este plan convierte el Capítulo III de la tesis en trabajo ejecutable con Codex
 
 **Cuándo:** inicio inmediato, en paralelo con la obtención de imágenes.
 
-**Trabajo:** preparar la estructura `src/knee/`, `notebooks/`, `configs/`, `tests/` y `app/`; definir dependencias reproducibles y la configuración de rutas de Drive sin valores privados; registrar la procedencia de la extracción Oracle/miNDAR (paquete 1249038, consultas, versión de cohorte); establecer un inventario de archivos y una plantilla de bitácora experimental. Agregar controles de Git para impedir subir datos o credenciales por accidente.
+**Trabajo:** preparar la estructura `src/knee/`, `notebooks/`, `configs/`, `tests/` y `app/`; definir dependencias reproducibles y la configuración de rutas de Drive sin valores privados; registrar en Drive la procedencia exacta de la extracción autorizada, sus consultas y la versión de cohorte; establecer un inventario de archivos y una plantilla de bitácora experimental. Agregar controles de Git para impedir subir datos o credenciales por accidente.
 
 **Entrega y cierre:** repositorio que ejecuta comprobaciones básicas en Colab y localmente, README actualizado, configuración de ejemplo y mapa entre CSV, manifiesto y DICOM. No es necesario subir a GitHub los CSV reales ni los DICOM.
+
+### Secuencia controlada de la Fase 0
+
+| Paso | Contenido | Estado |
+| ---: | --- | --- |
+| 1 | Contrato de alcance y trazabilidad basado en capítulos I, II y III. | Cerrado. |
+| 2 | Reglas metodológicas invariables y contrato ejecutable. | Cerrado. |
+| 3 | Estructura maestra de Drive e inventario de fuentes. | Cerrado. |
+| 4 | Mecanismo para registrar, evaluar y aprobar propuestas de cambio metodológico antes de aplicarlas. | Cerrado; versión 1.0 aprobada. |
+| 5 | Frontera reproducible GitHub–Colab–Drive: código central en `src/knee`, notebook de orquestación, pruebas y registro del commit. | Cerrado; arquitectura versión 1.0 aprobada. |
+| 6 | Ejecución completa en Colab con los archivos privados de Drive y verificación de las evidencias. | Pendiente. |
+
+La preparación o validación del entorno de Colab no corresponde al paso 4. Su posición se documentará en la secuencia antes de iniciarla; no se adelantará sustituyendo el control de cambios. La gobernanza de los pasos 1 a 4 está aprobada, pero la Fase 0 completa mantiene pendiente su criterio técnico de ejecución en Colab con Drive.
 
 ## Fase 1. Descarga selectiva y control radiográfico
 
 **Cuándo:** 24 de septiembre al 9 de octubre en el cronograma; pendiente de disponibilidad real de los archivos.
 
-**Trabajo:** corregir primero la auditoría piloto: `00829603` se registró dos veces como `.tar` y `.tar.gz`, mientras que falta auditar `00839603`. Confirmar los diez estudios únicos. Descargar selectivamente los archivos indicados por las 1 916 rutas únicas del manifiesto, sin trasladar el paquete OAI completo. Registrar disponibilidad, tamaño, huella de integridad, lectura DICOM, número de cuadros, profundidad, fotometría, dimensiones, modalidad y motivo de cualquier fallo.
+**Trabajo:** corregir primero la auditoría piloto resolviendo la duplicación y la omisión registradas en el manifiesto privado. Confirmar diez estudios únicos. Descargar selectivamente los archivos indicados por las rutas únicas del manifiesto, sin trasladar el paquete OAI completo. Registrar disponibilidad, tamaño, huella de integridad, lectura DICOM, número de cuadros, profundidad, fotometría, dimensiones, modalidad y motivo de cualquier fallo.
 
 Diseñar con casos de desarrollo una regla verificable para separar las dos rodillas de cada radiografía bilateral y localizar la región tibiofemoral. Verificar la lateralidad con anatomía y marcadores, pues el campo DICOM suele estar vacío. Revisar recortes y casos de baja confianza sin mirar la etiqueta de progresión. Conservar el original, el recorte, los parámetros usados y un registro de aceptación o rechazo. La operación de inferencia deberá poder reproducir el recorte sin una intervención manual privilegiada.
 
-**Entrega y cierre:** auditoría de las 1 916 adquisiciones o de las efectivamente obtenidas; manifiesto de recortes aceptados por rodilla; causas de exclusión; ejemplos visuales de control de calidad sin identificadores para uso permitido. No comenzar el entrenamiento final hasta conocer la cohorte común utilizable.
+**Entrega y cierre:** auditoría de todas las adquisiciones registradas o de las efectivamente obtenidas; manifiesto de recortes aceptados por rodilla; causas de exclusión; ejemplos visuales de control de calidad sin identificadores para uso permitido. No comenzar el entrenamiento final hasta conocer la cohorte común utilizable.
 
 ## Fase 2. Cohorte analítica y particiones congeladas
 
 **Cuándo:** 10 al 14 de octubre en el cronograma, después de la fase 1.
 
-**Trabajo:** unir el CSV con el manifiesto de imágenes aceptadas por `SRC_SUBJECT_ID`, `SIDE` y `BARCODE_BASE`. Comprobar unicidad, correspondencia, fecha V00 anterior a V06 y etiqueta definida como KL de V06 menos KL de V00 mayor o igual a uno. Documentar el tamaño final y las diferencias frente a las 2 778 rodillas auditadas inicialmente.
+**Trabajo:** unir la cohorte con el manifiesto de imágenes aceptadas mediante las claves privadas de participante, lateralidad y adquisición. Comprobar unicidad, correspondencia, fecha V00 anterior a V06 y etiqueta definida como KL de V06 menos KL de V00 mayor o igual a uno. Documentar el tamaño final y las diferencias frente a la cohorte auditada inicialmente.
 
 Con semilla 2026, asignar participantes a cinco bloques aproximadamente equilibrados; reservar el bloque 0 (aproximadamente 20 %) como prueba. Crear cinco pliegues agrupados dentro de los otros bloques de desarrollo. Los sujetos del piloto utilizados para ajustar recortes permanecerán en desarrollo. Comprobar sujetos, rodillas, positivos y negativos en cada división, sin probar semillas hasta obtener una partición favorable.
 
@@ -44,7 +57,7 @@ Con semilla 2026, asignar participantes a cinco bloques aproximadamente equilibr
 
 **Cuándo:** 15 al 21 de octubre en el cronograma.
 
-**Trabajo:** implementar pipelines con edad, sexo e IMC de V00 para regresión logística regularizada, XGBoost y perceptrón multicapa. Imputar los tres IMC ausentes con la mediana calculada en cada entrenamiento; codificar y escalar dentro del pliegue, nunca antes de dividir. Evaluar la referencia clínica que añade KL inicial y, de forma complementaria, una variante con cirugía previa y WOMAC, sin incorporarlas retroactivamente al contraste principal.
+**Trabajo:** implementar pipelines con edad, sexo e IMC de V00 para regresión logística regularizada, XGBoost y perceptrón multicapa. Imputar los valores ausentes de IMC con la mediana calculada en cada entrenamiento; codificar y escalar dentro del pliegue, nunca antes de dividir. Evaluar la referencia clínica que añade KL inicial y, de forma complementaria, una variante con cirugía previa y WOMAC, sin incorporarlas retroactivamente al contraste principal.
 
 **Entrega y cierre:** predicciones fuera de pliegue y métricas de desarrollo de todos los candidatos, configuración ganadora según PR-AUC definida como `average_precision_score`, transformaciones guardadas y registro de costos. Las métricas de desarrollo no serán el resultado final de la tesis.
 
@@ -82,7 +95,7 @@ Evaluar una sola vez las predicciones finales de prueba con PR-AUC (AP) como com
 
 Revisar el prototipo con el traumatólogo mediante los casos autorizados y la ficha prevista. Esta revisión trata comprensión y pertinencia de la interfaz; no constituye validación externa del desempeño predictivo. No afirmar transportabilidad a pacientes peruanos sin una cohorte externa con desenlace comparable.
 
-**Decisión de alcance antes de implementar la interfaz:** el capítulo I menciona mostrar un grado KL estimado, mientras que el capítulo III no define ni evalúa un modelo para producirlo. Resolver la discrepancia de los capítulos antes de prometer esa salida. El modelo principal de progresión y sus comparaciones no dependen de esa función adicional.
+**Decisión de alcance resuelta (`RES-KL-001`):** el prototipo no estimará ni mostrará un grado KL. Esa función requeriría otro modelo no definido ni evaluado en el capítulo III. La interfaz mostrará únicamente la probabilidad calibrada de progresión estructural a 48 meses, su clasificación mediante el umbral congelado, la versión del sistema y sus limitaciones.
 
 **Entrega y cierre:** servicio e interfaz ejecutables, pruebas críticas aprobadas, paquete de modelo versionado y registro descriptivo de la valoración profesional.
 
@@ -97,7 +110,7 @@ Revisar el prototipo con el traumatólogo mediante los casos autorizados y la fi
 ## Primer bloque de trabajo con Codex
 
 1. Crear la estructura del proyecto, configuración de ejemplo y verificaciones de integridad del CSV y manifiesto.
-2. Corregir el recuento del piloto y ejecutar de nuevo la auditoría con `00839603`.
+2. Corregir el recuento del piloto y ejecutar de nuevo la auditoría con el estudio omitido registrado en el manifiesto privado.
 3. Preparar un notebook de Colab que monte Drive, compruebe dependencias y rutas, y audite una muestra de DICOM sin exponer claves.
 4. Revisar juntos los recortes y la lateralidad antes de procesar masivamente las imágenes.
 
@@ -112,4 +125,4 @@ Revisar el prototipo con el traumatólogo mediante los casos autorizados y la fi
 | Recursos de Colab Pro menores a lo previsto | Medir con un ensayo; reducir búsquedas dentro de desarrollo y documentar el cambio. |
 | Resultado multimodal sin mejora | Reportar el contraste y las limitaciones sin cambiar modelos usando la prueba. |
 | Ausencia de datos peruanos longitudinales | Mantener la evaluación interna OAI y la valoración del especialista separadas; no llamarlas validación externa. |
-| KL estimado en el capítulo I | Acordar si se elimina de esa promesa o se diseña y evalúa como tarea auxiliar independiente. |
+| Persistencia de la promesa de KL estimado en una versión documental | Aplicar `RES-KL-001`: retirar esa promesa sin añadir otro modelo; el investigador corregirá posteriormente el apartado 1.5.2 del Word. |

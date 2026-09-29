@@ -1,0 +1,94 @@
+{
+  "schema_version": "1.0",
+  "registry_version": "1.0",
+  "status": "approved_control_mechanism",
+  "date": "2026-09-27",
+  "governing_document": "docs/03_CONTROL_CAMBIOS_METODOLOGICOS.md",
+  "request_template": "docs/templates/SOLICITUD_CAMBIO_METODOLOGICO.md",
+  "researcher_approval_required": true,
+  "training_authorized": false,
+  "mechanism_approval": {
+    "decision": "approved",
+    "approved_by": "researcher",
+    "date": "2026-09-27",
+    "scope": "phase_0_step_4_methodological_change_control"
+  },
+  "allowed_statuses": [
+    "borrador",
+    "en_analisis",
+    "esperando_aprobacion",
+    "aprobada_no_aplicada",
+    "rechazada",
+    "retirada",
+    "implementada",
+    "implementada_y_verificada"
+  ],
+  "impact_classes": ["M1", "M2", "M3", "M4"],
+  "proposals": [
+    {
+      "id": "MCR-2026-001",
+      "title": "Retirar la salida de grado KL estimado del prototipo",
+      "record_kind": "historical_baseline",
+      "registered_at": "2026-09-27",
+      "proponent": "researcher",
+      "impact_class": "M2",
+      "status": "implementada_y_verificada",
+      "affected_rules": ["PEND-KL-001", "RES-KL-001", "INV-PROT-001"],
+      "problem": "El capitulo I prometia estimar KL, pero el capitulo III no definia datos, modelo, entrenamiento ni evaluacion para esa tarea adicional.",
+      "proposed_change": "Retirar la promesa de KL estimado y limitar el prototipo a probabilidad calibrada de progresion estructural a 48 meses y clasificacion por umbral.",
+      "evidence": [
+        "La metodologia vigente solo define el desenlace de progresion estructural a 48 meses.",
+        "Agregar KL estimado requeriria una tarea, modelo y validacion adicionales."
+      ],
+      "alternatives": [
+        {
+          "name": "Mantener la promesa y agregar un estimador KL",
+          "decision": "rejected",
+          "reason": "Ampliaria el alcance sin metodologia definida."
+        },
+        {
+          "name": "Retirar la promesa del capitulo I",
+          "decision": "selected",
+          "reason": "Restaura coherencia sin cambiar objetivos, hipotesis ni comparaciones."
+        }
+      ],
+      "impact": {
+        "chapter_1": "Eliminar o reformular la frase del apartado 1.5.2.",
+        "chapter_2": "none",
+        "chapter_3": "none",
+        "objectives": "none",
+        "hypotheses": "none",
+        "cohort_and_outcome": "none",
+        "comparisons_and_statistics": "none",
+        "prototype": "No estimar ni mostrar grado KL.",
+        "time_compute_data": "Reduce una tarea no especificada.",
+        "bias_or_leakage": "No introduce riesgo nuevo."
+      },
+      "test_block_consulted_before_decision": false,
+      "approval": {
+        "decision": "aprobada",
+        "approved_by": "researcher",
+        "date": "2026-09-27",
+        "approved_scope": "Retirar exclusivamente la salida KL estimada; mantener sin cambios el uso de KL basal y de seguimiento en poblacion y desenlace.",
+        "conditions": [
+          "El investigador corregira posteriormente el archivo Word del capitulo I.",
+          "No se entrenara un modelo estimador de KL."
+        ]
+      },
+      "implementation": {
+        "applied": true,
+        "applied_at": "2026-09-27",
+        "model_code_changed": false,
+        "training_executed": false,
+        "artifacts": [
+          "docs/00_ALCANCE_Y_TRAZABILIDAD.md",
+          "docs/01_REGLAS_INVARIABLES.md",
+          "configs/governance/scope_contract.json",
+          "docs/DECISIONES.md"
+        ],
+        "verification": "Scope contract tests pass; estimated KL output is marked removed from scope.",
+        "remaining_action": "Researcher will update chapter I Word document."
+      }
+    }
+  ]
+}

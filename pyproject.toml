@@ -12,6 +12,7 @@ dependencies = ["openpyxl>=3.1,<4"]
 [project.scripts]
 knee-audit = "knee.audit:main"
 knee-run-record = "knee.experiment:main"
+knee-change-check = "knee.change_control:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

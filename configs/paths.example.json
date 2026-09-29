@@ -1,7 +1,7 @@
 {
-  "cohort_csv": "data/cohorte_oai_48m_final.csv",
-  "manifest_xlsx": "data/documentacion_cohorte_OAI_48m.xlsx",
-  "audit_json": "outputs/auditoria_cohorte.json",
-  "run_record_json": "outputs/registro_ejecucion.json"
+  "cohort_csv": "data/cohort_input.csv",
+  "manifest_xlsx": "data/cohort_manifest.xlsx",
+  "audit_json": "outputs/auditorias/auditoria_cohorte.json",
+  "run_record_json": "outputs/auditorias/registro_ejecucion.json"
 }
 
