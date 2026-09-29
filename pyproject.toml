@@ -17,6 +17,7 @@ dependencies = [
 knee-audit = "knee.audit:main"
 knee-dicom-audit = "knee.dicom_audit:main"
 knee-acquisition-inventory = "knee.acquisition_inventory:main"
+knee-selective-download = "knee.selective_download:main"
 knee-run-record = "knee.experiment:main"
 knee-change-check = "knee.change_control:main"
 

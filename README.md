@@ -4,7 +4,7 @@ Proyecto de tesis de Ingeniería de Sistemas: desarrollo y evaluación de un sis
 
 ## Estado
 
-La Fase 0 está cerrada técnicamente: la cohorte tabular fue auditada en local y en Colab, y sus evidencias privadas fueron verificadas en Drive. La Fase 1 ha comenzado y su paso 1 está cerrado: el piloto DICOM fue reconciliado y auditado con diez adquisiciones únicas. El paso 2 está en curso: se prepararon el inventario maestro, los controles de integridad y la cola reanudable de descarga selectiva para las 1,916 adquisiciones basales. La inspección completa de radiografías, los recortes, las particiones definitivas, el entrenamiento y la evaluación del prototipo siguen pendientes. No se reportan métricas predictivas hasta completar los experimentos.
+La Fase 0 está cerrada técnicamente: la cohorte tabular fue auditada en local y en Colab, y sus evidencias privadas fueron verificadas en Drive. La Fase 1 ha comenzado y su paso 1 está cerrado: el piloto DICOM fue reconciliado y auditado con diez adquisiciones únicas. El paso 2 está en curso: el inventario maestro de 1,916 adquisiciones fue ejecutado y verificado; registra 10 disponibles y 1,906 pendientes organizadas en 20 lotes de descarga selectiva. La inspección completa de radiografías, los recortes, las particiones definitivas, el entrenamiento y la evaluación del prototipo siguen pendientes. No se reportan métricas predictivas hasta completar los experimentos.
 
 ## Plan de trabajo
 
@@ -25,6 +25,8 @@ La [estrategia de modelos](docs/06_ESTRATEGIA_MODELOS.md) y su [registro ejecuta
 El [paso 1 de la Fase 1](docs/07_FASE_1_PASO_1.md) define cómo reconciliar el manifiesto piloto con diez adquisiciones DICOM realmente únicas, auditar su integridad por contenido y conservar la evidencia individual únicamente en Drive. Su [acta pública de cierre](docs/08_CIERRE_FASE_1_PASO_1.md) registra la ejecución verificada. La libreta [`01_auditoria_piloto_dicoms.ipynb`](notebooks/01_auditoria_piloto_dicoms.ipynb) se limita a orquestar ese control.
 
 El [paso 2 de la Fase 1](docs/09_FASE_1_PASO_2.md) verifica el contrato de 1,916 adquisiciones basales, distingue una descarga pendiente de una ausencia real, audita por contenido los paquetes ya disponibles y genera lotes privados para descarga selectiva. La libreta [`02_inventario_adquisiciones.ipynb`](notebooks/02_inventario_adquisiciones.ipynb) orquesta el módulo versionado sin incluir datos privados ni lógica científica duplicada.
+
+El [avance verificado del paso 2](docs/10_AVANCE_FASE_1_PASO_2.md) documenta el inventario inicial y el mecanismo de descarga exacta con el cliente oficial de NDA. La libreta [`03_descarga_selectiva_lote.ipynb`](notebooks/03_descarga_selectiva_lote.ipynb) prepara un lote, descarga únicamente sus rutas S3, audita el contenido en almacenamiento temporal y solo promueve a Drive un lote completo y válido.
 
 ## Empezar la fase 0
 

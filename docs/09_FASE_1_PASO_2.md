@@ -31,14 +31,18 @@ Estos recuentos validan el contrato de entrada. No representan todavía la cohor
 
 ## Descarga autorizada
 
-La descarga se realizará con la sesión autorizada del investigador en NDA. La guía oficial del NDA Download Manager permite filtrar la tabla por nombre o ruta y descargar archivos individuales, carpetas o rangos seleccionados. Se utilizará la columna `image_file` de la cola privada para localizar exclusivamente los archivos esperados. No se pegarán credenciales en Colab, GitHub, documentos ni registros.
+La descarga se realizará con la cuenta autorizada del investigador en NDA. El mecanismo principal será el cliente oficial `nda-tools` versión 0.7.0: `downloadcmd` acepta mediante `-t` un archivo de texto con las rutas S3 exactas que deben descargarse. El código construirá ese archivo directamente desde el lote elegido de la cola privada; así no dependerá de selección manual ni incorporará imágenes ajenas a la cohorte.
 
-Cada lote se almacenará bajo `dicom/originales/cohorte_v00/` en una subcarpeta identificable. La auditoría es recursiva, por lo que puede conservarse la organización por lotes y reanudarse una descarga interrumpida. Los diez archivos ya aprobados del piloto no deben descargarse de nuevo.
+Cada lote se descargará primero al almacenamiento temporal de Colab. Antes de copiar un archivo a Drive, el proceso exigirá que el lote esté completo, que cada paquete contenga una imagen DICOM decodificable y que no existan rutas inesperadas, duplicados ni conflictos de contenido. Solo entonces se guardará bajo `dicom/originales/cohorte_v00/lote_NNN/`, se volverán a verificar las huellas y se actualizará el inventario. Los diez archivos ya aprobados del piloto no se descargarán de nuevo.
+
+El usuario y el identificador de paquete se leerán de secretos de Colab. La contraseña se solicitará de forma oculta, permanecerá únicamente en un almacén efímero del entorno y será eliminada al terminar. No se pegarán ni persistirán credenciales en GitHub, Drive, notebooks, documentos o registros.
 
 Referencias operativas oficiales:
 
 - [NDA Download Manager User Guide](https://nda.nih.gov/static/docs/NDA_Download_Manager_User_Guide_v0.1.39.pdf)
 - [NDA: acceso a archivos y S3 links](https://nda.nih.gov/s/guid/nda-guid.html)
+- [Cliente oficial nda-tools](https://github.com/NDAR/nda-tools)
+- [nda-tools 0.7.0 en PyPI](https://pypi.org/project/nda-tools/0.7.0/)
 
 ## Evidencias privadas en Drive
 
@@ -57,6 +61,8 @@ Ningún archivo con identificadores, rutas o huellas individuales se publicará 
 ## Reglas de detención
 
 La ejecución se detiene si cambia el contrato de 1,916 adquisiciones, si una ruta deja de corresponder con su código basal, si falla la relación con las 2,778 rodillas, si aparece contenido conflictivo bajo una misma clave o si existen paquetes inesperados en las carpetas controladas. Un archivo no descargado se mantiene como pendiente y nunca se declara ausente en origen por inferencia.
+
+La promoción de un lote es atómica a nivel lógico: si cualquiera de sus adquisiciones falta o falla la auditoría, ninguna se incorpora como lote aprobado en Drive. Una nueva ejecución puede reutilizar archivos idénticos ya promovidos, pero se detiene si encuentra el mismo nombre con contenido diferente.
 
 ## Criterio de cierre
 
