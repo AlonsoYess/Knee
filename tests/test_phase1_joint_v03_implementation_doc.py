@@ -1,4 +1,4 @@
-"""Contract tests for the prepared v0.3 implementation record."""
+"""Contract tests for the executed v0.3 implementation record."""
 
 import unittest
 from pathlib import Path
@@ -15,10 +15,11 @@ class Phase1JointV03ImplementationDocumentTest(unittest.TestCase):
     def setUpClass(cls):
         cls.text = DOCUMENT.read_text(encoding="utf-8")
 
-    def test_record_distinguishes_preparation_from_private_execution(self):
-        self.assertIn("Implementación local preparada", self.text)
-        self.assertIn("piloto privado aún no ejecutado", self.text)
-        self.assertIn("no se ha realizado", self.text)
+    def test_record_distinguishes_execution_from_acceptance(self):
+        self.assertIn("Implementación ejecutada y rechazada", self.text)
+        self.assertIn("173fc7f6b7e8585f9d0c02346cad1bd03d0e90ec", self.text)
+        self.assertIn("aceptó 0/20 recortes", self.text)
+        self.assertIn("los parámetros no se congelan", self.text)
 
     def test_record_links_the_public_config_and_notebook(self):
         self.assertTrue(CONFIG.is_file())

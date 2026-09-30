@@ -2,9 +2,9 @@
 
 ## Estado
 
-**Implementación local preparada; piloto privado aún no ejecutado.** La autorización recibida cubre el localizador determinista `v0.3`, su configuración pública, las pruebas sintéticas y una libreta nueva para repetir exclusivamente las mismas veinte rodillas del piloto. No autoriza procesamiento masivo, particiones, entrenamiento ni apertura de la prueba reservada.
+**Implementación ejecutada y rechazada en el piloto privado.** La autorización recibida cubrió el localizador determinista `v0.3`, su configuración pública, las pruebas sintéticas y una libreta nueva para repetir exclusivamente las mismas veinte rodillas del piloto. No autorizó procesamiento masivo, particiones, entrenamiento ni apertura de la prueba reservada.
 
-La preparación no congela parámetros ni cierra el paso 4. Antes de ejecutar en Colab, los cambios deberán quedar en una revisión identificable del repositorio. Después de la ejecución, los veinte resultados tendrán que superar una nueva revisión visual ciega.
+La ejecución se realizó desde la revisión Git `173fc7f6b7e8585f9d0c02346cad1bd03d0e90ec`. La revisión visual ciega posterior aceptó 0/20 recortes, por lo que los parámetros no se congelan y el paso 4 continúa abierto. El resultado se documenta en [`19_REVISION_FASE_1_PASO_4_V03.md`](19_REVISION_FASE_1_PASO_4_V03.md).
 
 ## Cambios implementados
 
@@ -31,18 +31,20 @@ Las pruebas sintéticas cubren:
 - imposibilidad de confianza alta si falla una puerta obligatoria;
 - validez estructural, limpieza y bloqueos de la libreta nueva.
 
-La ejecución privada no forma parte de estas pruebas y no se ha realizado desde este repositorio local.
+La ejecución privada se realizó en Colab y sus artefactos permanecen en Drive; no forma parte de las pruebas sintéticas del repositorio.
 
-## Secuencia autorizada pendiente
+## Secuencia autorizada completada
 
-1. identificar la revisión de Git que contiene esta implementación;
-2. ejecutar la libreta 09 en Colab con el secreto `KNEE_DATA_ROOT`;
-3. comprobar que se procesaron exactamente diez estudios y veinte rodillas, sin fallos de integridad;
-4. revisar visualmente las veinte vistas sin consultar el desenlace;
-5. registrar aceptación o rechazo de `v0.3`;
-6. congelar parámetros y cerrar el paso 4 solamente si las veinte vistas cumplen el protocolo.
+1. se identificó la revisión de Git que contiene esta implementación;
+2. se ejecutó la libreta 09 en Colab con el secreto `KNEE_DATA_ROOT`;
+3. se procesaron exactamente diez estudios y veinte rodillas, sin fallos de integridad;
+4. se revisaron visualmente las veinte vistas sin consultar el desenlace;
+5. se registró el rechazo de `v0.3`;
+6. no se congelaron parámetros ni se cerró el paso 4.
 
-Hasta completar esa secuencia permanecen en `False`:
+La libreta 10 quedó preparada para generar el resumen público reproducible desde el CSV privado ya completado.
+
+Al finalizar esa secuencia permanecen en `False`:
 
 - `mass_processing_executed`;
 - `partitions_created`;
