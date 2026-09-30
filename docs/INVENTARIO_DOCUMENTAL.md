@@ -5,7 +5,7 @@
 | Campo | Valor |
 | --- | --- |
 | Estado | Activo |
-| Versión | 1.7 pública |
+| Versión | 1.8 pública |
 | Fecha de corte | 29 de septiembre de 2026 |
 | Ámbito | Artefactos rectores y cierres técnicos hasta la Fase 1, paso 3 |
 | Inventario exacto | Privado en Google Drive autorizado |
@@ -34,6 +34,7 @@ Este archivo es el resumen publicable del control documental. El inventario priv
 | Notebooks de inventario y descarga selectiva | Ejecutados | `notebooks/02_inventario_adquisiciones.ipynb`, `notebooks/03_descarga_selectiva_lote.ipynb`, `notebooks/04_descarga_lotes_pendientes.ipynb` | Copias aprobadas verificadas |
 | Protocolo y notebooks de separación bilateral | Cerrados; `bilateral_split_v0.2_pilot` congelado | `docs/12_FASE_1_PASO_3.md`, `notebooks/05_validacion_separacion_bilateral.ipynb`, `notebooks/06_cierre_revision_separacion_bilateral.ipynb` | Diez vistas aceptadas, cero exclusiones y parámetros privados verificados |
 | Acta pública de cierre de la Fase 1, paso 3 | 1.0, cerrada | `docs/13_CIERRE_FASE_1_PASO_3.md` | Registro, resumen y congelamiento privados verificados |
+| Protocolo, módulo y notebook de localización tibiofemoral | 0.1 piloto, preparados para ejecución | `docs/14_FASE_1_PASO_4.md`, `src/knee/joint_localization.py`, `notebooks/07_validacion_localizacion_tibiofemoral.ipynb` | Salidas privadas aún pendientes de ejecución |
 
 ## Historial preservado
 
@@ -53,6 +54,7 @@ Se verificaron copias privadas del README principal, README del prototipo, plan 
 - la ejecución técnica en Colab/Drive terminó correctamente y sus dos evidencias privadas fueron contrastadas;
 - las 1,916 adquisiciones basales están disponibles y legibles, la cola está vacía y los veinte lotes conservan evidencia verificable;
 - el paso 3 quedó cerrado con una entrada ciega al desenlace, diez vistas revisadas y aceptadas, una guarda de límites verificada y los parámetros de la versión 0.2 congelados antes del procesamiento masivo;
+- el paso 4 cuenta con código, configuración, pruebas y libreta de orquestación para veinte recortes piloto; aún no existen resultados privados de ejecución ni parámetros congelados;
 - no se ejecutó entrenamiento ni se abrió el conjunto de prueba reservado.
 
 El inventario público se ampliará solo con información necesaria para reproducibilidad y gobierno. Credenciales, identificadores individuales, rutas privadas, huellas de fuentes restringidas y enlaces privados nunca se publicarán.

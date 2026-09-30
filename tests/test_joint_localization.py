@@ -1,0 +1,230 @@
+"""Tests for the blinded tibiofemoral localization pilot."""
+
+import csv
+import io
+import json
+import tarfile
+import tempfile
+import unittest
+from pathlib import Path
+
+import numpy as np
+from pydicom.dataset import FileDataset, FileMetaDataset
+from pydicom.uid import ExplicitVRLittleEndian, generate_uid
+
+from knee.bilateral_separation import normalize_working_copy
+from knee.dicom_audit import sha256_bytes, sha256_file
+from knee.joint_localization import (
+    _extract_spacing,
+    locate_tibiofemoral_joint,
+    prepare_joint_localization_pilot,
+)
+
+
+PARAMETERS = {
+    "expected_unique_studies": 2,
+    "expected_knees": 4,
+    "expected_bilateral_algorithm_version": "bilateral_split_v0.2_pilot",
+    "algorithm_version": "test_joint_crop",
+    "joint_line_search_band": [0.32, 0.70],
+    "anatomy_x_band": [0.12, 0.88],
+    "analysis_half_width_fraction": 0.24,
+    "profile_smoothing_fraction": 0.012,
+    "bone_offset_fraction": 0.035,
+    "expected_joint_line_fraction": 0.52,
+    "darkness_weight": 0.45,
+    "bone_contrast_weight": 0.40,
+    "gradient_weight": 0.15,
+    "vertical_center_penalty": 0.08,
+    "crop_size_mm": 140.0,
+    "accepted_spacing_tags": ["ImagerPixelSpacing", "PixelSpacing"],
+    "minimum_score_prominence": 0.10,
+    "maximum_boundary_shift_fraction": 0.03,
+    "maximum_background_fraction": 0.30,
+    "high_confidence_threshold": 0.70,
+    "max_preview_width": 800,
+}
+
+
+def synthetic_half(seed: int = 0) -> np.ndarray:
+    rows, columns = 600, 500
+    yy, xx = np.mgrid[:rows, :columns]
+    image = np.full((rows, columns), 120, dtype=np.float64)
+    femur = ((xx - 250) / 170) ** 2 + ((yy - 150) / 150) ** 2 <= 1
+    tibia = ((xx - 250) / 180) ** 2 + ((yy - 455) / 150) ** 2 <= 1
+    image[femur] = 3100
+    image[tibia] = 2800
+    image[300:322, 90:410] = 180
+    image += ((xx + 2 * yy + seed) % 53).astype(np.float64)
+    return image.astype(np.uint16)
+
+
+def synthetic_bilateral(seed: int = 0) -> np.ndarray:
+    left = synthetic_half(seed)
+    right = synthetic_half(seed + 7)
+    return np.concatenate([left, right], axis=1)
+
+
+def dicom_bytes(pixels: np.ndarray, include_spacing: bool = True) -> bytes:
+    meta = FileMetaDataset()
+    meta.MediaStorageSOPClassUID = generate_uid()
+    meta.MediaStorageSOPInstanceUID = generate_uid()
+    meta.TransferSyntaxUID = ExplicitVRLittleEndian
+    dataset = FileDataset(None, {}, file_meta=meta, preamble=b"\0" * 128)
+    dataset.SOPClassUID = meta.MediaStorageSOPClassUID
+    dataset.SOPInstanceUID = meta.MediaStorageSOPInstanceUID
+    dataset.Rows, dataset.Columns = pixels.shape
+    dataset.SamplesPerPixel = 1
+    dataset.PhotometricInterpretation = "MONOCHROME2"
+    dataset.PixelRepresentation = 0
+    dataset.BitsAllocated = 16
+    dataset.BitsStored = 16
+    dataset.HighBit = 15
+    dataset.NumberOfFrames = 1
+    dataset.Modality = "CR"
+    if include_spacing:
+        dataset.ImagerPixelSpacing = [0.5, 0.5]
+    dataset.PixelData = pixels.tobytes()
+    stream = io.BytesIO()
+    dataset.save_as(stream, enforce_file_format=True)
+    return stream.getvalue()
+
+
+def write_archive(path: Path, payload: bytes) -> None:
+    with tarfile.open(path, "w:gz") as archive:
+        info = tarfile.TarInfo("image.dcm")
+        info.size = len(payload)
+        archive.addfile(info, io.BytesIO(payload))
+
+
+def write_csv(path: Path, rows: list[dict[str, str]]) -> None:
+    with path.open("w", newline="", encoding="utf-8-sig") as stream:
+        writer = csv.DictWriter(stream, fieldnames=rows[0].keys(), delimiter=";")
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+class JointLocalizationTest(unittest.TestCase):
+    def test_localization_finds_joint_gap_and_physical_crop(self):
+        normalized = normalize_working_copy(synthetic_half(), "MONOCHROME2")
+        result = locate_tibiofemoral_joint(normalized, 0.5, 0.5, PARAMETERS)
+
+        self.assertLess(abs(result["joint_center_y"] - 311), 24)
+        self.assertLess(abs(result["joint_center_x_half"] - 250), 36)
+        self.assertEqual(result["crop_rows"], 280)
+        self.assertEqual(result["crop_columns"], 280)
+        self.assertAlmostEqual(result["crop_height_mm"], 140.0)
+        self.assertAlmostEqual(result["crop_width_mm"], 140.0)
+
+    def test_spacing_is_required_and_explicit(self):
+        payload = dicom_bytes(synthetic_bilateral(), include_spacing=False)
+        from pydicom import dcmread
+
+        dataset = dcmread(io.BytesIO(payload))
+        with self.assertRaisesRegex(ValueError, "valid_pixel_spacing_not_available"):
+            _extract_spacing(dataset, ["ImagerPixelSpacing", "PixelSpacing"])
+
+    def test_pilot_uses_frozen_step3_and_writes_blinded_review(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "source"
+            source.mkdir()
+            selected = []
+            bilateral_rows = []
+            for index in range(2):
+                pixels = synthetic_bilateral(index)
+                payload = dicom_bytes(pixels)
+                package = source / f"private_{index}.tar.gz"
+                write_archive(package, payload)
+                manifest_key = f"sensitive_{index}"
+                selected.append(
+                    {
+                        "manifest_key": manifest_key,
+                        "package_relative_path": package.name,
+                        "package_sha256": sha256_file(package),
+                        "dicom_sha256": sha256_bytes(payload),
+                        "pixel_sha256": sha256_bytes(
+                            np.ascontiguousarray(pixels).tobytes()
+                        ),
+                    }
+                )
+                bilateral_rows.append(
+                    {
+                        "case_alias": f"case_{index + 1:03d}",
+                        "manifest_key": manifest_key,
+                        "split_column": "500",
+                        "technical_status": "CANDIDATE_OK",
+                        "error_code": "",
+                    }
+                )
+
+            audit = root / "audit.json"
+            audit.write_text(
+                json.dumps(
+                    {
+                        "public_summary": {"status": "ok"},
+                        "private_reconciliation": {"selected_packages": selected},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            bilateral = root / "bilateral"
+            bilateral.mkdir()
+            results_path = bilateral / "resultados_separacion_privados.csv"
+            write_csv(results_path, bilateral_rows)
+            (bilateral / "cierre_paso_3_publico.json").write_text(
+                json.dumps(
+                    {
+                        "status": "closed",
+                        "parameters_frozen": True,
+                        "algorithm_version": "bilateral_split_v0.2_pilot",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (bilateral / "parametros_congelados.json").write_text(
+                json.dumps(
+                    {
+                        "status": "frozen_after_blinded_visual_review",
+                        "algorithm_version": "bilateral_split_v0.2_pilot",
+                        "proposed_mapping": {
+                            "image_left": "RIGHT",
+                            "image_right": "LEFT",
+                        },
+                        "results_csv_sha256": sha256_file(results_path),
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            output = root / "output"
+            summary = prepare_joint_localization_pilot(
+                source, audit, bilateral, output, PARAMETERS
+            )
+
+            self.assertEqual(summary["status"], "ready_for_blinded_review")
+            self.assertEqual(summary["processed_knees"], 4)
+            self.assertFalse(summary["outcome_data_loaded"])
+            public_text = (output / "resumen_localizacion_publico.json").read_text(
+                encoding="utf-8"
+            )
+            self.assertNotIn("sensitive_", public_text)
+            with (output / "revision_visual_ciega.csv").open(
+                newline="", encoding="utf-8-sig"
+            ) as stream:
+                review = list(csv.DictReader(stream, delimiter=";"))
+            self.assertEqual(len(review), 4)
+            self.assertEqual(review[0]["knee_alias"], "case_001_RIGHT")
+            self.assertTrue((output / review[0]["preview_file"]).is_file())
+            self.assertTrue((output / "recortes_nativos/case_001_RIGHT_crop.npy").is_file())
+
+            review[0]["crop_acceptable_yes_no"] = "SI"
+            write_csv(output / "revision_visual_ciega.csv", review)
+            with self.assertRaisesRegex(RuntimeError, "refusing_to_overwrite"):
+                prepare_joint_localization_pilot(
+                    source, audit, bilateral, output, PARAMETERS
+                )
+
+
+if __name__ == "__main__":
+    unittest.main()

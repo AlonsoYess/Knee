@@ -4,7 +4,7 @@ Proyecto de tesis de Ingeniería de Sistemas: desarrollo y evaluación de un sis
 
 ## Estado
 
-La Fase 0 está cerrada técnicamente. En la Fase 1 están cerrados los pasos 1, 2 y 3: el piloto DICOM fue reconciliado con diez adquisiciones únicas, la descarga selectiva completó las 1,916 adquisiciones basales esperadas y `bilateral_split_v0.2_pilot` quedó congelado después de una revisión visual ciega. Las diez separaciones y lateralidades fueron aceptadas, incluido un caso limítrofe correctamente derivado a revisión, sin exclusiones. El siguiente trabajo autorizado es diseñar y validar la localización tibiofemoral y el recorte por rodilla sobre el piloto. El procesamiento masivo, las particiones definitivas, el entrenamiento y la evaluación del prototipo siguen bloqueados. No se reportan métricas predictivas hasta completar los experimentos.
+La Fase 0 está cerrada técnicamente. En la Fase 1 están cerrados los pasos 1, 2 y 3: el piloto DICOM fue reconciliado con diez adquisiciones únicas, la descarga selectiva completó las 1,916 adquisiciones basales esperadas y `bilateral_split_v0.2_pilot` quedó congelado después de una revisión visual ciega. Las diez separaciones y lateralidades fueron aceptadas, incluido un caso limítrofe correctamente derivado a revisión, sin exclusiones. El paso 4 ya cuenta con un localizador tibiofemoral determinista, un recorte físico candidato de 140 × 140 mm, controles de confianza y una libreta para validar veinte rodillas del piloto. Su ejecución y revisión visual siguen pendientes. El procesamiento masivo, las particiones definitivas, el entrenamiento y la evaluación del prototipo permanecen bloqueados. No se reportan métricas predictivas hasta completar los experimentos.
 
 ## Plan de trabajo
 
@@ -31,6 +31,8 @@ El [avance verificado del paso 2](docs/10_AVANCE_FASE_1_PASO_2.md) documenta el 
 El [cierre verificado del paso 2](docs/11_CIERRE_FASE_1_PASO_2.md) registra el inventario final completo, la verificación de los veinte lotes y el mantenimiento de los bloqueos de entrenamiento y prueba reservada. Autoriza preparar el paso 3 de control radiográfico, no iniciar entrenamiento.
 
 El [protocolo del paso 3](docs/12_FASE_1_PASO_3.md) define una separación bilateral determinista, proporcional a la resolución y con control de confianza, incluida una guarda del 1 % para candidatos próximos a los límites de búsqueda. Las libretas [`05_validacion_separacion_bilateral.ipynb`](notebooks/05_validacion_separacion_bilateral.ipynb) y [`06_cierre_revision_separacion_bilateral.ipynb`](notebooks/06_cierre_revision_separacion_bilateral.ipynb) ejecutaron la validación y el congelamiento verificable. El [acta pública de cierre](docs/13_CIERRE_FASE_1_PASO_3.md) registra 10/10 separaciones y lateralidades aceptadas, cero exclusiones y los parámetros congelados. Autoriza preparar el paso 4 sobre el piloto; no autoriza procesamiento masivo ni entrenamiento.
+
+El [protocolo del paso 4](docs/14_FASE_1_PASO_4.md) define la localización tibiofemoral multiseñal, el campo de visión físico candidato y la revisión ciega de veinte rodillas. La libreta [`07_validacion_localizacion_tibiofemoral.ipynb`](notebooks/07_validacion_localizacion_tibiofemoral.ipynb) exige el cierre congelado del paso 3, ejecuta el módulo versionado y muestra las vistas privadas para revisión. Todavía no autoriza aplicar los recortes a las 1,916 adquisiciones.
 
 ## Empezar la fase 0
 
