@@ -59,6 +59,28 @@ PRIVATE_RESULT_FIELDS = (
     "boundary_shift_fraction",
     "background_fraction",
     "saturation_fraction",
+    "localization_strategy",
+    "left_femoral_edge_y",
+    "left_tibial_edge_y",
+    "right_femoral_edge_y",
+    "right_tibial_edge_y",
+    "left_joint_width_mm",
+    "right_joint_width_mm",
+    "left_pair_score",
+    "right_pair_score",
+    "directed_edge_strength_score",
+    "compartment_width_difference_mm",
+    "vertical_edge_gate_passed",
+    "compartment_consensus_gate_passed",
+    "detected_artifact_components",
+    "detected_artifact_extent_mm",
+    "effective_inner_margin_mm",
+    "artifact_clearance_gate_passed",
+    "boundary_gate_passed",
+    "background_gate_passed",
+    "saturation_gate_passed",
+    "mandatory_gates_passed",
+    "review_reasons",
     "confidence_score",
     "confidence_level",
     "technical_status",
@@ -250,9 +272,10 @@ def _profile_signals(
         3, round(rows * float(parameters["profile_smoothing_fraction"]))
     )
     intensity = _smooth_profile(profile, smooth_width)
-    vertical_gradient = _smooth_profile(
-        np.abs(np.diff(intensity, prepend=intensity[:1])), smooth_width
-    )
+    raw_signed_gradient = np.diff(intensity, prepend=intensity[:1])
+    signed_gradient = _smooth_profile(raw_signed_gradient, smooth_width)
+    # Preserve the exact v0.2 absolute-gradient signal for legacy dispatch.
+    vertical_gradient = _smooth_profile(np.abs(raw_signed_gradient), smooth_width)
     darkness = 1.0 - _robust_unit(intensity)
     gradient = _robust_unit(vertical_gradient)
     offset = max(2, int(round(rows * float(parameters["bone_offset_fraction"]))))
@@ -263,6 +286,9 @@ def _profile_signals(
         "intensity": intensity,
         "darkness": darkness,
         "gradient": gradient,
+        "signed_gradient": signed_gradient,
+        "descending_edge": _robust_unit(np.clip(-signed_gradient, 0.0, None)),
+        "ascending_edge": _robust_unit(np.clip(signed_gradient, 0.0, None)),
         "bone_contrast": _robust_unit(bone_contrast_raw),
     }
 
@@ -310,7 +336,7 @@ def _compartment_score(
     return score, signals
 
 
-def locate_tibiofemoral_joint(
+def _locate_tibiofemoral_joint_v02(
     normalized_half: np.ndarray,
     row_spacing_mm: float,
     column_spacing_mm: float,
@@ -460,6 +486,455 @@ def locate_tibiofemoral_joint(
     }
 
 
+def _directed_edge_pairs(
+    normalized: np.ndarray,
+    bounds: tuple[int, int],
+    first: int,
+    last: int,
+    row_spacing_mm: float,
+    parameters: dict[str, Any],
+) -> list[dict[str, float | int]]:
+    """Rank dark gaps bounded by a descending and then ascending edge."""
+    x0, x1 = bounds
+    profile = np.median(normalized[:, x0:x1], axis=1)
+    signals = _profile_signals(profile, normalized.shape[0], parameters)
+    rows = normalized.shape[0]
+    minimum_gap = max(
+        1, int(round(float(parameters["joint_gap_min_mm"]) / row_spacing_mm))
+    )
+    maximum_gap = max(
+        minimum_gap,
+        int(round(float(parameters["joint_gap_max_mm"]) / row_spacing_mm)),
+    )
+    context = max(
+        1, int(round(float(parameters["bone_context_mm"]) / row_spacing_mm))
+    )
+    expected_row = float(parameters["expected_joint_line_fraction"]) * (rows - 1)
+    prior_scale = max(1.0, (last - first) / 2.0)
+    brightness = _robust_unit(signals["intensity"])
+    candidates: list[dict[str, float | int]] = []
+    for femoral_edge in range(first, last):
+        tibial_first = femoral_edge + minimum_gap
+        tibial_last = min(last - 1, femoral_edge + maximum_gap)
+        if tibial_first > tibial_last:
+            continue
+        for tibial_edge in range(tibial_first, tibial_last + 1):
+            center = 0.5 * (femoral_edge + tibial_edge)
+            edge_strength = float(
+                min(
+                    signals["descending_edge"][femoral_edge],
+                    signals["ascending_edge"][tibial_edge],
+                )
+            )
+            gap_darkness = float(
+                np.mean(signals["darkness"][femoral_edge : tibial_edge + 1])
+            )
+            upper = brightness[max(0, femoral_edge - context) : femoral_edge]
+            lower = brightness[
+                tibial_edge + 1 : min(rows, tibial_edge + 1 + context)
+            ]
+            outside_bone = 0.5 * (
+                (float(np.mean(upper)) if upper.size else 0.0)
+                + (float(np.mean(lower)) if lower.size else 0.0)
+            )
+            center_prior = float(
+                np.exp(-0.5 * ((center - expected_row) / prior_scale) ** 2)
+            )
+            score = float(
+                float(parameters["edge_pair_weight"]) * edge_strength
+                + float(parameters["gap_darkness_pair_weight"]) * gap_darkness
+                + float(parameters["outside_bone_pair_weight"]) * outside_bone
+                + float(parameters["pair_center_prior_weight"]) * center_prior
+            )
+            candidates.append(
+                {
+                    "femoral_edge_y": femoral_edge,
+                    "tibial_edge_y": tibial_edge,
+                    "center_y": center,
+                    "width_mm": (tibial_edge - femoral_edge) * row_spacing_mm,
+                    "score": score,
+                    "minimum_edge_strength": edge_strength,
+                    "gap_darkness": gap_darkness,
+                    "outside_bone": outside_bone,
+                }
+            )
+    candidates.sort(key=lambda item: float(item["score"]), reverse=True)
+    return candidates[: int(parameters["top_edge_pairs_per_compartment"])]
+
+
+def _bright_artifact_components(
+    normalized: np.ndarray,
+    y0: int,
+    y1: int,
+    inner_edge: str | None,
+    parameters: dict[str, Any],
+) -> tuple[int, int]:
+    """Return compact bright components and their deepest inner-edge extent."""
+    if inner_edge is None:
+        return 0, 0
+    rows, columns = normalized.shape
+    scan_width = max(
+        1, int(round(columns * float(parameters["artifact_scan_fraction"])))
+    )
+    if inner_edge == "LEFT":
+        scan_x0, scan_x1 = 0, min(columns, scan_width)
+    else:
+        scan_x0, scan_x1 = max(0, columns - scan_width), columns
+    region = normalized[max(0, y0) : min(rows, y1), scan_x0:scan_x1]
+    if region.size == 0:
+        return 0, 0
+    mask = region >= float(parameters["artifact_bright_threshold"])
+    visited = np.zeros(mask.shape, dtype=bool)
+    minimum_area = int(parameters["artifact_component_min_area_pixels"])
+    maximum_area = max(
+        minimum_area,
+        int(
+            round(
+                mask.size
+                * float(parameters["artifact_component_max_area_fraction"])
+            )
+        ),
+    )
+    maximum_height = max(
+        1,
+        int(
+            round(
+                mask.shape[0]
+                * float(parameters["artifact_component_max_height_fraction"])
+            )
+        ),
+    )
+    maximum_width = max(
+        1,
+        int(
+            round(
+                mask.shape[1]
+                * float(parameters["artifact_component_max_width_fraction"])
+            )
+        ),
+    )
+    minimum_fill = float(parameters["artifact_component_min_fill_ratio"])
+    count = 0
+    deepest = 0
+    height, width = mask.shape
+    for start_y, start_x in zip(*np.nonzero(mask & ~visited)):
+        if visited[start_y, start_x]:
+            continue
+        stack = [(int(start_y), int(start_x))]
+        visited[start_y, start_x] = True
+        area = 0
+        min_x = max_x = int(start_x)
+        min_y = max_y = int(start_y)
+        while stack:
+            current_y, current_x = stack.pop()
+            area += 1
+            min_x, max_x = min(min_x, current_x), max(max_x, current_x)
+            min_y, max_y = min(min_y, current_y), max(max_y, current_y)
+            for delta_y, delta_x in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+                neighbor_y = current_y + delta_y
+                neighbor_x = current_x + delta_x
+                if not (0 <= neighbor_y < height and 0 <= neighbor_x < width):
+                    continue
+                if visited[neighbor_y, neighbor_x] or not mask[neighbor_y, neighbor_x]:
+                    continue
+                visited[neighbor_y, neighbor_x] = True
+                stack.append((neighbor_y, neighbor_x))
+        component_height = max_y - min_y + 1
+        component_width = max_x - min_x + 1
+        fill = area / (component_height * component_width)
+        if not (
+            minimum_area <= area <= maximum_area
+            and component_height <= maximum_height
+            and component_width <= maximum_width
+            and fill >= minimum_fill
+        ):
+            continue
+        count += 1
+        extent = max_x + 1 if inner_edge == "LEFT" else width - min_x
+        deepest = max(deepest, extent)
+    return count, deepest
+
+
+def _locate_tibiofemoral_joint_v03(
+    normalized_half: np.ndarray,
+    row_spacing_mm: float,
+    column_spacing_mm: float,
+    parameters: dict[str, Any],
+    inner_edge: str | None = None,
+) -> dict[str, Any]:
+    """Locate the joint with directed edge pairs and mandatory confidence gates."""
+    rows, columns = normalized_half.shape
+    search_low, search_high = (
+        float(value) for value in parameters["joint_line_search_band"]
+    )
+    if not 0.15 <= search_low < search_high <= 0.85:
+        raise ValueError("invalid_joint_line_search_band")
+    x_center = _weighted_x_center(normalized_half, parameters)
+    first = max(1, int(round(rows * search_low)))
+    last = min(rows - 1, int(round(rows * search_high)))
+    if last - first < 8:
+        raise ValueError("joint_search_band_too_small")
+    left_bounds, right_bounds = _compartment_bounds(x_center, columns, parameters)
+    left_pairs = _directed_edge_pairs(
+        normalized_half, left_bounds, first, last, row_spacing_mm, parameters
+    )
+    right_pairs = _directed_edge_pairs(
+        normalized_half, right_bounds, first, last, row_spacing_mm, parameters
+    )
+    if not left_pairs or not right_pairs:
+        raise ValueError("directed_edge_pair_not_available")
+
+    maximum_center_distance = float(
+        parameters["maximum_compartment_peak_distance_fraction"]
+    )
+    maximum_width_difference = float(
+        parameters["maximum_compartment_width_difference_mm"]
+    )
+    combinations: list[
+        tuple[float, dict[str, float | int], dict[str, float | int]]
+    ] = []
+    for left_pair in left_pairs:
+        for right_pair in right_pairs:
+            center_distance = abs(
+                float(left_pair["center_y"]) - float(right_pair["center_y"])
+            ) / rows
+            width_difference = abs(
+                float(left_pair["width_mm"]) - float(right_pair["width_mm"])
+            )
+            if (
+                center_distance > maximum_center_distance
+                or width_difference > maximum_width_difference
+            ):
+                continue
+            center_agreement = max(
+                0.0,
+                1.0 - center_distance / max(maximum_center_distance, 1e-6),
+            )
+            width_agreement = max(
+                0.0,
+                1.0
+                - width_difference / max(maximum_width_difference, 1e-6),
+            )
+            denominator = (
+                1.0
+                + float(parameters["compartment_consensus_weight"])
+                + float(parameters["compartment_width_consensus_weight"])
+            )
+            combined_score = (
+                0.5 * (float(left_pair["score"]) + float(right_pair["score"]))
+                + float(parameters["compartment_consensus_weight"])
+                * center_agreement
+                + float(parameters["compartment_width_consensus_weight"])
+                * width_agreement
+            ) / denominator
+            combinations.append((combined_score, left_pair, right_pair))
+    compartment_consensus_gate = bool(combinations)
+    if combinations:
+        _, left_pair, right_pair = max(combinations, key=lambda item: item[0])
+    else:
+        left_pair, right_pair = left_pairs[0], right_pairs[0]
+
+    left_center = float(left_pair["center_y"])
+    right_center = float(right_pair["center_y"])
+    y_center = int(round(0.5 * (left_center + right_center)))
+    center_distance_fraction = abs(left_center - right_center) / rows
+    agreement_score = float(
+        np.clip(
+            1.0
+            - center_distance_fraction / max(maximum_center_distance, 1e-6),
+            0.0,
+            1.0,
+        )
+    )
+    width_difference_mm = abs(
+        float(left_pair["width_mm"]) - float(right_pair["width_mm"])
+    )
+    edge_strength = min(
+        float(left_pair["minimum_edge_strength"]),
+        float(right_pair["minimum_edge_strength"]),
+    )
+    vertical_edge_gate = (
+        edge_strength >= float(parameters["minimum_directed_edge_strength"])
+        and float(left_pair["score"]) >= float(parameters["minimum_pair_score"])
+        and float(right_pair["score"]) >= float(parameters["minimum_pair_score"])
+    )
+
+    crop_height_mm = float(parameters["crop_height_mm"])
+    crop_width_mm = float(parameters["crop_width_mm"])
+    crop_rows = int(round(crop_height_mm / row_spacing_mm))
+    crop_columns = int(round(crop_width_mm / column_spacing_mm))
+    crop_y0, crop_y1, shift_y = _fit_box(y_center, crop_rows, rows)
+    artifact_count, artifact_extent_pixels = _bright_artifact_components(
+        normalized_half, crop_y0, crop_y1, inner_edge, parameters
+    )
+    static_margin_pixels = int(
+        round(float(parameters["inner_edge_margin_mm"]) / column_spacing_mm)
+    )
+    safety_pixels = int(
+        round(float(parameters["artifact_safety_buffer_mm"]) / column_spacing_mm)
+    )
+    required_margin_pixels = max(
+        static_margin_pixels,
+        artifact_extent_pixels + safety_pixels if artifact_count else 0,
+    )
+    maximum_feasible_margin = columns - crop_columns
+    if maximum_feasible_margin < 0:
+        raise ValueError("physical_crop_does_not_fit_unilateral_field")
+    applied_margin_pixels = min(required_margin_pixels, maximum_feasible_margin)
+    crop_x0, crop_x1, shift_x, inner_clearance_pixels = _fit_box_with_inner_guard(
+        x_center,
+        crop_columns,
+        columns,
+        inner_edge,
+        applied_margin_pixels,
+    )
+    artifact_clearance_gate = required_margin_pixels <= maximum_feasible_margin
+    boundary_shift_fraction = max(shift_y / rows, shift_x / columns)
+    crop = normalized_half[crop_y0:crop_y1, crop_x0:crop_x1]
+    background_fraction = float(np.mean(crop <= 0.02))
+    saturation_fraction = float(np.mean(crop >= 0.98))
+    boundary_gate = boundary_shift_fraction <= float(
+        parameters["maximum_boundary_shift_fraction"]
+    )
+    background_gate = background_fraction <= float(
+        parameters["maximum_background_fraction"]
+    )
+    saturation_gate = saturation_fraction <= float(
+        parameters["maximum_saturation_fraction"]
+    )
+    mandatory_gates = (
+        vertical_edge_gate
+        and compartment_consensus_gate
+        and boundary_gate
+        and background_gate
+        and saturation_gate
+        and artifact_clearance_gate
+    )
+
+    average_pair_score = 0.5 * (
+        float(left_pair["score"]) + float(right_pair["score"])
+    )
+    score_prominence = float(np.clip(average_pair_score, 0.0, 1.0))
+    contrast_at_center = 0.5 * (
+        float(left_pair["outside_bone"]) + float(right_pair["outside_bone"])
+    )
+    width_agreement = max(
+        0.0,
+        1.0 - width_difference_mm / max(maximum_width_difference, 1e-6),
+    )
+    confidence_score = float(
+        0.34 * average_pair_score
+        + 0.22 * edge_strength
+        + 0.18 * agreement_score
+        + 0.10 * width_agreement
+        + 0.08 * max(0.0, 1.0 - background_fraction)
+        + 0.08 * max(0.0, 1.0 - saturation_fraction)
+    )
+    high_confidence = mandatory_gates and confidence_score >= float(
+        parameters["high_confidence_threshold"]
+    )
+    reasons: list[str] = []
+    if not vertical_edge_gate:
+        reasons.append("EDGE_PAIR")
+    if not compartment_consensus_gate:
+        reasons.append("VERTICAL_DISAGREEMENT")
+    if not artifact_clearance_gate:
+        reasons.append("ARTIFACT_CLEARANCE")
+    if not boundary_gate:
+        reasons.append("BOUNDARY_SHIFT")
+    if not background_gate:
+        reasons.append("BACKGROUND")
+    if not saturation_gate:
+        reasons.append("SATURATION")
+    if mandatory_gates and not high_confidence:
+        reasons.append("LOW_COMPOSITE_CONFIDENCE")
+    if not vertical_edge_gate:
+        technical_status = "REVIEW_REQUIRED_EDGE_PAIR"
+    elif not compartment_consensus_gate:
+        technical_status = "REVIEW_REQUIRED_VERTICAL_DISAGREEMENT"
+    elif not artifact_clearance_gate:
+        technical_status = "REVIEW_REQUIRED_ARTIFACT_CLEARANCE"
+    elif high_confidence:
+        technical_status = "CANDIDATE_OK"
+    else:
+        technical_status = "REVIEW_REQUIRED"
+
+    return {
+        "joint_center_x_half": int(round(x_center)),
+        "joint_center_y": y_center,
+        "joint_center_x_fraction": x_center / columns,
+        "joint_center_y_fraction": y_center / rows,
+        "crop_x0_half": crop_x0,
+        "crop_x1_half": crop_x1,
+        "crop_y0": crop_y0,
+        "crop_y1": crop_y1,
+        "crop_rows": crop_rows,
+        "crop_columns": crop_columns,
+        "crop_height_mm": crop_rows * row_spacing_mm,
+        "crop_width_mm": crop_columns * column_spacing_mm,
+        "score_prominence": score_prominence,
+        "bone_contrast_score": contrast_at_center,
+        "left_compartment_peak_y": int(round(left_center)),
+        "right_compartment_peak_y": int(round(right_center)),
+        "compartment_peak_distance_fraction": center_distance_fraction,
+        "compartment_agreement_score": agreement_score,
+        "inner_edge_clearance_mm": inner_clearance_pixels * column_spacing_mm,
+        "boundary_shift_fraction": boundary_shift_fraction,
+        "background_fraction": background_fraction,
+        "saturation_fraction": saturation_fraction,
+        "localization_strategy": "directed_edge_pairs_v0.3",
+        "left_femoral_edge_y": int(left_pair["femoral_edge_y"]),
+        "left_tibial_edge_y": int(left_pair["tibial_edge_y"]),
+        "right_femoral_edge_y": int(right_pair["femoral_edge_y"]),
+        "right_tibial_edge_y": int(right_pair["tibial_edge_y"]),
+        "left_joint_width_mm": float(left_pair["width_mm"]),
+        "right_joint_width_mm": float(right_pair["width_mm"]),
+        "left_pair_score": float(left_pair["score"]),
+        "right_pair_score": float(right_pair["score"]),
+        "directed_edge_strength_score": edge_strength,
+        "compartment_width_difference_mm": width_difference_mm,
+        "vertical_edge_gate_passed": vertical_edge_gate,
+        "compartment_consensus_gate_passed": compartment_consensus_gate,
+        "detected_artifact_components": artifact_count,
+        "detected_artifact_extent_mm": artifact_extent_pixels * column_spacing_mm,
+        "effective_inner_margin_mm": required_margin_pixels * column_spacing_mm,
+        "artifact_clearance_gate_passed": artifact_clearance_gate,
+        "boundary_gate_passed": boundary_gate,
+        "background_gate_passed": background_gate,
+        "saturation_gate_passed": saturation_gate,
+        "mandatory_gates_passed": mandatory_gates,
+        "review_reasons": "|".join(reasons),
+        "confidence_score": confidence_score,
+        "confidence_level": "HIGH" if high_confidence else "LOW",
+        "technical_status": technical_status,
+    }
+
+
+def locate_tibiofemoral_joint(
+    normalized_half: np.ndarray,
+    row_spacing_mm: float,
+    column_spacing_mm: float,
+    parameters: dict[str, Any],
+    inner_edge: str | None = None,
+) -> dict[str, Any]:
+    """Dispatch to the explicitly configured localization strategy."""
+    if parameters.get("localization_strategy") == "directed_edge_pairs_v0.3":
+        return _locate_tibiofemoral_joint_v03(
+            normalized_half,
+            row_spacing_mm,
+            column_spacing_mm,
+            parameters,
+            inner_edge,
+        )
+    return _locate_tibiofemoral_joint_v02(
+        normalized_half,
+        row_spacing_mm,
+        column_spacing_mm,
+        parameters,
+        inner_edge,
+    )
+
+
 def _make_preview(
     normalized_half: np.ndarray,
     localization: dict[str, Any],
@@ -569,6 +1044,75 @@ def _validate_parameters(parameters: dict[str, Any]) -> None:
         raise ValueError("inner_edge_margin_mm_is_negative")
     if int(parameters["max_preview_width"]) < 640:
         raise ValueError("max_preview_width_is_too_small")
+    strategy = parameters.get("localization_strategy")
+    if strategy is None:
+        return
+    if strategy != "directed_edge_pairs_v0.3":
+        raise ValueError("unsupported_localization_strategy")
+    v03_required = {
+        "joint_gap_min_mm",
+        "joint_gap_max_mm",
+        "bone_context_mm",
+        "edge_pair_weight",
+        "gap_darkness_pair_weight",
+        "outside_bone_pair_weight",
+        "pair_center_prior_weight",
+        "top_edge_pairs_per_compartment",
+        "minimum_directed_edge_strength",
+        "minimum_pair_score",
+        "maximum_compartment_width_difference_mm",
+        "compartment_width_consensus_weight",
+        "artifact_scan_fraction",
+        "artifact_bright_threshold",
+        "artifact_component_min_area_pixels",
+        "artifact_component_max_area_fraction",
+        "artifact_component_max_height_fraction",
+        "artifact_component_max_width_fraction",
+        "artifact_component_min_fill_ratio",
+        "artifact_safety_buffer_mm",
+        "maximum_saturation_fraction",
+    }
+    missing_v03 = sorted(v03_required - parameters.keys())
+    if missing_v03:
+        raise ValueError("missing_v03_parameters:" + ",".join(missing_v03))
+    pair_weights = sum(
+        float(parameters[key])
+        for key in (
+            "edge_pair_weight",
+            "gap_darkness_pair_weight",
+            "outside_bone_pair_weight",
+            "pair_center_prior_weight",
+        )
+    )
+    if not np.isclose(pair_weights, 1.0):
+        raise ValueError("directed_pair_weights_must_sum_to_one")
+    if not 0.0 < float(parameters["joint_gap_min_mm"]) < float(
+        parameters["joint_gap_max_mm"]
+    ):
+        raise ValueError("invalid_joint_gap_range")
+    if float(parameters["bone_context_mm"]) <= 0.0:
+        raise ValueError("bone_context_mm_must_be_positive")
+    if int(parameters["top_edge_pairs_per_compartment"]) < 1:
+        raise ValueError("top_edge_pairs_per_compartment_must_be_positive")
+    for key in (
+        "minimum_directed_edge_strength",
+        "minimum_pair_score",
+        "artifact_scan_fraction",
+        "artifact_bright_threshold",
+        "artifact_component_max_area_fraction",
+        "artifact_component_max_height_fraction",
+        "artifact_component_max_width_fraction",
+        "artifact_component_min_fill_ratio",
+        "maximum_saturation_fraction",
+    ):
+        if not 0.0 < float(parameters[key]) <= 1.0:
+            raise ValueError(f"{key}_must_be_in_zero_one")
+    if int(parameters["artifact_component_min_area_pixels"]) < 1:
+        raise ValueError("artifact_component_min_area_pixels_must_be_positive")
+    if float(parameters["artifact_safety_buffer_mm"]) < 0.0:
+        raise ValueError("artifact_safety_buffer_mm_is_negative")
+    if float(parameters["maximum_compartment_width_difference_mm"]) <= 0.0:
+        raise ValueError("maximum_compartment_width_difference_mm_must_be_positive")
 
 
 def prepare_joint_localization_pilot(
@@ -757,6 +1301,9 @@ def prepare_joint_localization_pilot(
 
     successful = [row for row in result_rows if not row["error_code"]]
     confidence_counts = Counter(str(row["confidence_level"]) for row in successful)
+    technical_status_counts = Counter(
+        str(row["technical_status"]) for row in successful
+    )
     spacing_counts = Counter(str(row["spacing_source"]) for row in successful)
     public_summary = {
         "status": (
@@ -765,6 +1312,9 @@ def prepare_joint_localization_pilot(
             else "technical_failure"
         ),
         "algorithm_version": parameters["algorithm_version"],
+        "localization_strategy": parameters.get(
+            "localization_strategy", "legacy_absolute_gradient_v0.2"
+        ),
         "source_bilateral_algorithm_version": parameters[
             "expected_bilateral_algorithm_version"
         ],
@@ -774,6 +1324,7 @@ def prepare_joint_localization_pilot(
         "processed_knees": len(successful),
         "technical_failures": failures,
         "confidence_counts": dict(sorted(confidence_counts.items())),
+        "technical_status_counts": dict(sorted(technical_status_counts.items())),
         "spacing_source_counts": dict(sorted(spacing_counts.items())),
         "crop_height_mm": float(parameters["crop_height_mm"]),
         "crop_width_mm": float(parameters["crop_width_mm"]),
@@ -819,6 +1370,32 @@ def prepare_joint_localization_pilot(
             "high_confidence_threshold",
         )
     }
+    if parameters.get("localization_strategy") == "directed_edge_pairs_v0.3":
+        for key in (
+            "localization_strategy",
+            "joint_gap_min_mm",
+            "joint_gap_max_mm",
+            "bone_context_mm",
+            "edge_pair_weight",
+            "gap_darkness_pair_weight",
+            "outside_bone_pair_weight",
+            "pair_center_prior_weight",
+            "top_edge_pairs_per_compartment",
+            "minimum_directed_edge_strength",
+            "minimum_pair_score",
+            "maximum_compartment_width_difference_mm",
+            "compartment_width_consensus_weight",
+            "artifact_scan_fraction",
+            "artifact_bright_threshold",
+            "artifact_component_min_area_pixels",
+            "artifact_component_max_area_fraction",
+            "artifact_component_max_height_fraction",
+            "artifact_component_max_width_fraction",
+            "artifact_component_min_fill_ratio",
+            "artifact_safety_buffer_mm",
+            "maximum_saturation_fraction",
+        ):
+            candidate_parameters[key] = parameters[key]
     candidate_parameters.update(
         {
             "status": "candidate_not_frozen_until_blinded_visual_review",

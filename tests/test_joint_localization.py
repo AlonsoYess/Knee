@@ -16,6 +16,7 @@ from knee.bilateral_separation import normalize_working_copy
 from knee.dicom_audit import sha256_bytes, sha256_file
 from knee.joint_localization import (
     _extract_spacing,
+    _validate_parameters,
     locate_tibiofemoral_joint,
     prepare_joint_localization_pilot,
 )
@@ -50,6 +51,34 @@ PARAMETERS = {
     "maximum_background_fraction": 0.30,
     "high_confidence_threshold": 0.70,
     "max_preview_width": 800,
+}
+
+V03_PARAMETERS = {
+    **PARAMETERS,
+    "algorithm_version": "tibiofemoral_crop_v0.3_pilot",
+    "localization_strategy": "directed_edge_pairs_v0.3",
+    "compartment_consensus_weight": 0.25,
+    "maximum_compartment_width_difference_mm": 8.0,
+    "compartment_width_consensus_weight": 0.10,
+    "joint_gap_min_mm": 1.5,
+    "joint_gap_max_mm": 18.0,
+    "bone_context_mm": 6.0,
+    "edge_pair_weight": 0.45,
+    "gap_darkness_pair_weight": 0.25,
+    "outside_bone_pair_weight": 0.20,
+    "pair_center_prior_weight": 0.10,
+    "top_edge_pairs_per_compartment": 12,
+    "minimum_directed_edge_strength": 0.12,
+    "minimum_pair_score": 0.35,
+    "artifact_scan_fraction": 0.35,
+    "artifact_bright_threshold": 0.90,
+    "artifact_component_min_area_pixels": 12,
+    "artifact_component_max_area_fraction": 0.015,
+    "artifact_component_max_height_fraction": 0.10,
+    "artifact_component_max_width_fraction": 0.10,
+    "artifact_component_min_fill_ratio": 0.25,
+    "artifact_safety_buffer_mm": 4.0,
+    "maximum_saturation_fraction": 0.40,
 }
 
 
@@ -112,6 +141,23 @@ def write_csv(path: Path, rows: list[dict[str, str]]) -> None:
 
 
 class JointLocalizationTest(unittest.TestCase):
+    def test_public_v03_configuration_is_complete_and_valid(self):
+        config_path = (
+            Path(__file__).resolve().parents[1]
+            / "configs"
+            / "joint_localization.v0.3.example.json"
+        )
+        config = json.loads(config_path.read_text(encoding="utf-8"))
+
+        _validate_parameters(config)
+
+        self.assertEqual(config["algorithm_version"], "tibiofemoral_crop_v0.3_pilot")
+        self.assertEqual(
+            config["localization_strategy"], "directed_edge_pairs_v0.3"
+        )
+        self.assertEqual(config["expected_knees"], 20)
+        self.assertIn("v0_3_piloto", config["output_dir"])
+
     def test_localization_finds_joint_gap_and_physical_crop(self):
         normalized = normalize_working_copy(synthetic_half(), "MONOCHROME2")
         result = locate_tibiofemoral_joint(normalized, 0.5, 0.5, PARAMETERS)
@@ -148,6 +194,101 @@ class JointLocalizationTest(unittest.TestCase):
             normalized.shape[1] - right_half["crop_x1_half"], expected_margin
         )
         self.assertGreaterEqual(left_half["crop_x0_half"], expected_margin)
+
+    def test_v03_uses_directed_edges_around_the_true_joint_gap(self):
+        normalized = normalize_working_copy(synthetic_half(), "MONOCHROME2")
+
+        result = locate_tibiofemoral_joint(
+            normalized, 0.5, 0.5, V03_PARAMETERS
+        )
+
+        self.assertLessEqual(abs(result["joint_center_y"] - 311), 12)
+        self.assertLess(result["left_femoral_edge_y"], result["left_tibial_edge_y"])
+        self.assertLess(result["right_femoral_edge_y"], result["right_tibial_edge_y"])
+        self.assertTrue(result["vertical_edge_gate_passed"])
+        self.assertTrue(result["compartment_consensus_gate_passed"])
+
+    def test_v03_rejects_a_false_dark_band_below_the_joint(self):
+        pixels = synthetic_half().copy()
+        pixels[382:402, 70:430] = 120
+        normalized = normalize_working_copy(pixels, "MONOCHROME2")
+
+        result = locate_tibiofemoral_joint(
+            normalized, 0.5, 0.5, V03_PARAMETERS
+        )
+
+        self.assertLessEqual(abs(result["joint_center_y"] - 311), 16)
+
+    def test_v03_rejects_a_false_dark_band_above_the_joint(self):
+        pixels = synthetic_half().copy()
+        pixels[228:248, 70:430] = 120
+        normalized = normalize_working_copy(pixels, "MONOCHROME2")
+
+        result = locate_tibiofemoral_joint(
+            normalized, 0.5, 0.5, V03_PARAMETERS
+        )
+
+        self.assertLessEqual(abs(result["joint_center_y"] - 311), 16)
+
+    def test_v03_marks_incompatible_compartments_for_review(self):
+        pixels = synthetic_half().copy()
+        pixels[300:322, 80:240] = 2800
+        pixels[370:392, 80:240] = 120
+        normalized = normalize_working_copy(pixels, "MONOCHROME2")
+        parameters = {
+            **V03_PARAMETERS,
+            "maximum_compartment_peak_distance_fraction": 0.02,
+            "top_edge_pairs_per_compartment": 1,
+        }
+
+        result = locate_tibiofemoral_joint(normalized, 0.5, 0.5, parameters)
+
+        self.assertFalse(result["compartment_consensus_gate_passed"])
+        self.assertEqual(
+            result["technical_status"],
+            "REVIEW_REQUIRED_VERTICAL_DISAGREEMENT",
+        )
+        self.assertEqual(result["confidence_level"], "LOW")
+
+    def test_v03_expands_the_inner_guard_for_bright_ruler_components(self):
+        pixels = synthetic_half().copy()
+        for y0 in (220, 270, 330, 380):
+            pixels[y0 : y0 + 5, 458:464] = 4095
+        normalized = normalize_working_copy(pixels, "MONOCHROME2")
+
+        result = locate_tibiofemoral_joint(
+            normalized,
+            0.5,
+            0.5,
+            V03_PARAMETERS,
+            inner_edge="RIGHT",
+        )
+
+        self.assertGreater(result["detected_artifact_components"], 0)
+        self.assertGreater(
+            result["effective_inner_margin_mm"],
+            V03_PARAMETERS["inner_edge_margin_mm"],
+        )
+        self.assertGreaterEqual(
+            normalized.shape[1] - result["crop_x1_half"],
+            round(result["effective_inner_margin_mm"] / 0.5),
+        )
+
+    def test_v03_never_declares_high_when_a_mandatory_gate_fails(self):
+        normalized = normalize_working_copy(synthetic_half(), "MONOCHROME2")
+        parameters = {
+            **V03_PARAMETERS,
+            "minimum_pair_score": 1.0,
+            "high_confidence_threshold": 0.01,
+        }
+
+        result = locate_tibiofemoral_joint(
+            normalized, 0.5, 0.5, parameters
+        )
+
+        self.assertFalse(result["vertical_edge_gate_passed"])
+        self.assertFalse(result["mandatory_gates_passed"])
+        self.assertEqual(result["confidence_level"], "LOW")
 
     def test_spacing_is_required_and_explicit(self):
         payload = dicom_bytes(synthetic_bilateral(), include_spacing=False)

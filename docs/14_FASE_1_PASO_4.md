@@ -16,7 +16,9 @@ La primera alternativa es determinista, interpretable y sin entrenamiento adicio
 
 La versión inicial `tibiofemoral_crop_v0.1_pilot` resumía la intensidad en una banda central. Su revisión ciega demostró que esa banda podía confundir la espina tibial o estructuras inferiores con la interlínea y que una caja físicamente correcta podía conservar puntos de la regla central. Por ello `v0.1` quedó rechazada y sus parámetros no se congelaron.
 
-La corrección `tibiofemoral_crop_v0.2_pilot` conserva el enfoque determinista, pero estima perfiles independientes en los compartimentos medial y lateral, excluye la zona intercondílea central de la decisión primaria y exige concordancia espacial entre ambos perfiles. La confianza incorpora la distancia entre los dos máximos candidatos; una discordancia obliga a revisión. La posición horizontal continúa derivándose de la anatomía y el ajuste de la caja añade una separación física mínima respecto del borde interno donde se ubica la regla central. No se desplaza manualmente una rodilla individual.
+La corrección `tibiofemoral_crop_v0.2_pilot` conservó el enfoque determinista, pero estimó perfiles independientes en los compartimentos medial y lateral, excluyó la zona intercondílea central de la decisión primaria y exigió concordancia espacial entre ambos perfiles. La confianza incorporó la distancia entre los dos máximos candidatos y el ajuste de la caja añadió una separación física mínima respecto del borde interno. Su revisión posterior mostró que la concordancia podía reforzar un máximo equivocado y que el margen fijo no excluía todos los puntos de la regla, por lo que `v0.2` también quedó rechazada.
+
+La corrección `v0.3`, definida inicialmente en [`17_PROPUESTA_FASE_1_PASO_4_V03.md`](17_PROPUESTA_FASE_1_PASO_4_V03.md), ya está implementada y preparada localmente según [`18_IMPLEMENTACION_FASE_1_PASO_4_V03.md`](18_IMPLEMENTACION_FASE_1_PASO_4_V03.md). Usa pares de bordes dirigidos, consenso de centro y ancho, una banda periférica adaptativa y puertas obligatorias de confianza. Todavía no se ha ejecutado sobre el piloto privado y no desplaza manualmente una rodilla individual.
 
 El campo de visión candidato es cuadrado y mide 140 × 140 mm. Sus dimensiones en píxeles se calculan a partir de `ImagerPixelSpacing` y, si no existe, `PixelSpacing`. La ausencia de un espaciado válido es un fallo técnico explícito: no se sustituye silenciosamente por una escala arbitraria. El recorte nativo conserva la profundidad original; la normalización percentilar se usa únicamente para localizar y revisar. El redimensionamiento a 224 o 384 píxeles corresponderá al pipeline del modelo y no altera este campo de visión anatómico.
 
@@ -42,7 +44,7 @@ Esto impide recalcular silenciosamente la separación o modificar la lateralidad
 
 ## Salidas privadas del piloto
 
-La ejecución inicial se conserva en `outputs/auditorias/fase_1/paso_4_localizacion_tibiofemoral`. La repetición `v0.2` escribe en el subdirectorio `v0_2_piloto`, sin sobrescribir la evidencia rechazada de `v0.1`:
+La ejecución inicial se conserva en `outputs/auditorias/fase_1/paso_4_localizacion_tibiofemoral`. La repetición `v0.2` escribe en `v0_2_piloto` y la futura ejecución de `v0.3` escribirá en `v0_3_piloto`, sin sobrescribir las evidencias rechazadas:
 
 - `resumen_localizacion_publico.json`: recuentos agregados y estado del piloto;
 - `resultados_localizacion_privados.csv`: coordenadas, espaciado, confianza, trazabilidad y huellas individuales;
@@ -81,6 +83,6 @@ El paso 4 podrá cerrarse únicamente cuando:
 
 ## Estado
 
-**Paso abierto; primera versión rechazada y repetición corregida preparada.** `tibiofemoral_crop_v0.1_pilot` procesó las veinte rodillas, pero la revisión ciega aceptó integralmente 9/20 y rechazó 11/20. Nueve líneas no quedaron centradas y siete recortes conservaron la regla o sus puntos; ambos defectos se superponen en algunos casos. No se atribuyeron exclusiones técnicas a los DICOM y no se consultó el desenlace.
+**Paso abierto; `v0.1` y `v0.2` rechazadas.** `tibiofemoral_crop_v0.1_pilot` aceptó integralmente 9/20 recortes. La repetición `tibiofemoral_crop_v0.2_pilot` procesó las mismas veinte rodillas sin fallos, pero la revisión ciega aceptó 8/20 y rechazó 12/20. Ocho líneas no quedaron centradas, cinco recortes conservaron la regla o sus puntos, la anatomía permaneció completa y no hubo exclusiones técnicas. No se consultó el desenlace.
 
-La revisión rechazada quedó documentada sin congelar parámetros. El siguiente acto autorizado es ejecutar [`08_repeticion_localizacion_tibiofemoral_v02.ipynb`](../notebooks/08_repeticion_localizacion_tibiofemoral_v02.ipynb), que valida primero el acta de `v0.1` y luego genera las veinte vistas con `v0.2`. Esta corrección refina el mismo procedimiento durante el piloto y no cambia población, entrada, desenlace, horizonte ni modelos. El procesamiento masivo continúa bloqueado hasta que una versión complete y supere la revisión.
+Ambas revisiones están documentadas en [`15_REVISION_FASE_1_PASO_4_V01.md`](15_REVISION_FASE_1_PASO_4_V01.md) y [`16_REVISION_FASE_1_PASO_4_V02.md`](16_REVISION_FASE_1_PASO_4_V02.md), sin congelar parámetros. La propuesta [`17_PROPUESTA_FASE_1_PASO_4_V03.md`](17_PROPUESTA_FASE_1_PASO_4_V03.md) fue implementada dentro del mismo procedimiento determinista y su preparación se registra en [`18_IMPLEMENTACION_FASE_1_PASO_4_V03.md`](18_IMPLEMENTACION_FASE_1_PASO_4_V03.md). La ejecución privada y la revisión visual de `v0.3` siguen pendientes. El procesamiento masivo continúa bloqueado hasta que una versión complete y supere la revisión.
