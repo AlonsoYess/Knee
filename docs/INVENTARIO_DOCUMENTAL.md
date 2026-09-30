@@ -5,7 +5,7 @@
 | Campo | Valor |
 | --- | --- |
 | Estado | Activo |
-| Versión | 1.13 pública |
+| Versión | 1.14 pública |
 | Fecha de corte | 30 de septiembre de 2026 |
 | Ámbito | Artefactos rectores y avance controlado hasta la Fase 1, paso 4 |
 | Inventario exacto | Privado en Google Drive autorizado |
@@ -34,13 +34,14 @@ Este archivo es el resumen publicable del control documental. El inventario priv
 | Notebooks de inventario y descarga selectiva | Ejecutados | `notebooks/02_inventario_adquisiciones.ipynb`, `notebooks/03_descarga_selectiva_lote.ipynb`, `notebooks/04_descarga_lotes_pendientes.ipynb` | Copias aprobadas verificadas |
 | Protocolo y notebooks de separación bilateral | Cerrados; `bilateral_split_v0.2_pilot` congelado | `docs/12_FASE_1_PASO_3.md`, `notebooks/05_validacion_separacion_bilateral.ipynb`, `notebooks/06_cierre_revision_separacion_bilateral.ipynb` | Diez vistas aceptadas, cero exclusiones y parámetros privados verificados |
 | Acta pública de cierre de la Fase 1, paso 3 | 1.0, cerrada | `docs/13_CIERRE_FASE_1_PASO_3.md` | Registro, resumen y congelamiento privados verificados |
-| Protocolo, módulo y notebooks de localización tibiofemoral | `v0.1`, `v0.2` y `v0.3` rechazadas; `v0.4` propuesta | `docs/14_FASE_1_PASO_4.md`, `src/knee/joint_localization.py`, `src/knee/joint_review.py`, `notebooks/07_validacion_localizacion_tibiofemoral.ipynb`, `notebooks/08_repeticion_localizacion_tibiofemoral_v02.ipynb`, `notebooks/09_repeticion_localizacion_tibiofemoral_v03.ipynb`, `notebooks/10_cierre_revision_localizacion_tibiofemoral_v03.ipynb` | Tres revisiones y el cierre de `v0.3` verificados; no existe implementación `v0.4` |
+| Protocolo, módulo y notebooks de localización tibiofemoral | `v0.1`, `v0.2` y `v0.3` rechazadas; `v0.4` preparada | `docs/14_FASE_1_PASO_4.md`, `src/knee/joint_localization.py`, `src/knee/joint_review.py`, `notebooks/07_validacion_localizacion_tibiofemoral.ipynb`, `notebooks/08_repeticion_localizacion_tibiofemoral_v02.ipynb`, `notebooks/09_repeticion_localizacion_tibiofemoral_v03.ipynb`, `notebooks/10_cierre_revision_localizacion_tibiofemoral_v03.ipynb`, `notebooks/11_repeticion_localizacion_tibiofemoral_v04.ipynb` | Tres revisiones y el cierre de `v0.3` verificados; `v0.4` pendiente de ejecución privada |
 | Acta pública de revisión de `v0.1` | 1.0, rechazada después de revisión ciega | `docs/15_REVISION_FASE_1_PASO_4_V01.md` | Decisiones individuales preservadas en privado |
 | Acta pública de revisión de `v0.2` | 1.0, rechazada después de revisión ciega | `docs/16_REVISION_FASE_1_PASO_4_V02.md` | Decisiones individuales preservadas en privado |
 | Propuesta técnica de `v0.3` | 0.1, antecedente aprobado | `docs/17_PROPUESTA_FASE_1_PASO_4_V03.md` | Dio origen a la implementación determinista autorizada |
 | Implementación de `v0.3` | 0.1, ejecutada y rechazada | `docs/18_IMPLEMENTACION_FASE_1_PASO_4_V03.md`, `configs/joint_localization.v0.3.example.json`, `notebooks/09_repeticion_localizacion_tibiofemoral_v03.ipynb` | Se ejecutó sobre las mismas veinte rodillas desde una revisión Git identificable |
 | Acta pública de revisión de `v0.3` | 1.0, rechazada y cerrada reproduciblemente | `docs/19_REVISION_FASE_1_PASO_4_V03.md`, `notebooks/10_cierre_revision_localizacion_tibiofemoral_v03.ipynb` | Decisiones individuales y cierre verificados en privado |
-| Propuesta técnica de `v0.4` | 0.1, propuesta no autorizada | `docs/20_PROPUESTA_FASE_1_PASO_4_V04.md` | No implementada; no existe una libreta nueva |
+| Propuesta técnica de `v0.4` | 0.1, antecedente aprobado | `docs/20_PROPUESTA_FASE_1_PASO_4_V04.md` | Dio origen a la implementación determinista autorizada |
+| Implementación de `v0.4` | 0.1, preparada y no ejecutada | `docs/21_IMPLEMENTACION_FASE_1_PASO_4_V04.md`, `configs/joint_localization.v0.4.example.json`, `notebooks/11_repeticion_localizacion_tibiofemoral_v04.ipynb` | Código y libreta aprobada preparados; ejecución y revisión privadas pendientes |
 
 ## Historial preservado
 
@@ -62,7 +63,7 @@ Se verificaron copias privadas del README principal, README del prototipo, plan 
 - el paso 3 quedó cerrado con una entrada ciega al desenlace, diez vistas revisadas y aceptadas, una guarda de límites verificada y los parámetros de la versión 0.2 congelados antes del procesamiento masivo;
 - el paso 4 conserva las ejecuciones y revisiones ciegas de `v0.1`, `v0.2` y `v0.3`: 9/20, 8/20 y 0/20 recortes íntegramente aceptables, respectivamente, sin exclusiones técnicas ni congelamiento de parámetros;
 - el cierre reproducible de la revisión de `v0.3` fue ejecutado y verificado sin habilitar ninguna operación posterior;
-- la corrección `v0.4` está documentada solo como propuesta y requiere autorización expresa antes de modificar código;
+- la corrección `v0.4` fue autorizada, implementada y preparada con una salida independiente; todavía no fue ejecutada ni revisada sobre las imágenes privadas;
 - no se ejecutó entrenamiento ni se abrió el conjunto de prueba reservado.
 
 El inventario público se ampliará solo con información necesaria para reproducibilidad y gobierno. Credenciales, identificadores individuales, rutas privadas, huellas de fuentes restringidas y enlaces privados nunca se publicarán.

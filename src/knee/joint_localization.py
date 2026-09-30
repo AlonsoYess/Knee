@@ -72,10 +72,25 @@ PRIVATE_RESULT_FIELDS = (
     "compartment_width_difference_mm",
     "vertical_edge_gate_passed",
     "compartment_consensus_gate_passed",
+    "left_profile_peak_y",
+    "right_profile_peak_y",
+    "left_cross_method_distance_mm",
+    "right_cross_method_distance_mm",
+    "cross_method_consensus_gate_passed",
+    "left_bone_support_fraction",
+    "right_bone_support_fraction",
+    "bone_support_gate_passed",
+    "anatomy_envelope_x0",
+    "anatomy_envelope_x1",
+    "anatomy_envelope_width_mm",
+    "anatomy_preservation_gate_passed",
     "detected_artifact_components",
     "detected_artifact_extent_mm",
+    "detected_artifact_lines",
+    "detected_artifact_line_extent_mm",
     "effective_inner_margin_mm",
     "artifact_clearance_gate_passed",
+    "feasible_crop_gate_passed",
     "boundary_gate_passed",
     "background_gate_passed",
     "saturation_gate_passed",
@@ -655,6 +670,309 @@ def _bright_artifact_components(
     return count, deepest
 
 
+def _bright_artifact_lines(
+    normalized: np.ndarray,
+    y0: int,
+    y1: int,
+    inner_edge: str | None,
+    parameters: dict[str, Any],
+) -> tuple[int, int]:
+    """Return narrow, vertically repeated bright structures near the inner edge."""
+    if inner_edge is None:
+        return 0, 0
+    rows, columns = normalized.shape
+    scan_width = max(
+        1, int(round(columns * float(parameters["artifact_scan_fraction"])))
+    )
+    if inner_edge == "LEFT":
+        scan_x0, scan_x1 = 0, min(columns, scan_width)
+    else:
+        scan_x0, scan_x1 = max(0, columns - scan_width), columns
+    region = normalized[max(0, y0) : min(rows, y1), scan_x0:scan_x1]
+    if region.size == 0:
+        return 0, 0
+    threshold = float(parameters["artifact_line_bright_threshold"])
+    coverage = np.mean(region >= threshold, axis=0)
+    active = coverage >= float(parameters["artifact_line_min_coverage_fraction"])
+    maximum_width = max(
+        1,
+        int(
+            round(
+                region.shape[1]
+                * float(parameters["artifact_line_max_width_fraction"])
+            )
+        ),
+    )
+    count = 0
+    deepest = 0
+    start: int | None = None
+    for index in range(active.size + 1):
+        is_active = index < active.size and bool(active[index])
+        if is_active and start is None:
+            start = index
+            continue
+        if is_active or start is None:
+            continue
+        end = index
+        width = end - start
+        if width <= maximum_width:
+            count += 1
+            extent = end if inner_edge == "LEFT" else region.shape[1] - start
+            deepest = max(deepest, extent)
+        start = None
+    return count, deepest
+
+
+def _compartment_profile_peak(
+    normalized: np.ndarray,
+    bounds: tuple[int, int],
+    candidates: np.ndarray,
+    parameters: dict[str, Any],
+) -> dict[str, float | int]:
+    """Return the legacy mult signal peak for cross-family agreement."""
+    score, signals = _compartment_score(normalized, bounds, candidates, parameters)
+    best_index = int(np.argmax(score))
+    center_y = int(candidates[best_index])
+    prominence = float(np.clip(score[best_index] - np.median(score), 0.0, 1.0))
+    return {
+        "center_y": center_y,
+        "prominence": prominence,
+        "bone_contrast": float(signals["bone_contrast"][center_y]),
+    }
+
+
+def _bone_support_fraction(
+    normalized: np.ndarray,
+    bounds: tuple[int, int],
+    pair: dict[str, float | int],
+    row_spacing_mm: float,
+    parameters: dict[str, Any],
+) -> float:
+    """Measure repeated bright bone support above and below a candidate gap."""
+    x0, x1 = bounds
+    subbands = int(parameters["bone_support_subbands"])
+    edges = np.linspace(x0, x1, subbands + 1, dtype=int)
+    context = max(
+        1, int(round(float(parameters["bone_context_mm"]) / row_spacing_mm))
+    )
+    femoral = int(pair["femoral_edge_y"])
+    tibial = int(pair["tibial_edge_y"])
+    threshold = float(parameters["minimum_bone_support_score"])
+    passed = 0
+    considered = 0
+    for index in range(subbands):
+        sx0, sx1 = int(edges[index]), int(edges[index + 1])
+        if sx1 <= sx0:
+            continue
+        upper = normalized[max(0, femoral - context) : femoral, sx0:sx1]
+        lower = normalized[
+            tibial + 1 : min(normalized.shape[0], tibial + 1 + context), sx0:sx1
+        ]
+        if not upper.size or not lower.size:
+            continue
+        considered += 1
+        if min(float(np.median(upper)), float(np.median(lower))) >= threshold:
+            passed += 1
+    return passed / considered if considered else 0.0
+
+
+def _anatomy_envelope(
+    normalized: np.ndarray,
+    y_center: int,
+    x_center: float,
+    compartment_bounds: tuple[tuple[int, int], tuple[int, int]],
+    row_spacing_mm: float,
+    column_spacing_mm: float,
+    parameters: dict[str, Any],
+) -> tuple[int, int]:
+    """Estimate a conservative horizontal bone envelope around the joint."""
+    rows, columns = normalized.shape
+    half_height = max(
+        1,
+        int(
+            round(
+                0.5
+                * float(parameters["anatomy_envelope_height_mm"])
+                / row_spacing_mm
+            )
+        ),
+    )
+    y0, y1 = max(0, y_center - half_height), min(rows, y_center + half_height)
+    profile = np.percentile(normalized[y0:y1], 75.0, axis=0)
+    smooth_width = max(3, int(round(columns * 0.01)))
+    support = _smooth_profile(_robust_unit(profile), smooth_width)
+    low_fraction, high_fraction = (
+        float(value) for value in parameters["anatomy_x_band"]
+    )
+    core_half_width = max(
+        1,
+        int(
+            round(
+                0.5
+                * float(parameters["anatomy_envelope_core_width_mm"])
+                / column_spacing_mm
+            )
+        ),
+    )
+    search_x0 = max(
+        0,
+        int(round(columns * low_fraction)),
+        int(round(x_center)) - core_half_width,
+    )
+    search_x1 = min(
+        columns,
+        int(round(columns * high_fraction)),
+        int(round(x_center)) + core_half_width + 1,
+    )
+    supported = np.flatnonzero(
+        support[search_x0:search_x1]
+        >= float(parameters["anatomy_envelope_threshold"])
+    )
+    left_bounds, right_bounds = compartment_bounds
+    if supported.size:
+        envelope_x0 = min(search_x0 + int(supported[0]), left_bounds[0])
+        envelope_x1 = max(search_x0 + int(supported[-1]) + 1, right_bounds[1])
+    else:
+        envelope_x0, envelope_x1 = left_bounds[0], right_bounds[1]
+    safety = max(
+        0, int(round(float(parameters["anatomy_safety_margin_mm"]) / column_spacing_mm))
+    )
+    envelope_x0 = max(0, min(envelope_x0, int(round(x_center))) - safety)
+    envelope_x1 = min(columns, max(envelope_x1, int(round(x_center)) + 1) + safety)
+    return envelope_x0, envelope_x1
+
+
+def _select_anatomy_first_crop(
+    normalized: np.ndarray,
+    y0: int,
+    y1: int,
+    x_center: float,
+    crop_columns: int,
+    envelope: tuple[int, int],
+    inner_edge: str | None,
+    column_spacing_mm: float,
+    parameters: dict[str, Any],
+) -> dict[str, Any]:
+    """Choose among anatomy-preserving windows; artifacts can reject, not displace."""
+    _, columns = normalized.shape
+    if crop_columns <= 0 or crop_columns > columns:
+        raise ValueError("physical_crop_does_not_fit_unilateral_field")
+    proposed = int(round(x_center - crop_columns / 2.0))
+    proposed = min(max(proposed, 0), columns - crop_columns)
+    envelope_x0, envelope_x1 = envelope
+    minimum_start = max(0, envelope_x1 - crop_columns)
+    maximum_start = min(columns - crop_columns, envelope_x0)
+    anatomy_candidates = (
+        list(range(minimum_start, maximum_start + 1))
+        if minimum_start <= maximum_start
+        else []
+    )
+    compact_count, compact_extent = _bright_artifact_components(
+        normalized, y0, y1, inner_edge, parameters
+    )
+    line_count, line_extent = _bright_artifact_lines(
+        normalized, y0, y1, inner_edge, parameters
+    )
+    static_margin = int(
+        round(float(parameters["inner_edge_margin_mm"]) / column_spacing_mm)
+    )
+    safety = int(
+        round(float(parameters["artifact_safety_buffer_mm"]) / column_spacing_mm)
+    )
+    detected_extent = max(
+        compact_extent if compact_count else 0,
+        line_extent if line_count else 0,
+    )
+    required_margin = max(
+        static_margin,
+        detected_extent + safety if compact_count or line_count else 0,
+    )
+
+    def evaluate(start: int) -> dict[str, Any]:
+        end = start + crop_columns
+        crop = normalized[y0:y1, start:end]
+        background_fraction = float(np.mean(crop <= 0.02))
+        saturation_fraction = float(np.mean(crop >= 0.98))
+        clearance = (
+            start
+            if inner_edge == "LEFT"
+            else columns - end
+            if inner_edge == "RIGHT"
+            else min(start, columns - end)
+        )
+        shift_fraction = abs(start - proposed) / columns
+        artifact_gate = clearance >= required_margin
+        boundary_gate = shift_fraction <= float(
+            parameters["maximum_boundary_shift_fraction"]
+        )
+        background_gate = background_fraction <= float(
+            parameters["maximum_background_fraction"]
+        )
+        saturation_gate = saturation_fraction <= float(
+            parameters["maximum_saturation_fraction"]
+        )
+        return {
+            "start": start,
+            "end": end,
+            "clearance": clearance,
+            "shift_fraction": shift_fraction,
+            "background_fraction": background_fraction,
+            "saturation_fraction": saturation_fraction,
+            "artifact_gate": artifact_gate,
+            "boundary_gate": boundary_gate,
+            "background_gate": background_gate,
+            "saturation_gate": saturation_gate,
+            "all_gates": artifact_gate
+            and boundary_gate
+            and background_gate
+            and saturation_gate,
+        }
+
+    if anatomy_candidates:
+        evaluated = [evaluate(start) for start in anatomy_candidates]
+        passing = [candidate for candidate in evaluated if candidate["all_gates"]]
+        pool = passing or evaluated
+        chosen = max(
+            pool,
+            key=lambda candidate: (
+                int(candidate["artifact_gate"]),
+                int(candidate["background_gate"]),
+                int(candidate["boundary_gate"]),
+                int(candidate["saturation_gate"]),
+                -float(candidate["background_fraction"]),
+                -float(candidate["shift_fraction"]),
+            ),
+        )
+        anatomy_gate = True
+        feasible_gate = bool(passing)
+    else:
+        chosen = evaluate(proposed)
+        anatomy_gate = bool(
+            chosen["start"] <= envelope_x0
+            and chosen["end"] >= envelope_x1
+        )
+        feasible_gate = False
+    return {
+        "crop_x0": int(chosen["start"]),
+        "crop_x1": int(chosen["end"]),
+        "inner_clearance_pixels": int(chosen["clearance"]),
+        "horizontal_shift_fraction": float(chosen["shift_fraction"]),
+        "background_fraction": float(chosen["background_fraction"]),
+        "saturation_fraction": float(chosen["saturation_fraction"]),
+        "artifact_clearance_gate": bool(chosen["artifact_gate"]),
+        "boundary_gate": bool(chosen["boundary_gate"]),
+        "background_gate": bool(chosen["background_gate"]),
+        "saturation_gate": bool(chosen["saturation_gate"]),
+        "anatomy_gate": anatomy_gate,
+        "feasible_gate": feasible_gate,
+        "compact_count": compact_count,
+        "compact_extent_pixels": compact_extent,
+        "line_count": line_count,
+        "line_extent_pixels": line_extent,
+        "required_margin_pixels": required_margin,
+    }
+
+
 def _locate_tibiofemoral_joint_v03(
     normalized_half: np.ndarray,
     row_spacing_mm: float,
@@ -910,6 +1228,366 @@ def _locate_tibiofemoral_joint_v03(
     }
 
 
+def _locate_tibiofemoral_joint_v04(
+    normalized_half: np.ndarray,
+    row_spacing_mm: float,
+    column_spacing_mm: float,
+    parameters: dict[str, Any],
+    inner_edge: str | None = None,
+) -> dict[str, Any]:
+    """Locate a joint by cross-family consensus and anatomy-first cropping."""
+    rows, columns = normalized_half.shape
+    search_low, search_high = (
+        float(value) for value in parameters["joint_line_search_band"]
+    )
+    if not 0.15 <= search_low < search_high <= 0.85:
+        raise ValueError("invalid_joint_line_search_band")
+    x_center = _weighted_x_center(normalized_half, parameters)
+    first = max(1, int(round(rows * search_low)))
+    last = min(rows - 1, int(round(rows * search_high)))
+    if last - first < 8:
+        raise ValueError("joint_search_band_too_small")
+    candidates = np.arange(first, last, dtype=int)
+    left_bounds, right_bounds = _compartment_bounds(x_center, columns, parameters)
+    left_profile = _compartment_profile_peak(
+        normalized_half, left_bounds, candidates, parameters
+    )
+    right_profile = _compartment_profile_peak(
+        normalized_half, right_bounds, candidates, parameters
+    )
+    left_pairs = _directed_edge_pairs(
+        normalized_half, left_bounds, first, last, row_spacing_mm, parameters
+    )
+    right_pairs = _directed_edge_pairs(
+        normalized_half, right_bounds, first, last, row_spacing_mm, parameters
+    )
+    if not left_pairs or not right_pairs:
+        raise ValueError("directed_edge_pair_not_available")
+
+    maximum_center_distance = float(
+        parameters["maximum_compartment_peak_distance_fraction"]
+    )
+    maximum_width_difference = float(
+        parameters["maximum_compartment_width_difference_mm"]
+    )
+    maximum_cross_method_distance = float(
+        parameters["maximum_cross_method_distance_mm"]
+    )
+    minimum_support_fraction = float(parameters["minimum_bone_support_fraction"])
+    combinations: list[dict[str, Any]] = []
+    for left_pair in left_pairs:
+        for right_pair in right_pairs:
+            left_center = float(left_pair["center_y"])
+            right_center = float(right_pair["center_y"])
+            center_distance_fraction = abs(left_center - right_center) / rows
+            width_difference_mm = abs(
+                float(left_pair["width_mm"]) - float(right_pair["width_mm"])
+            )
+            left_cross_distance_mm = (
+                abs(left_center - float(left_profile["center_y"])) * row_spacing_mm
+            )
+            right_cross_distance_mm = (
+                abs(right_center - float(right_profile["center_y"])) * row_spacing_mm
+            )
+            left_support = _bone_support_fraction(
+                normalized_half,
+                left_bounds,
+                left_pair,
+                row_spacing_mm,
+                parameters,
+            )
+            right_support = _bone_support_fraction(
+                normalized_half,
+                right_bounds,
+                right_pair,
+                row_spacing_mm,
+                parameters,
+            )
+            compartment_gate = bool(
+                center_distance_fraction <= maximum_center_distance
+                and width_difference_mm <= maximum_width_difference
+            )
+            cross_method_gate = bool(
+                left_cross_distance_mm <= maximum_cross_method_distance
+                and right_cross_distance_mm <= maximum_cross_method_distance
+            )
+            bone_support_gate = bool(
+                left_support >= minimum_support_fraction
+                and right_support >= minimum_support_fraction
+            )
+            center_agreement = max(
+                0.0,
+                1.0
+                - center_distance_fraction / max(maximum_center_distance, 1e-6),
+            )
+            width_agreement = max(
+                0.0,
+                1.0
+                - width_difference_mm / max(maximum_width_difference, 1e-6),
+            )
+            profile_agreement = 0.5 * (
+                max(
+                    0.0,
+                    1.0
+                    - left_cross_distance_mm
+                    / max(maximum_cross_method_distance, 1e-6),
+                )
+                + max(
+                    0.0,
+                    1.0
+                    - right_cross_distance_mm
+                    / max(maximum_cross_method_distance, 1e-6),
+                )
+            )
+            average_pair_score = 0.5 * (
+                float(left_pair["score"]) + float(right_pair["score"])
+            )
+            combined_score = float(
+                0.38 * average_pair_score
+                + 0.22 * profile_agreement
+                + 0.15 * center_agreement
+                + 0.10 * width_agreement
+                + 0.15 * (0.5 * (left_support + right_support))
+            )
+            combinations.append(
+                {
+                    "left_pair": left_pair,
+                    "right_pair": right_pair,
+                    "left_cross_distance_mm": left_cross_distance_mm,
+                    "right_cross_distance_mm": right_cross_distance_mm,
+                    "left_support": left_support,
+                    "right_support": right_support,
+                    "center_distance_fraction": center_distance_fraction,
+                    "width_difference_mm": width_difference_mm,
+                    "center_agreement": center_agreement,
+                    "width_agreement": width_agreement,
+                    "profile_agreement": profile_agreement,
+                    "average_pair_score": average_pair_score,
+                    "compartment_gate": compartment_gate,
+                    "cross_method_gate": cross_method_gate,
+                    "bone_support_gate": bone_support_gate,
+                    "combined_score": combined_score,
+                }
+            )
+    selected = max(
+        combinations,
+        key=lambda item: (
+            int(item["compartment_gate"])
+            + int(item["cross_method_gate"])
+            + int(item["bone_support_gate"]),
+            int(item["bone_support_gate"]),
+            int(item["cross_method_gate"]),
+            float(item["combined_score"]),
+        ),
+    )
+    left_pair = selected["left_pair"]
+    right_pair = selected["right_pair"]
+    left_center = float(left_pair["center_y"])
+    right_center = float(right_pair["center_y"])
+    y_center = int(round(0.5 * (left_center + right_center)))
+    edge_strength = min(
+        float(left_pair["minimum_edge_strength"]),
+        float(right_pair["minimum_edge_strength"]),
+    )
+    vertical_edge_gate = bool(
+        edge_strength >= float(parameters["minimum_directed_edge_strength"])
+        and float(left_pair["score"]) >= float(parameters["minimum_pair_score"])
+        and float(right_pair["score"]) >= float(parameters["minimum_pair_score"])
+    )
+    compartment_consensus_gate = bool(selected["compartment_gate"])
+    cross_method_consensus_gate = bool(selected["cross_method_gate"])
+    bone_support_gate = bool(selected["bone_support_gate"])
+
+    crop_height_mm = float(parameters["crop_height_mm"])
+    crop_width_mm = float(parameters["crop_width_mm"])
+    crop_rows = int(round(crop_height_mm / row_spacing_mm))
+    crop_columns = int(round(crop_width_mm / column_spacing_mm))
+    crop_y0, crop_y1, shift_y = _fit_box(y_center, crop_rows, rows)
+    envelope = _anatomy_envelope(
+        normalized_half,
+        y_center,
+        x_center,
+        (left_bounds, right_bounds),
+        row_spacing_mm,
+        column_spacing_mm,
+        parameters,
+    )
+    horizontal = _select_anatomy_first_crop(
+        normalized_half,
+        crop_y0,
+        crop_y1,
+        x_center,
+        crop_columns,
+        envelope,
+        inner_edge,
+        column_spacing_mm,
+        parameters,
+    )
+    crop_x0, crop_x1 = int(horizontal["crop_x0"]), int(horizontal["crop_x1"])
+    boundary_shift_fraction = max(
+        shift_y / rows, float(horizontal["horizontal_shift_fraction"])
+    )
+    boundary_gate = bool(
+        horizontal["boundary_gate"]
+        and shift_y / rows <= float(parameters["maximum_boundary_shift_fraction"])
+    )
+    anatomy_gate = bool(horizontal["anatomy_gate"])
+    artifact_gate = bool(horizontal["artifact_clearance_gate"])
+    feasible_crop_gate = bool(horizontal["feasible_gate"])
+    background_gate = bool(horizontal["background_gate"])
+    saturation_gate = bool(horizontal["saturation_gate"])
+    mandatory_gates = bool(
+        vertical_edge_gate
+        and compartment_consensus_gate
+        and cross_method_consensus_gate
+        and bone_support_gate
+        and anatomy_gate
+        and artifact_gate
+        and feasible_crop_gate
+        and boundary_gate
+        and background_gate
+        and saturation_gate
+    )
+
+    confidence_score = float(
+        0.26 * float(selected["average_pair_score"])
+        + 0.16 * edge_strength
+        + 0.18 * float(selected["profile_agreement"])
+        + 0.12 * float(selected["center_agreement"])
+        + 0.08 * float(selected["width_agreement"])
+        + 0.12
+        * (0.5 * (float(selected["left_support"]) + float(selected["right_support"])))
+        + 0.04 * max(0.0, 1.0 - float(horizontal["background_fraction"]))
+        + 0.04 * max(0.0, 1.0 - float(horizontal["saturation_fraction"]))
+    )
+    high_confidence = mandatory_gates and confidence_score >= float(
+        parameters["high_confidence_threshold"]
+    )
+    reasons: list[str] = []
+    if not vertical_edge_gate:
+        reasons.append("EDGE_PAIR")
+    if not compartment_consensus_gate:
+        reasons.append("VERTICAL_DISAGREEMENT")
+    if not cross_method_consensus_gate:
+        reasons.append("CROSS_METHOD_DISAGREEMENT")
+    if not bone_support_gate:
+        reasons.append("BONE_SUPPORT")
+    if not anatomy_gate:
+        reasons.append("ANATOMY_INCOMPLETE")
+    if not artifact_gate:
+        reasons.append("ARTIFACT_CLEARANCE")
+    if not feasible_crop_gate:
+        reasons.append("NO_FEASIBLE_CROP")
+    if not boundary_gate:
+        reasons.append("BOUNDARY_SHIFT")
+    if not background_gate:
+        reasons.append("BACKGROUND")
+    if not saturation_gate:
+        reasons.append("SATURATION")
+    if mandatory_gates and not high_confidence:
+        reasons.append("LOW_COMPOSITE_CONFIDENCE")
+    if not vertical_edge_gate:
+        technical_status = "REVIEW_REQUIRED_EDGE_PAIR"
+    elif not (
+        compartment_consensus_gate
+        and cross_method_consensus_gate
+        and bone_support_gate
+    ):
+        technical_status = "REVIEW_REQUIRED_VERTICAL_DISAGREEMENT"
+    elif not anatomy_gate:
+        technical_status = "REVIEW_REQUIRED_ANATOMY"
+    elif not feasible_crop_gate:
+        technical_status = "REVIEW_REQUIRED_NO_FEASIBLE_CROP"
+    elif not artifact_gate:
+        technical_status = "REVIEW_REQUIRED_ARTIFACT_CLEARANCE"
+    elif high_confidence:
+        technical_status = "CANDIDATE_OK"
+    else:
+        technical_status = "REVIEW_REQUIRED"
+
+    return {
+        "joint_center_x_half": int(round(x_center)),
+        "joint_center_y": y_center,
+        "joint_center_x_fraction": x_center / columns,
+        "joint_center_y_fraction": y_center / rows,
+        "crop_x0_half": crop_x0,
+        "crop_x1_half": crop_x1,
+        "crop_y0": crop_y0,
+        "crop_y1": crop_y1,
+        "crop_rows": crop_rows,
+        "crop_columns": crop_columns,
+        "crop_height_mm": crop_rows * row_spacing_mm,
+        "crop_width_mm": crop_columns * column_spacing_mm,
+        "score_prominence": float(np.clip(selected["average_pair_score"], 0.0, 1.0)),
+        "bone_contrast_score": 0.5
+        * (
+            float(left_profile["bone_contrast"])
+            + float(right_profile["bone_contrast"])
+        ),
+        "left_compartment_peak_y": int(round(left_center)),
+        "right_compartment_peak_y": int(round(right_center)),
+        "compartment_peak_distance_fraction": float(
+            selected["center_distance_fraction"]
+        ),
+        "compartment_agreement_score": float(selected["center_agreement"]),
+        "inner_edge_clearance_mm": int(horizontal["inner_clearance_pixels"])
+        * column_spacing_mm,
+        "boundary_shift_fraction": boundary_shift_fraction,
+        "background_fraction": float(horizontal["background_fraction"]),
+        "saturation_fraction": float(horizontal["saturation_fraction"]),
+        "localization_strategy": "hybrid_anatomy_guard_v0.4",
+        "left_femoral_edge_y": int(left_pair["femoral_edge_y"]),
+        "left_tibial_edge_y": int(left_pair["tibial_edge_y"]),
+        "right_femoral_edge_y": int(right_pair["femoral_edge_y"]),
+        "right_tibial_edge_y": int(right_pair["tibial_edge_y"]),
+        "left_joint_width_mm": float(left_pair["width_mm"]),
+        "right_joint_width_mm": float(right_pair["width_mm"]),
+        "left_pair_score": float(left_pair["score"]),
+        "right_pair_score": float(right_pair["score"]),
+        "directed_edge_strength_score": edge_strength,
+        "compartment_width_difference_mm": float(
+            selected["width_difference_mm"]
+        ),
+        "vertical_edge_gate_passed": vertical_edge_gate,
+        "compartment_consensus_gate_passed": compartment_consensus_gate,
+        "left_profile_peak_y": int(left_profile["center_y"]),
+        "right_profile_peak_y": int(right_profile["center_y"]),
+        "left_cross_method_distance_mm": float(
+            selected["left_cross_distance_mm"]
+        ),
+        "right_cross_method_distance_mm": float(
+            selected["right_cross_distance_mm"]
+        ),
+        "cross_method_consensus_gate_passed": cross_method_consensus_gate,
+        "left_bone_support_fraction": float(selected["left_support"]),
+        "right_bone_support_fraction": float(selected["right_support"]),
+        "bone_support_gate_passed": bone_support_gate,
+        "anatomy_envelope_x0": int(envelope[0]),
+        "anatomy_envelope_x1": int(envelope[1]),
+        "anatomy_envelope_width_mm": (envelope[1] - envelope[0])
+        * column_spacing_mm,
+        "anatomy_preservation_gate_passed": anatomy_gate,
+        "detected_artifact_components": int(horizontal["compact_count"]),
+        "detected_artifact_extent_mm": int(horizontal["compact_extent_pixels"])
+        * column_spacing_mm,
+        "detected_artifact_lines": int(horizontal["line_count"]),
+        "detected_artifact_line_extent_mm": int(horizontal["line_extent_pixels"])
+        * column_spacing_mm,
+        "effective_inner_margin_mm": int(horizontal["required_margin_pixels"])
+        * column_spacing_mm,
+        "artifact_clearance_gate_passed": artifact_gate,
+        "feasible_crop_gate_passed": feasible_crop_gate,
+        "boundary_gate_passed": boundary_gate,
+        "background_gate_passed": background_gate,
+        "saturation_gate_passed": saturation_gate,
+        "mandatory_gates_passed": mandatory_gates,
+        "review_reasons": "|".join(reasons),
+        "confidence_score": confidence_score,
+        "confidence_level": "HIGH" if high_confidence else "LOW",
+        "technical_status": technical_status,
+    }
+
+
 def locate_tibiofemoral_joint(
     normalized_half: np.ndarray,
     row_spacing_mm: float,
@@ -918,6 +1596,14 @@ def locate_tibiofemoral_joint(
     inner_edge: str | None = None,
 ) -> dict[str, Any]:
     """Dispatch to the explicitly configured localization strategy."""
+    if parameters.get("localization_strategy") == "hybrid_anatomy_guard_v0.4":
+        return _locate_tibiofemoral_joint_v04(
+            normalized_half,
+            row_spacing_mm,
+            column_spacing_mm,
+            parameters,
+            inner_edge,
+        )
     if parameters.get("localization_strategy") == "directed_edge_pairs_v0.3":
         return _locate_tibiofemoral_joint_v03(
             normalized_half,
@@ -1047,7 +1733,11 @@ def _validate_parameters(parameters: dict[str, Any]) -> None:
     strategy = parameters.get("localization_strategy")
     if strategy is None:
         return
-    if strategy != "directed_edge_pairs_v0.3":
+    supported_strategies = {
+        "directed_edge_pairs_v0.3",
+        "hybrid_anatomy_guard_v0.4",
+    }
+    if strategy not in supported_strategies:
         raise ValueError("unsupported_localization_strategy")
     v03_required = {
         "joint_gap_min_mm",
@@ -1113,6 +1803,49 @@ def _validate_parameters(parameters: dict[str, Any]) -> None:
         raise ValueError("artifact_safety_buffer_mm_is_negative")
     if float(parameters["maximum_compartment_width_difference_mm"]) <= 0.0:
         raise ValueError("maximum_compartment_width_difference_mm_must_be_positive")
+    if strategy == "hybrid_anatomy_guard_v0.4":
+        v04_required = {
+            "maximum_cross_method_distance_mm",
+            "bone_support_subbands",
+            "minimum_bone_support_score",
+            "minimum_bone_support_fraction",
+            "anatomy_envelope_height_mm",
+            "anatomy_envelope_core_width_mm",
+            "anatomy_envelope_threshold",
+            "anatomy_safety_margin_mm",
+            "artifact_line_bright_threshold",
+            "artifact_line_min_coverage_fraction",
+            "artifact_line_max_width_fraction",
+        }
+        missing_v04 = sorted(v04_required - parameters.keys())
+        if missing_v04:
+            raise ValueError("missing_v04_parameters:" + ",".join(missing_v04))
+        if float(parameters["maximum_cross_method_distance_mm"]) <= 0.0:
+            raise ValueError("maximum_cross_method_distance_mm_must_be_positive")
+        if int(parameters["bone_support_subbands"]) < 2:
+            raise ValueError("bone_support_subbands_must_be_at_least_two")
+        if float(parameters["anatomy_envelope_height_mm"]) <= 0.0:
+            raise ValueError("anatomy_envelope_height_mm_must_be_positive")
+        if float(parameters["anatomy_envelope_core_width_mm"]) <= 0.0:
+            raise ValueError("anatomy_envelope_core_width_mm_must_be_positive")
+        if (
+            float(parameters["anatomy_envelope_core_width_mm"])
+            + 2.0 * float(parameters["anatomy_safety_margin_mm"])
+            > float(parameters["crop_width_mm"])
+        ):
+            raise ValueError("anatomy_envelope_with_safety_exceeds_crop_width")
+        if float(parameters["anatomy_safety_margin_mm"]) < 0.0:
+            raise ValueError("anatomy_safety_margin_mm_is_negative")
+        for key in (
+            "minimum_bone_support_score",
+            "minimum_bone_support_fraction",
+            "anatomy_envelope_threshold",
+            "artifact_line_bright_threshold",
+            "artifact_line_min_coverage_fraction",
+            "artifact_line_max_width_fraction",
+        ):
+            if not 0.0 < float(parameters[key]) <= 1.0:
+                raise ValueError(f"{key}_must_be_in_zero_one")
 
 
 def prepare_joint_localization_pilot(
@@ -1370,7 +2103,10 @@ def prepare_joint_localization_pilot(
             "high_confidence_threshold",
         )
     }
-    if parameters.get("localization_strategy") == "directed_edge_pairs_v0.3":
+    if parameters.get("localization_strategy") in {
+        "directed_edge_pairs_v0.3",
+        "hybrid_anatomy_guard_v0.4",
+    }:
         for key in (
             "localization_strategy",
             "joint_gap_min_mm",
@@ -1394,6 +2130,21 @@ def prepare_joint_localization_pilot(
             "artifact_component_min_fill_ratio",
             "artifact_safety_buffer_mm",
             "maximum_saturation_fraction",
+        ):
+            candidate_parameters[key] = parameters[key]
+    if parameters.get("localization_strategy") == "hybrid_anatomy_guard_v0.4":
+        for key in (
+            "maximum_cross_method_distance_mm",
+            "bone_support_subbands",
+            "minimum_bone_support_score",
+            "minimum_bone_support_fraction",
+            "anatomy_envelope_height_mm",
+            "anatomy_envelope_core_width_mm",
+            "anatomy_envelope_threshold",
+            "anatomy_safety_margin_mm",
+            "artifact_line_bright_threshold",
+            "artifact_line_min_coverage_fraction",
+            "artifact_line_max_width_fraction",
         ):
             candidate_parameters[key] = parameters[key]
     candidate_parameters.update(

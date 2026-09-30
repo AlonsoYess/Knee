@@ -13,10 +13,11 @@ class Phase1JointV04ProposalDocumentTest(unittest.TestCase):
     def setUpClass(cls):
         cls.text = DOCUMENT.read_text(encoding="utf-8")
 
-    def test_proposal_is_not_implemented_or_authorized(self):
-        self.assertIn("no implementada ni autorizada", self.text)
-        self.assertIn("Autorización requerida", self.text)
-        self.assertNotIn("Implementación preparada", self.text)
+    def test_proposal_records_approval_without_claiming_private_execution(self):
+        self.assertIn("Antecedente aprobado e implementado", self.text)
+        self.assertIn("Autorización registrada", self.text)
+        self.assertIn("todavía no se ha ejecutado en Colab", self.text)
+        self.assertIn("21_IMPLEMENTACION_FASE_1_PASO_4_V04.md", self.text)
 
     def test_proposal_decouples_anatomy_and_artifact_handling(self):
         self.assertIn("gobernada primero por anatomía", self.text)

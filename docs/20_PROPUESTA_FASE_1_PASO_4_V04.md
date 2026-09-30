@@ -2,7 +2,7 @@
 
 ## Estado y límite de autorización
 
-**Propuesta documentada; no implementada ni autorizada para ejecución.** Este documento responde al rechazo visual de `v0.3` y define una corrección reproducible sobre las mismas veinte rodillas del piloto. No modifica todavía código, configuraciones ni notebooks.
+**Antecedente aprobado e implementado; ejecución privada pendiente.** Este documento respondió al rechazo visual de `v0.3` y definió una corrección reproducible sobre las mismas veinte rodillas del piloto. El investigador autorizó posteriormente implementar `v0.4` y publicar los cambios en la rama actual. La implementación preparada se documenta en [`21_IMPLEMENTACION_FASE_1_PASO_4_V04.md`](21_IMPLEMENTACION_FASE_1_PASO_4_V04.md); todavía no se ha ejecutado en Colab ni revisado visualmente.
 
 La propuesta conserva:
 
@@ -112,9 +112,9 @@ El paso 4 solo podrá cerrarse si las veinte rodillas:
 
 Se propone que `v0.4` sea la última iteración determinista ajustada con estas mismas veinte rodillas. Una cuarta versión rechazada indicaría que continuar afinando reglas sobre el mismo piloto aumenta el riesgo de sobreajuste sin evidencia de generalización. En ese caso no se preparará automáticamente una `v0.5`: se documentará el límite del enfoque y se presentará una propuesta metodológica separada para un localizador de puntos anatómicos con anotaciones, validación y particiones propias. Esa alternativa no queda autorizada por este documento.
 
-## Autorización requerida
+## Autorización registrada
 
-La aprobación de esta propuesta autorizaría únicamente:
+La aprobación recibida autorizó únicamente:
 
 - implementar `tibiofemoral_crop_v0.4_pilot` con pruebas públicas;
 - crear una configuración pública nueva;
@@ -122,4 +122,4 @@ La aprobación de esta propuesta autorizaría únicamente:
 - colocar la copia aprobada de esa libreta en la carpeta privada de notebooks;
 - realizar una nueva revisión visual ciega.
 
-No autorizaría ejecutar Colab en nombre del investigador, procesar la cohorte completa, crear particiones, entrenar modelos ni abrir la prueba reservada.
+No autorizó ejecutar Colab en nombre del investigador, procesar la cohorte completa, crear particiones, entrenar modelos ni abrir la prueba reservada.
