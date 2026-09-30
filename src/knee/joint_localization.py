@@ -51,6 +51,11 @@ PRIVATE_RESULT_FIELDS = (
     "crop_width_mm",
     "score_prominence",
     "bone_contrast_score",
+    "left_compartment_peak_y",
+    "right_compartment_peak_y",
+    "compartment_peak_distance_fraction",
+    "compartment_agreement_score",
+    "inner_edge_clearance_mm",
     "boundary_shift_fraction",
     "background_fraction",
     "saturation_fraction",
@@ -213,11 +218,104 @@ def _fit_box(center: float, size: int, limit: int) -> tuple[int, int, int]:
     return start, start + size, abs(start - proposed)
 
 
+def _fit_box_with_inner_guard(
+    center: float,
+    size: int,
+    limit: int,
+    inner_edge: str | None,
+    margin: int,
+) -> tuple[int, int, int, int]:
+    """Fit a crop while keeping deterministic clearance from the central ruler."""
+    if inner_edge not in {None, "LEFT", "RIGHT"}:
+        raise ValueError("invalid_inner_edge")
+    if margin < 0:
+        raise ValueError("invalid_inner_edge_margin")
+    available_start = margin if inner_edge == "LEFT" else 0
+    available_end = limit - margin if inner_edge == "RIGHT" else limit
+    available = available_end - available_start
+    if size <= 0 or size > available:
+        raise ValueError("physical_crop_does_not_fit_after_inner_edge_guard")
+    proposed = int(round(center - size / 2.0))
+    start = min(max(proposed, available_start), available_end - size)
+    clearance = start if inner_edge == "LEFT" else limit - (start + size)
+    if inner_edge is None:
+        clearance = min(start, limit - (start + size))
+    return start, start + size, abs(start - proposed), clearance
+
+
+def _profile_signals(
+    profile: np.ndarray, rows: int, parameters: dict[str, Any]
+) -> dict[str, np.ndarray]:
+    smooth_width = max(
+        3, round(rows * float(parameters["profile_smoothing_fraction"]))
+    )
+    intensity = _smooth_profile(profile, smooth_width)
+    vertical_gradient = _smooth_profile(
+        np.abs(np.diff(intensity, prepend=intensity[:1])), smooth_width
+    )
+    darkness = 1.0 - _robust_unit(intensity)
+    gradient = _robust_unit(vertical_gradient)
+    offset = max(2, int(round(rows * float(parameters["bone_offset_fraction"]))))
+    before = np.take(intensity, np.clip(np.arange(rows) - offset, 0, rows - 1))
+    after = np.take(intensity, np.clip(np.arange(rows) + offset, 0, rows - 1))
+    bone_contrast_raw = np.clip((before + after) / 2.0 - intensity, 0.0, None)
+    return {
+        "intensity": intensity,
+        "darkness": darkness,
+        "gradient": gradient,
+        "bone_contrast": _robust_unit(bone_contrast_raw),
+    }
+
+
+def _compartment_bounds(
+    x_center: float, columns: int, parameters: dict[str, Any]
+) -> tuple[tuple[int, int], tuple[int, int]]:
+    inner = int(
+        round(columns * float(parameters["compartment_inner_offset_fraction"]))
+    )
+    outer = int(
+        round(columns * float(parameters["compartment_outer_offset_fraction"]))
+    )
+    minimum = int(parameters["minimum_compartment_width_pixels"])
+    if not 0 <= inner < outer:
+        raise ValueError("invalid_compartment_offsets")
+    left = (
+        max(0, int(round(x_center)) - outer),
+        max(0, int(round(x_center)) - inner),
+    )
+    right = (
+        min(columns, int(round(x_center)) + inner),
+        min(columns, int(round(x_center)) + outer),
+    )
+    if left[1] - left[0] < minimum or right[1] - right[0] < minimum:
+        raise ValueError("compartment_band_too_narrow")
+    return left, right
+
+
+def _compartment_score(
+    normalized: np.ndarray,
+    bounds: tuple[int, int],
+    candidates: np.ndarray,
+    parameters: dict[str, Any],
+) -> tuple[np.ndarray, dict[str, np.ndarray]]:
+    x0, x1 = bounds
+    profile = np.median(normalized[:, x0:x1], axis=1)
+    signals = _profile_signals(profile, normalized.shape[0], parameters)
+    score = (
+        float(parameters["darkness_weight"]) * signals["darkness"][candidates]
+        + float(parameters["bone_contrast_weight"])
+        * signals["bone_contrast"][candidates]
+        + float(parameters["gradient_weight"]) * signals["gradient"][candidates]
+    )
+    return score, signals
+
+
 def locate_tibiofemoral_joint(
     normalized_half: np.ndarray,
     row_spacing_mm: float,
     column_spacing_mm: float,
     parameters: dict[str, Any],
+    inner_edge: str | None = None,
 ) -> dict[str, Any]:
     """Locate a joint-space candidate and derive a fixed physical field of view."""
     rows, columns = normalized_half.shape
@@ -226,33 +324,9 @@ def locate_tibiofemoral_joint(
     )
     if not 0.15 <= search_low < search_high <= 0.85:
         raise ValueError("invalid_joint_line_search_band")
-    if not 0.0 < float(parameters["analysis_half_width_fraction"]) < 0.5:
-        raise ValueError("invalid_analysis_half_width_fraction")
 
     x_center = _weighted_x_center(normalized_half, parameters)
-    half_width = max(8, int(round(columns * float(parameters["analysis_half_width_fraction"]))))
-    x0 = max(0, int(round(x_center)) - half_width)
-    x1 = min(columns, int(round(x_center)) + half_width + 1)
-    analysis = normalized_half[:, x0:x1]
-    if analysis.shape[1] < 16:
-        raise ValueError("joint_profile_band_too_narrow")
-
-    intensity = np.median(analysis, axis=1)
-    vertical_gradient = np.median(
-        np.abs(np.diff(analysis, axis=0, prepend=analysis[:1])), axis=1
-    )
-    smooth_width = max(3, round(rows * float(parameters["profile_smoothing_fraction"])))
-    intensity = _smooth_profile(intensity, smooth_width)
-    vertical_gradient = _smooth_profile(vertical_gradient, smooth_width)
-    darkness = 1.0 - _robust_unit(intensity)
-    gradient = _robust_unit(vertical_gradient)
-
     offset = max(2, int(round(rows * float(parameters["bone_offset_fraction"]))))
-    before = np.take(intensity, np.clip(np.arange(rows) - offset, 0, rows - 1))
-    after = np.take(intensity, np.clip(np.arange(rows) + offset, 0, rows - 1))
-    bone_contrast_raw = np.clip((before + after) / 2.0 - intensity, 0.0, None)
-    bone_contrast = _robust_unit(bone_contrast_raw)
-
     first = max(offset, int(round(rows * search_low)))
     last = min(rows - offset, int(round(rows * search_high)))
     candidates = np.arange(first, last, dtype=int)
@@ -262,22 +336,62 @@ def locate_tibiofemoral_joint(
     expected_row = expected_fraction * (rows - 1)
     half_band = max(1.0, (last - first) / 2.0)
     center_distance = np.abs(candidates - expected_row) / half_band
+    left_bounds, right_bounds = _compartment_bounds(x_center, columns, parameters)
+    left_score, left_signals = _compartment_score(
+        normalized_half, left_bounds, candidates, parameters
+    )
+    right_score, right_signals = _compartment_score(
+        normalized_half, right_bounds, candidates, parameters
+    )
+    left_peak = int(candidates[int(np.argmax(left_score))])
+    right_peak = int(candidates[int(np.argmax(right_score))])
+    peak_distance_fraction = abs(left_peak - right_peak) / rows
+    maximum_peak_distance = float(
+        parameters["maximum_compartment_peak_distance_fraction"]
+    )
+    agreement_score = float(
+        np.clip(
+            1.0
+            - peak_distance_fraction / max(maximum_peak_distance, 1e-6),
+            0.0,
+            1.0,
+        )
+    )
+    agreement_sigma = max(
+        1.0,
+        rows * float(parameters["compartment_consensus_sigma_fraction"]),
+    )
+    consensus = 0.5 * (
+        np.exp(-0.5 * ((candidates - left_peak) / agreement_sigma) ** 2)
+        + np.exp(-0.5 * ((candidates - right_peak) / agreement_sigma) ** 2)
+    )
     score = (
-        float(parameters["darkness_weight"]) * darkness[candidates]
-        + float(parameters["bone_contrast_weight"]) * bone_contrast[candidates]
-        + float(parameters["gradient_weight"]) * gradient[candidates]
+        0.5 * (_robust_unit(left_score) + _robust_unit(right_score))
+        + float(parameters["compartment_consensus_weight"]) * consensus
         - float(parameters["vertical_center_penalty"]) * center_distance
     )
     best_index = int(np.argmax(score))
     y_center = int(candidates[best_index])
     score_prominence = float(np.clip(score[best_index] - np.median(score), 0.0, 1.0))
-    contrast_at_center = float(bone_contrast[y_center])
+    contrast_at_center = float(
+        0.5
+        * (
+            left_signals["bone_contrast"][y_center]
+            + right_signals["bone_contrast"][y_center]
+        )
+    )
 
-    crop_size_mm = float(parameters["crop_size_mm"])
-    crop_rows = int(round(crop_size_mm / row_spacing_mm))
-    crop_columns = int(round(crop_size_mm / column_spacing_mm))
+    crop_height_mm = float(parameters["crop_height_mm"])
+    crop_width_mm = float(parameters["crop_width_mm"])
+    crop_rows = int(round(crop_height_mm / row_spacing_mm))
+    crop_columns = int(round(crop_width_mm / column_spacing_mm))
     crop_y0, crop_y1, shift_y = _fit_box(y_center, crop_rows, rows)
-    crop_x0, crop_x1, shift_x = _fit_box(x_center, crop_columns, columns)
+    margin_pixels = int(
+        round(float(parameters["inner_edge_margin_mm"]) / column_spacing_mm)
+    )
+    crop_x0, crop_x1, shift_x, inner_clearance_pixels = _fit_box_with_inner_guard(
+        x_center, crop_columns, columns, inner_edge, margin_pixels
+    )
     boundary_shift_fraction = max(shift_y / rows, shift_x / columns)
     crop = normalized_half[crop_y0:crop_y1, crop_x0:crop_x1]
     background_fraction = float(np.mean(crop <= 0.02))
@@ -302,17 +416,19 @@ def locate_tibiofemoral_joint(
         / max(float(parameters["maximum_background_fraction"]), 1e-6),
     )
     confidence_score = float(
-        0.40 * prominence_component
-        + 0.25 * contrast_at_center
-        + 0.15 * vertical_component
+        0.32 * prominence_component
+        + 0.20 * contrast_at_center
+        + 0.20 * agreement_score
+        + 0.10 * vertical_component
         + 0.10 * horizontal_component
-        + 0.10 * artifact_component
+        + 0.08 * artifact_component
     )
     high_confidence = (
         score_prominence >= float(parameters["minimum_score_prominence"])
         and boundary_shift_fraction
         <= float(parameters["maximum_boundary_shift_fraction"])
         and background_fraction <= float(parameters["maximum_background_fraction"])
+        and peak_distance_fraction <= maximum_peak_distance
         and confidence_score >= float(parameters["high_confidence_threshold"])
     )
     return {
@@ -330,6 +446,11 @@ def locate_tibiofemoral_joint(
         "crop_width_mm": crop_columns * column_spacing_mm,
         "score_prominence": score_prominence,
         "bone_contrast_score": contrast_at_center,
+        "left_compartment_peak_y": left_peak,
+        "right_compartment_peak_y": right_peak,
+        "compartment_peak_distance_fraction": peak_distance_fraction,
+        "compartment_agreement_score": agreement_score,
+        "inner_edge_clearance_mm": inner_clearance_pixels * column_spacing_mm,
         "boundary_shift_fraction": boundary_shift_fraction,
         "background_fraction": background_fraction,
         "saturation_fraction": saturation_fraction,
@@ -406,7 +527,12 @@ def _validate_parameters(parameters: dict[str, Any]) -> None:
         "algorithm_version",
         "joint_line_search_band",
         "anatomy_x_band",
-        "analysis_half_width_fraction",
+        "compartment_inner_offset_fraction",
+        "compartment_outer_offset_fraction",
+        "minimum_compartment_width_pixels",
+        "maximum_compartment_peak_distance_fraction",
+        "compartment_consensus_sigma_fraction",
+        "compartment_consensus_weight",
         "profile_smoothing_fraction",
         "bone_offset_fraction",
         "expected_joint_line_fraction",
@@ -414,7 +540,9 @@ def _validate_parameters(parameters: dict[str, Any]) -> None:
         "bone_contrast_weight",
         "gradient_weight",
         "vertical_center_penalty",
-        "crop_size_mm",
+        "crop_height_mm",
+        "crop_width_mm",
+        "inner_edge_margin_mm",
         "accepted_spacing_tags",
         "minimum_score_prominence",
         "maximum_boundary_shift_fraction",
@@ -433,8 +561,12 @@ def _validate_parameters(parameters: dict[str, Any]) -> None:
         raise ValueError("localization_weights_must_sum_to_one")
     if int(parameters["expected_knees"]) != 2 * int(parameters["expected_unique_studies"]):
         raise ValueError("expected_knees_must_equal_two_per_study")
-    if float(parameters["crop_size_mm"]) < 100.0:
-        raise ValueError("crop_size_mm_is_too_small")
+    if float(parameters["crop_height_mm"]) < 100.0:
+        raise ValueError("crop_height_mm_is_too_small")
+    if float(parameters["crop_width_mm"]) < 100.0:
+        raise ValueError("crop_width_mm_is_too_small")
+    if float(parameters["inner_edge_margin_mm"]) < 0.0:
+        raise ValueError("inner_edge_margin_mm_is_negative")
     if int(parameters["max_preview_width"]) < 640:
         raise ValueError("max_preview_width_is_too_small")
 
@@ -509,7 +641,11 @@ def prepare_joint_localization_pilot(
             for side, half_x0, half_x1, normalized_half, native_half in halves:
                 knee_alias = f"{case_alias}_{side}"
                 localization = locate_tibiofemoral_joint(
-                    normalized_half, row_spacing, column_spacing, parameters
+                    normalized_half,
+                    row_spacing,
+                    column_spacing,
+                    parameters,
+                    inner_edge=side,
                 )
                 x0, x1 = int(localization["crop_x0_half"]), int(localization["crop_x1_half"])
                 y0, y1 = int(localization["crop_y0"]), int(localization["crop_y1"])
@@ -639,7 +775,9 @@ def prepare_joint_localization_pilot(
         "technical_failures": failures,
         "confidence_counts": dict(sorted(confidence_counts.items())),
         "spacing_source_counts": dict(sorted(spacing_counts.items())),
-        "crop_size_mm": float(parameters["crop_size_mm"]),
+        "crop_height_mm": float(parameters["crop_height_mm"]),
+        "crop_width_mm": float(parameters["crop_width_mm"]),
+        "inner_edge_margin_mm": float(parameters["inner_edge_margin_mm"]),
         "visual_review_status": "pending",
         "outcome_data_loaded": False,
         "mass_processing_executed": False,
@@ -658,7 +796,12 @@ def prepare_joint_localization_pilot(
             "expected_bilateral_algorithm_version",
             "joint_line_search_band",
             "anatomy_x_band",
-            "analysis_half_width_fraction",
+            "compartment_inner_offset_fraction",
+            "compartment_outer_offset_fraction",
+            "minimum_compartment_width_pixels",
+            "maximum_compartment_peak_distance_fraction",
+            "compartment_consensus_sigma_fraction",
+            "compartment_consensus_weight",
             "profile_smoothing_fraction",
             "bone_offset_fraction",
             "expected_joint_line_fraction",
@@ -666,7 +809,9 @@ def prepare_joint_localization_pilot(
             "bone_contrast_weight",
             "gradient_weight",
             "vertical_center_penalty",
-            "crop_size_mm",
+            "crop_height_mm",
+            "crop_width_mm",
+            "inner_edge_margin_mm",
             "accepted_spacing_tags",
             "minimum_score_prominence",
             "maximum_boundary_shift_fraction",

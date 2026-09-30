@@ -8,13 +8,15 @@ No procesa todavía las 1,916 adquisiciones, no crea la cohorte radiográfica de
 
 ## Decisión técnica candidata
 
-La primera alternativa será determinista, interpretable y sin entrenamiento adicional. Combina tres señales calculadas en cada campo unilateral ya separado:
+La primera alternativa es determinista, interpretable y sin entrenamiento adicional. Combina tres señales calculadas en cada campo unilateral ya separado:
 
 1. oscuridad relativa de la interlínea dentro de una banda vertical anatómicamente plausible;
 2. contraste entre la interlínea candidata y las regiones óseas superior e inferior;
 3. gradiente vertical robusto alrededor de los bordes articulares.
 
-La posición horizontal se estima mediante un centro ponderado de la anatomía de alta intensidad, excluyendo los bordes laterales. La posición vertical se selecciona por una función multiseñal suavizada y una penalización leve respecto de la región esperada; no se acepta automáticamente el centro geométrico.
+La versión inicial `tibiofemoral_crop_v0.1_pilot` resumía la intensidad en una banda central. Su revisión ciega demostró que esa banda podía confundir la espina tibial o estructuras inferiores con la interlínea y que una caja físicamente correcta podía conservar puntos de la regla central. Por ello `v0.1` quedó rechazada y sus parámetros no se congelaron.
+
+La corrección `tibiofemoral_crop_v0.2_pilot` conserva el enfoque determinista, pero estima perfiles independientes en los compartimentos medial y lateral, excluye la zona intercondílea central de la decisión primaria y exige concordancia espacial entre ambos perfiles. La confianza incorpora la distancia entre los dos máximos candidatos; una discordancia obliga a revisión. La posición horizontal continúa derivándose de la anatomía y el ajuste de la caja añade una separación física mínima respecto del borde interno donde se ubica la regla central. No se desplaza manualmente una rodilla individual.
 
 El campo de visión candidato es cuadrado y mide 140 × 140 mm. Sus dimensiones en píxeles se calculan a partir de `ImagerPixelSpacing` y, si no existe, `PixelSpacing`. La ausencia de un espaciado válido es un fallo técnico explícito: no se sustituye silenciosamente por una escala arbitraria. El recorte nativo conserva la profundidad original; la normalización percentilar se usa únicamente para localizar y revisar. El redimensionamiento a 224 o 384 píxeles corresponderá al pipeline del modelo y no altera este campo de visión anatómico.
 
@@ -40,7 +42,7 @@ Esto impide recalcular silenciosamente la separación o modificar la lateralidad
 
 ## Salidas privadas del piloto
 
-La ejecución escribe en `outputs/auditorias/fase_1/paso_4_localizacion_tibiofemoral`:
+La ejecución inicial se conserva en `outputs/auditorias/fase_1/paso_4_localizacion_tibiofemoral`. La repetición `v0.2` escribe en el subdirectorio `v0_2_piloto`, sin sobrescribir la evidencia rechazada de `v0.1`:
 
 - `resumen_localizacion_publico.json`: recuentos agregados y estado del piloto;
 - `resultados_localizacion_privados.csv`: coordenadas, espaciado, confianza, trazabilidad y huellas individuales;
@@ -79,4 +81,6 @@ El paso 4 podrá cerrarse únicamente cuando:
 
 ## Estado
 
-**Preparación reproducible implementada; ejecución piloto pendiente.** El siguiente acto autorizado es ejecutar [`07_validacion_localizacion_tibiofemoral.ipynb`](../notebooks/07_validacion_localizacion_tibiofemoral.ipynb) en Colab y revisar las veinte vistas. El procesamiento masivo continúa bloqueado hasta cerrar este paso.
+**Paso abierto; primera versión rechazada y repetición corregida preparada.** `tibiofemoral_crop_v0.1_pilot` procesó las veinte rodillas, pero la revisión ciega aceptó integralmente 9/20 y rechazó 11/20. Nueve líneas no quedaron centradas y siete recortes conservaron la regla o sus puntos; ambos defectos se superponen en algunos casos. No se atribuyeron exclusiones técnicas a los DICOM y no se consultó el desenlace.
+
+La revisión rechazada quedó documentada sin congelar parámetros. El siguiente acto autorizado es ejecutar [`08_repeticion_localizacion_tibiofemoral_v02.ipynb`](../notebooks/08_repeticion_localizacion_tibiofemoral_v02.ipynb), que valida primero el acta de `v0.1` y luego genera las veinte vistas con `v0.2`. Esta corrección refina el mismo procedimiento durante el piloto y no cambia población, entrada, desenlace, horizonte ni modelos. El procesamiento masivo continúa bloqueado hasta que una versión complete y supere la revisión.

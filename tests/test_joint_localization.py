@@ -28,7 +28,12 @@ PARAMETERS = {
     "algorithm_version": "test_joint_crop",
     "joint_line_search_band": [0.32, 0.70],
     "anatomy_x_band": [0.12, 0.88],
-    "analysis_half_width_fraction": 0.24,
+    "compartment_inner_offset_fraction": 0.055,
+    "compartment_outer_offset_fraction": 0.23,
+    "minimum_compartment_width_pixels": 18,
+    "maximum_compartment_peak_distance_fraction": 0.04,
+    "compartment_consensus_sigma_fraction": 0.018,
+    "compartment_consensus_weight": 0.35,
     "profile_smoothing_fraction": 0.012,
     "bone_offset_fraction": 0.035,
     "expected_joint_line_fraction": 0.52,
@@ -36,7 +41,9 @@ PARAMETERS = {
     "bone_contrast_weight": 0.40,
     "gradient_weight": 0.15,
     "vertical_center_penalty": 0.08,
-    "crop_size_mm": 140.0,
+    "crop_height_mm": 140.0,
+    "crop_width_mm": 140.0,
+    "inner_edge_margin_mm": 12.0,
     "accepted_spacing_tags": ["ImagerPixelSpacing", "PixelSpacing"],
     "minimum_score_prominence": 0.10,
     "maximum_boundary_shift_fraction": 0.03,
@@ -109,12 +116,38 @@ class JointLocalizationTest(unittest.TestCase):
         normalized = normalize_working_copy(synthetic_half(), "MONOCHROME2")
         result = locate_tibiofemoral_joint(normalized, 0.5, 0.5, PARAMETERS)
 
-        self.assertLess(abs(result["joint_center_y"] - 311), 24)
+        self.assertLessEqual(abs(result["joint_center_y"] - 311), 24)
         self.assertLess(abs(result["joint_center_x_half"] - 250), 36)
         self.assertEqual(result["crop_rows"], 280)
         self.assertEqual(result["crop_columns"], 280)
         self.assertAlmostEqual(result["crop_height_mm"], 140.0)
         self.assertAlmostEqual(result["crop_width_mm"], 140.0)
+        self.assertLessEqual(result["compartment_peak_distance_fraction"], 0.04)
+
+    def test_compartment_consensus_ignores_a_central_false_gap(self):
+        pixels = synthetic_half().astype(np.float64)
+        pixels[385:410, 205:295] = 120
+        normalized = normalize_working_copy(pixels.astype(np.uint16), "MONOCHROME2")
+
+        result = locate_tibiofemoral_joint(normalized, 0.5, 0.5, PARAMETERS)
+
+        self.assertLessEqual(abs(result["joint_center_y"] - 311), 24)
+
+    def test_inner_edge_guard_keeps_crop_away_from_central_ruler(self):
+        normalized = normalize_working_copy(synthetic_half(), "MONOCHROME2")
+
+        right_half = locate_tibiofemoral_joint(
+            normalized, 0.5, 0.5, PARAMETERS, inner_edge="RIGHT"
+        )
+        left_half = locate_tibiofemoral_joint(
+            normalized, 0.5, 0.5, PARAMETERS, inner_edge="LEFT"
+        )
+
+        expected_margin = round(PARAMETERS["inner_edge_margin_mm"] / 0.5)
+        self.assertGreaterEqual(
+            normalized.shape[1] - right_half["crop_x1_half"], expected_margin
+        )
+        self.assertGreaterEqual(left_half["crop_x0_half"], expected_margin)
 
     def test_spacing_is_required_and_explicit(self):
         payload = dicom_bytes(synthetic_bilateral(), include_spacing=False)

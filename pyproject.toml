@@ -22,6 +22,7 @@ knee-selective-download = "knee.selective_download:main"
 knee-bilateral-pilot = "knee.bilateral_separation:main"
 knee-bilateral-close = "knee.bilateral_review:main"
 knee-joint-pilot = "knee.joint_localization:main"
+knee-joint-review = "knee.joint_review:main"
 knee-run-record = "knee.experiment:main"
 knee-change-check = "knee.change_control:main"
 
