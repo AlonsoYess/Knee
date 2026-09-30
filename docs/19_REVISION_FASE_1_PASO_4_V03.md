@@ -33,4 +33,6 @@ La única candidata etiquetada automáticamente como `HIGH` conservó puntos de 
 - entrenamiento;
 - apertura de la prueba reservada.
 
-La libreta [`10_cierre_revision_localizacion_tibiofemoral_v03.ipynb`](../notebooks/10_cierre_revision_localizacion_tibiofemoral_v03.ipynb) quedó preparada para validar el CSV privado y generar el resumen público reproducible. Su ejecución en Colab es el único cierre operativo pendiente de esta revisión. Cualquier nueva versión o cambio de familia técnica requiere una propuesta explícita y autorización separada.
+La libreta [`10_cierre_revision_localizacion_tibiofemoral_v03.ipynb`](../notebooks/10_cierre_revision_localizacion_tibiofemoral_v03.ipynb) fue ejecutada en Colab. El cierre verificó 20 revisiones, 0 recortes aceptables, 20 rechazados, 0 exclusiones técnicas, parámetros no congelados y todos los bloqueos posteriores en `False`. El registro quedó asociado a la revisión Git `ee2bce8124b8eba345694ae1301a824fda38ab18`.
+
+El cierre operativo de `v0.3` está completo, pero el paso 4 continúa abierto. La propuesta de una corrección `v0.4` se documenta por separado en [`20_PROPUESTA_FASE_1_PASO_4_V04.md`](20_PROPUESTA_FASE_1_PASO_4_V04.md) y requiere autorización expresa antes de modificar código.

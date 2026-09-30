@@ -4,7 +4,7 @@
 
 **Propuesta documentada; no implementada ni autorizada para ejecución.** Este documento responde al rechazo visual de `v0.2` y define una corrección reproducible dentro de las mismas veinte rodillas del piloto. No modifica todavía código, configuraciones ni notebooks.
 
-> Actualización posterior del 30 de septiembre de 2026: la implementación fue autorizada y quedó preparada localmente. Su estado vigente se documenta en [`18_IMPLEMENTACION_FASE_1_PASO_4_V03.md`](18_IMPLEMENTACION_FASE_1_PASO_4_V03.md). El piloto privado todavía no se ha ejecutado.
+> Actualización posterior del 30 de septiembre de 2026: la implementación fue autorizada, se ejecutó sobre el piloto privado y quedó rechazada con 0/20 recortes aceptables. Su estado final se documenta en [`18_IMPLEMENTACION_FASE_1_PASO_4_V03.md`](18_IMPLEMENTACION_FASE_1_PASO_4_V03.md) y [`19_REVISION_FASE_1_PASO_4_V03.md`](19_REVISION_FASE_1_PASO_4_V03.md).
 
 La propuesta conserva:
 
