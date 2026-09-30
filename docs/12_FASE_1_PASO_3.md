@@ -79,6 +79,10 @@ Para cada alias se documentará:
 
 Las vistas de confianza baja deben revisarse con especial atención. La intervención humana valida la regla general; no autoriza dibujar recortes manuales privilegiados que luego no puedan reproducirse en la aplicación.
 
+## Cierre reproducible
+
+Después de completar la revisión, el comando `knee-bilateral-close` compara cada valor automático del registro con los resultados privados originales, exige decisiones para los diez alias, confirma que la revisión fue ciega y detiene el cierre ante un rechazo, exclusión, edición de los valores automáticos o violación de los bloqueos. Si todas las condiciones se cumplen, genera `parametros_congelados.json` y `cierre_paso_3_publico.json`. La libreta [`06_cierre_revision_separacion_bilateral.ipynb`](../notebooks/06_cierre_revision_separacion_bilateral.ipynb) orquesta esta operación desde una revisión identificable del repositorio.
+
 ## Criterio de cierre
 
 El paso 3 podrá cerrarse solo cuando:
@@ -92,4 +96,4 @@ El paso 3 podrá cerrarse solo cuando:
 
 ## Estado
 
-**Piloto ejecutado una vez y ajuste de control preparado.** Las diez líneas fueron visualmente aceptables y la lateralidad propuesta fue respaldada por marcadores o anatomía. Antes de congelar parámetros debe repetirse la libreta con `bilateral_split_v0.2_pilot`, que añade la guarda de límites detectada durante el piloto, y después registrar formalmente la revisión ciega. El paso permanece abierto; no se ha ejecutado procesamiento masivo, entrenamiento ni apertura de la prueba reservada.
+**Repetición y revisión visual completadas; cierre reproducible preparado.** `bilateral_split_v0.2_pilot` procesó las diez adquisiciones sin fallos: nueve casos quedaron en confianza alta y `case_003` fue derivado correctamente a revisión por la guarda de límites. Las diez separaciones y lateralidades fueron aceptadas, sin exclusiones y sin consultar el desenlace. Falta ejecutar y verificar la libreta de cierre para congelar los parámetros. No se ha ejecutado procesamiento masivo, entrenamiento ni apertura de la prueba reservada.
