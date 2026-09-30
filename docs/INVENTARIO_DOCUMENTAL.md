@@ -5,9 +5,9 @@
 | Campo | Valor |
 | --- | --- |
 | Estado | Activo |
-| Versión | 1.4 pública |
+| Versión | 1.7 pública |
 | Fecha de corte | 29 de septiembre de 2026 |
-| Ámbito | Artefactos rectores, cierre de la Fase 0 y preparación del paso 3 de la Fase 1 |
+| Ámbito | Artefactos rectores y cierres técnicos hasta la Fase 1, paso 3 |
 | Inventario exacto | Privado en Google Drive autorizado |
 
 Este archivo es el resumen publicable del control documental. El inventario privado conserva nombres de archivo completos, enlaces, identificadores de Drive, tamaños, huellas SHA-256 y ubicación exacta de cada versión. Esa evidencia no se replica en GitHub.
@@ -32,7 +32,8 @@ Este archivo es el resumen publicable del control documental. El inventario priv
 | Protocolo y avance del inventario radiográfico | Cerrados | `docs/09_FASE_1_PASO_2.md`, `docs/10_AVANCE_FASE_1_PASO_2.md` | Evidencias privadas verificadas |
 | Acta pública de cierre de la Fase 1, paso 2 | 1.0, cerrada | `docs/11_CIERRE_FASE_1_PASO_2.md` | Inventario, lotes y registros privados verificados |
 | Notebooks de inventario y descarga selectiva | Ejecutados | `notebooks/02_inventario_adquisiciones.ipynb`, `notebooks/03_descarga_selectiva_lote.ipynb`, `notebooks/04_descarga_lotes_pendientes.ipynb` | Copias aprobadas verificadas |
-| Protocolo y notebooks de separación bilateral | Repetición 0.2 y revisión ciega completadas; cierre preparado | `docs/12_FASE_1_PASO_3.md`, `notebooks/05_validacion_separacion_bilateral.ipynb`, `notebooks/06_cierre_revision_separacion_bilateral.ipynb` | Diez vistas aceptadas, cero exclusiones; falta ejecutar el congelamiento verificable |
+| Protocolo y notebooks de separación bilateral | Cerrados; `bilateral_split_v0.2_pilot` congelado | `docs/12_FASE_1_PASO_3.md`, `notebooks/05_validacion_separacion_bilateral.ipynb`, `notebooks/06_cierre_revision_separacion_bilateral.ipynb` | Diez vistas aceptadas, cero exclusiones y parámetros privados verificados |
+| Acta pública de cierre de la Fase 1, paso 3 | 1.0, cerrada | `docs/13_CIERRE_FASE_1_PASO_3.md` | Registro, resumen y congelamiento privados verificados |
 
 ## Historial preservado
 
@@ -51,7 +52,7 @@ Se verificaron copias privadas del README principal, README del prototipo, plan 
 - los pasos 1 a 6 están cerrados y versionados;
 - la ejecución técnica en Colab/Drive terminó correctamente y sus dos evidencias privadas fueron contrastadas;
 - las 1,916 adquisiciones basales están disponibles y legibles, la cola está vacía y los veinte lotes conservan evidencia verificable;
-- el paso 3 cuenta con una entrada ciega al desenlace, diez vistas revisadas, una guarda de límites verificada en la versión 0.2 y una operación reproducible de cierre; falta ejecutar el congelamiento de parámetros;
+- el paso 3 quedó cerrado con una entrada ciega al desenlace, diez vistas revisadas y aceptadas, una guarda de límites verificada y los parámetros de la versión 0.2 congelados antes del procesamiento masivo;
 - no se ejecutó entrenamiento ni se abrió el conjunto de prueba reservado.
 
 El inventario público se ampliará solo con información necesaria para reproducibilidad y gobierno. Credenciales, identificadores individuales, rutas privadas, huellas de fuentes restringidas y enlaces privados nunca se publicarán.
