@@ -20,6 +20,10 @@ Se instaló en un entorno virtual separado NumPy 1.26.4, SciPy 1.14.1, OpenCV 4.
 
 Estas pruebas usan matrices sintéticas, no radiografías de OAI. Por tanto, `candidate.runtime_verified=true` en el registro significa solo ejecución técnica sintética; `candidate.local_performance_verified=false` permanece.
 
+## Corrección operativa de la libreta 13 (v1.1)
+
+La primera ejecución del investigador en Colab 2026.07/Python 3.12 se detuvo **antes del piloto**: `venv` terminó con código 1 durante el subproceso `ensurepip`. El motivo interno de `ensurepip` no quedó visible; el fallo no informa nada sobre la localización anatómica. La libreta 13 v1.1 fija `virtualenv==21.7.11`, desactiva sus actualizaciones periódicas de paquetes de arranque, comprueba Python 3.12 y muestra la salida de error si la creación vuelve a fallar. `virtualenv` usa su mecanismo de paquetes de arranque incluido, sin alterar `requirements-mcr004.txt`, el código ROI ni los umbrales. La corrección local se valida con pruebas, pero no se atribuye una ejecución Colab exitosa hasta que el investigador la confirme. La copia v1.0 ejecutada parcialmente se conserva en el historial privado.
+
 ## Revisión y puerta posterior
 
 La hoja `revision_tecnica_ciega.csv` conserva veinte filas, incluso abstenciones. Para cada candidata se registran lateralidad, cobertura, encuadre, visualización, contaminación crítica, advertencia periférica y decisión: `aceptable`, `aceptable_con_advertencia_periferica`, `rechazado` o `no_evaluable`. Una abstención permanece en el denominador y no se reclasifica como aceptada. La revisión cotejará la mitad original con la ROI, sin desenlace ni predicción. Esta entrega no llena respuestas ni simula una segunda lectura.

@@ -30,6 +30,11 @@ class RoiMcr004NotebookTest(unittest.TestCase):
 
     def test_isolated_environment_and_no_early_downstream_action(self):
         self.assertIn("venv_mcr004", self.source)
+        self.assertIn("sys.version_info[:2] != (3, 12)", self.source)
+        self.assertIn("virtualenv==21.7.11", self.source)
+        self.assertIn("environment['virtualenv_bootstrap'] = '21.7.11'", self.source)
+        self.assertIn("--no-periodic-update", self.source)
+        self.assertNotIn("'-m', 'venv'", self.source)
         self.assertIn("requirements-mcr004.txt", self.source)
         self.assertIn("registro_preparacion.json", self.source)
         self.assertIn("git_commit", self.source)
