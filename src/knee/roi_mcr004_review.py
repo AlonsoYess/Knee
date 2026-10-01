@@ -41,6 +41,8 @@ BLOCKED = ("mass_processing_executed", "partitions_created",
            "training_executed", "reserved_test_opened")
 SUMMARY_FILE = "resumen_revision_tecnica_publico.json"
 RECORD_FILE = "registro_cierre_revision_tecnica.json"
+COMPLETED_CSV = "revision_tecnica_asistida_completada.csv"
+COMPLETED_PROVENANCE = "procedencia_revision_asistida_completada.json"
 
 
 def _rows(path: Path, fields: tuple[str, ...]) -> list[dict[str, str]]:
@@ -325,8 +327,14 @@ def validate_decisions(rows: list[dict[str, str]]) -> dict[str, Any]:
             if any(row[key] != value for key, value in expected.items()):
                 raise ValueError("acceptable_decision_has_failed_or_unknown_criterion")
         elif row["decision"] == "no_evaluable":
-            if row["visualizable_yes_no"] != "NO":
-                raise ValueError("no_evaluable_requires_failed_visualization")
+            # A visible image may still leave a criterion unresolved. Do not
+            # invent a display failure to encode doubt about a mark's nature.
+            if row["visualizable_yes_no"] != "NO" and not any(
+                    row[key] == "" for key in FLAGS[:6]):
+                raise ValueError("no_evaluable_requires_failed_visualization_or_unknown_criterion")
+            if any(row[key] == "NO" for key in FLAGS[:3]) or (
+                    row["critical_contamination_yes_no"] == "SI"):
+                raise ValueError("known_failed_criterion_requires_rejection")
         elif not (any(row[key] == "NO" for key in FLAGS[:4]) or
                   row["critical_contamination_yes_no"] == "SI"):
             raise ValueError("rejection_requires_documented_failed_criterion")
@@ -351,6 +359,79 @@ def validate_decisions(rows: list[dict[str, str]]) -> dict[str, Any]:
                 for case in {r["case_alias"] for r in rows})}
 
 
+def _verify_saved_view(config, context, row, view):
+    if not isinstance(view, dict) or view.get("knee_alias") != row["knee_alias"] or (
+            view.get("review_csv_sha256") != context["review_csv_sha256"]):
+        raise ValueError("view_identity_mismatch")
+    result = next(r for r in context["results"] if r["knee_alias"] == row["knee_alias"])
+    if view.get("native_crop_sha256") != result["native_crop_sha256"]:
+        raise ValueError("view_native_crop_mismatch")
+    file = _resolve_under_root(config["output_dir"], view["display_file"], "display_file")
+    if (view.get("visualization_only") is not True or
+            not file.relative_to(config["output_dir"].resolve()).as_posix().startswith("revision_visualizacion/") or
+            _read_json(file.with_suffix(".json")) != view or
+            sha256_file(file) != view.get("display_sha256")):
+        raise ValueError("view_integrity_mismatch")
+
+
+def read_completed_assistance(config: dict[str, Any]) -> dict[str, Any]:
+    """Load prepared proposals, not human attestations or a completed closure.
+
+    The original 17 proposals and original draft remain unchanged. Only the
+    formerly pending rows are completed, with the exact saved display evidence.
+    """
+    context = read_context(config)
+    output = config["output_dir"]
+    provenance = _read_json(output/COMPLETED_PROVENANCE)
+    if (provenance.get("schema_version") != 1 or
+            provenance.get("status") != "completed_assistance_pending_investigator_confirmation" or
+            provenance.get("reviewer") != "Codex" or
+            provenance.get("algorithm_version") != ALGORITHM_VERSION or
+            provenance.get("pilot_git_commit") != context["pilot_git_commit"] or
+            provenance.get("original_assisted_provenance_sha256") != sha256_file(
+                output/"procedencia_revision_asistida.json") or
+            provenance.get("draft_csv_sha256") != context["review_csv_sha256"]):
+        raise ValueError("completed_assistance_provenance_mismatch")
+    _require_false(provenance, ("outcome_data_consulted", "independent_second_reader",
+                               "investigator_confirmation", "closure_executed")+BLOCKED)
+    if provenance.get("version_known_to_assistant") is not True:
+        raise ValueError("completed_assistance_version_disclosure_missing")
+    if sha256_file(output/COMPLETED_CSV) != provenance.get("completed_csv_sha256"):
+        raise ValueError("completed_assistance_csv_hash_mismatch")
+    rows = _rows(output/COMPLETED_CSV, REVIEW_FIELDS)
+    if [r["knee_alias"] for r in rows] != [r["knee_alias"] for r in context["review"]]:
+        raise ValueError("completed_assistance_identity_or_order_changed")
+    views = provenance.get("window_evidence")
+    pending = set(context["pending_knee_aliases"])
+    if not isinstance(views, dict) or set(views) != pending:
+        raise ValueError("completed_assistance_window_evidence_incomplete")
+    updates = {}
+    for original, row in zip(context["review"], rows):
+        if any(row[key] != original[key] for key in IMMUTABLE):
+            raise ValueError("completed_assistance_identity_changed")
+        alias = row["knee_alias"]
+        if alias not in pending:
+            if row != original:
+                raise ValueError("previous_assisted_proposal_changed")
+            continue
+        if not row["reviewer_notes"].startswith(original["reviewer_notes"]+" | "):
+            raise ValueError("prior_pending_observation_not_preserved")
+        _verify_saved_view(config, context, row, views[alias])
+        updates[alias] = {key: row[key] for key in ("decision", *FLAGS)}
+        updates[alias].update(
+            reviewer_notes=row["reviewer_notes"][len(original["reviewer_notes"])+3:],
+            window_reviewed=True, view=views[alias])
+    validate_decisions(rows)
+    fingerprint = {"csv_file": COMPLETED_CSV,
+                   "csv_sha256": sha256_file(output/COMPLETED_CSV),
+                   "provenance_file": COMPLETED_PROVENANCE,
+                   "provenance_sha256": sha256_file(output/COMPLETED_PROVENANCE)}
+    return {"review": rows, "draft_csv_sha256": context["review_csv_sha256"],
+            "updates": updates, "assisted_completion": fingerprint,
+            "preparation_status": provenance["status"],
+            "review_mode": "codex_prepared_pending_investigator_confirmation"}
+
+
 def close_review(config: dict[str, Any], response: dict[str, Any], git_commit: str):
     context = read_context(config)
     if (response.get("confirm_entire_assisted_review") is not True or
@@ -364,6 +445,12 @@ def close_review(config: dict[str, Any], response: dict[str, Any], git_commit: s
     updates = response.get("updates")
     if not isinstance(updates, dict) or not set(updates) <= {r["knee_alias"] for r in context["review"]}:
         raise ValueError("unexpected_review_updates")
+    completed = None
+    if "assisted_completion" in response:
+        completed = read_completed_assistance(config)
+        if (response["assisted_completion"] != completed["assisted_completion"] or
+                updates != completed["updates"]):
+            raise ValueError("prepared_assistance_changed_before_confirmation")
     output = config["output_dir"]
     rows = [dict(r) for r in context["review"]]
     for row in rows:
@@ -376,19 +463,13 @@ def close_review(config: dict[str, Any], response: dict[str, Any], git_commit: s
             raise ValueError("unexpected_update_fields")
         if update["window_reviewed"] is not True or not update["reviewer_notes"].strip():
             raise ValueError("window_inspection_and_reason_required")
-        view = update["view"]
-        if view.get("knee_alias") != row["knee_alias"] or (
-                view.get("review_csv_sha256") != context["review_csv_sha256"]):
-            raise ValueError("view_identity_mismatch")
-        file = _resolve_under_root(output, view["display_file"], "display_file")
-        if (view.get("visualization_only") is not True or
-                not file.relative_to(output.resolve()).as_posix().startswith("revision_visualizacion/") or
-                _read_json(file.with_suffix(".json")) != view or
-                sha256_file(file) != view.get("display_sha256")):
-            raise ValueError("view_integrity_mismatch")
+        _verify_saved_view(config, context, row, update["view"])
         for field in ("decision", *FLAGS):
             row[field] = update[field]
-        row["reviewer_notes"] += " | Confirmacion/correccion del investigador en Colab: "+update["reviewer_notes"]
+        prefix = (" | " if completed else " | Confirmacion/correccion del investigador en Colab: ")
+        row["reviewer_notes"] += prefix+update["reviewer_notes"]
+    if completed and rows != completed["review"]:
+        raise ValueError("prepared_assistance_roundtrip_mismatch")
     metrics = validate_decisions(rows)
     checked = verify_native_integrity(config, context["results"])
     if checked != metrics["candidate_knees"]:
@@ -410,6 +491,7 @@ def close_review(config: dict[str, Any], response: dict[str, Any], git_commit: s
         "outcome_data_loaded": False, **{flag: False for flag in BLOCKED},
         "review_csv_sha256": sha256_bytes(final_bytes),
         "assisted_draft_csv_sha256": context["review_csv_sha256"],
+        "review_entry_mode": "codex_prepared" if completed else "investigator_form",
         "results_csv_sha256": context["provenance"]["results_csv_sha256"],
         "closure_execution_environment": "Google Colab, libreta 14",
         "review_provenance": "Revision tecnica asistida por Codex y confirmada por el investigador. "
@@ -419,6 +501,8 @@ def close_review(config: dict[str, Any], response: dict[str, Any], git_commit: s
     record = {**summary, "summary_sha256": sha256_bytes(_json_bytes(summary)),
               "assisted_provenance_sha256": sha256_file(output/"procedencia_revision_asistida.json"),
               "response": response}
+    if completed:
+        record["completed_assistance"] = completed["assisted_completion"]
     # Validate everything before writes. Preserve draft and input evidence on any failure.
     if backup.exists() or (output/"respuestas_investigador.json").exists():
         raise FileExistsError("prior_closure_attempt_present_do_not_overwrite")
@@ -442,7 +526,7 @@ def close_review(config: dict[str, Any], response: dict[str, Any], git_commit: s
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", required=True, type=Path)
-    parser.add_argument("--action", required=True, choices=("context", "view", "close"))
+    parser.add_argument("--action", required=True, choices=("context", "assisted-context", "view", "close"))
     parser.add_argument("--alias")
     parser.add_argument("--low", type=float)
     parser.add_argument("--high", type=float)
@@ -456,6 +540,8 @@ def main():
         context = read_context(config)
         payload = {key: context[key] for key in ("review", "pending_knee_aliases",
                    "review_csv_sha256", "pilot_git_commit")}
+    elif args.action == "assisted-context":
+        payload = read_completed_assistance(config)
     elif args.action == "view":
         payload = make_view(config, args.alias, args.low, args.high)
     else:

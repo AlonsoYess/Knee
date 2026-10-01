@@ -19,7 +19,8 @@ if DEPENDENCIES:
     from knee.roi_mcr004_review import (
         ALGORITHM_VERSION, UPSTREAM_COMMIT, BLOCKED, FLAGS, RESULT_FIELDS,
         REVIEW_FIELDS, SUMMARY_FILE, RECORD_FILE, CropConfig, Trace,
-        close_review, make_view, read_context, validate_decisions,
+        COMPLETED_CSV, COMPLETED_PROVENANCE, close_review, make_view,
+        read_completed_assistance, read_context, validate_decisions,
         verify_native_integrity, window_image,
     )
 
@@ -135,6 +136,29 @@ class Mcr004ReviewTests(unittest.TestCase):
     def _all_accepted(self):
         return [acceptable(dict(row)) for row in self.template]
 
+    def _completed_fixture(self):
+        response = self._response()
+        rows = [dict(r) for r in self.review]
+        original = rows[-1]["reviewer_notes"]
+        update = response["updates"][self.pending]
+        update.update(decision="no_evaluable", critical_contamination_yes_no="",
+                      reviewer_notes="Codex: visible image; nature of a mark unresolved.")
+        rows[-1].update({key: update[key] for key in ("decision", *FLAGS)})
+        rows[-1]["reviewer_notes"] = original+" | "+update["reviewer_notes"]
+        write_csv(self.output/COMPLETED_CSV, REVIEW_FIELDS, rows)
+        provenance = {"schema_version": 1,
+            "status": "completed_assistance_pending_investigator_confirmation",
+            "reviewer": "Codex", "algorithm_version": ALGORITHM_VERSION,
+            "pilot_git_commit": "e"*40, "draft_csv_sha256": response["draft_csv_sha256"],
+            "original_assisted_provenance_sha256": sha256_file(self.output/"procedencia_revision_asistida.json"),
+            "completed_csv_sha256": sha256_file(self.output/COMPLETED_CSV),
+            "window_evidence": {self.pending: update["view"]},
+            "version_known_to_assistant": True,
+            **{key: False for key in ("outcome_data_consulted", "independent_second_reader",
+                "investigator_confirmation", "closure_executed", *BLOCKED)}}
+        write_json(self.output/COMPLETED_PROVENANCE, provenance)
+        return rows, provenance
+
     def test_context_returns_only_existing_pending_and_anchors_original_template(self):
         context = read_context(self.config)
         self.assertEqual(context["pending_knee_aliases"],[self.pending])
@@ -214,7 +238,8 @@ class Mcr004ReviewTests(unittest.TestCase):
 
     def test_unknown_criteria_pending_or_non_blinded_cannot_be_accepted(self):
         for key,value in (("decision",""),("coverage_ok_yes_no",""),
-                          ("critical_contamination_yes_no","SI"),("outcome_blinded_yes_no","NO")):
+                          ("critical_contamination_yes_no","SI"),
+                          ("critical_contamination_yes_no",""),("outcome_blinded_yes_no","NO")):
             rows = self._all_accepted()
             rows[0][key] = value
             with self.subTest(key=key),self.assertRaises(ValueError):
@@ -222,8 +247,7 @@ class Mcr004ReviewTests(unittest.TestCase):
 
     def test_non_evaluable_requires_visualization_failure_and_counts_as_incorrect(self):
         rows = self._all_accepted()
-        rows[0].update(decision="no_evaluable",visualizable_yes_no="NO",
-                       coverage_ok_yes_no="",frame_ok_yes_no="")
+        rows[0].update(decision="no_evaluable",visualizable_yes_no="NO")
         metrics = validate_decisions(rows)
         self.assertEqual(metrics["non_evaluable_crops"],1)
         self.assertEqual(metrics["incorrect_candidates"],1)
@@ -231,6 +255,106 @@ class Mcr004ReviewTests(unittest.TestCase):
         rows[0]["visualizable_yes_no"] = "SI"
         with self.assertRaisesRegex(ValueError,"failed_visualization"):
             validate_decisions(rows)
+
+    def test_visible_but_unresolved_criterion_counts_as_failure_not_display_failure(self):
+        rows = self._all_accepted()
+        rows[0].update(decision="no_evaluable", critical_contamination_yes_no="",
+                       reviewer_notes="Visible contours; nature of mark unresolved")
+        metrics = validate_decisions(rows)
+        self.assertEqual(rows[0]["visualizable_yes_no"], "SI")
+        self.assertEqual(metrics["non_evaluable_crops"], 1)
+        self.assertEqual(metrics["incorrect_candidates"], 1)
+        self.assertEqual(metrics["abstained_knees"], 0)
+        self.assertFalse(metrics["historical_gate_passed"])
+
+    def test_known_failed_criterion_is_not_hidden_as_unresolved_doubt(self):
+        for key, value in (("coverage_ok_yes_no", "NO"),
+                           ("critical_contamination_yes_no", "SI")):
+            rows = self._all_accepted()
+            rows[0].update(decision="no_evaluable", visualizable_yes_no="NO")
+            rows[0][key] = value
+            with self.subTest(key=key), self.assertRaisesRegex(ValueError, "requires_rejection"):
+                validate_decisions(rows)
+
+    def test_completed_assistance_keeps_prior_rows_draft_and_no_human_attestations(self):
+        draft = (self.output/"revision_tecnica_ciega.csv").read_bytes()
+        rows, _ = self._completed_fixture()
+        prepared = read_completed_assistance(self.config)
+        self.assertEqual(prepared["review"], rows)
+        self.assertEqual(prepared["review"][:-1], self.review[:-1])
+        self.assertEqual(set(prepared["updates"]), {self.pending})
+        for key in ("confirm_entire_assisted_review", "outcome_blinded", "technical_tests_passed"):
+            self.assertNotIn(key, prepared)
+        self.assertEqual((self.output/"revision_tecnica_ciega.csv").read_bytes(), draft)
+        self.assertFalse((self.output/RECORD_FILE).exists())
+
+    def test_completed_assistance_rejects_mutated_csv_or_false_provenance(self):
+        _, provenance = self._completed_fixture()
+        path = self.output/COMPLETED_CSV
+        original = path.read_bytes()
+        path.write_bytes(original+b"\n")
+        with self.assertRaisesRegex(ValueError, "csv_hash_mismatch"):
+            read_completed_assistance(self.config)
+        path.write_bytes(original)
+        for key, value in (("investigator_confirmation", True),
+                           ("outcome_data_consulted", True), ("draft_csv_sha256", "changed"),
+                           ("original_assisted_provenance_sha256", "changed")):
+            write_json(self.output/COMPLETED_PROVENANCE, {**provenance, key: value})
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                read_completed_assistance(self.config)
+
+    def test_completed_assistance_blocks_prior_row_or_identity_changes_even_with_new_hash(self):
+        rows, provenance = self._completed_fixture()
+        for index, key, value in ((0, "reviewer_notes", "changed"),
+                                  (19, "patient_side", "RIGHT"),
+                                  (19, "reviewer_notes", "previous observation removed")):
+            modified = [dict(r) for r in rows]
+            modified[index][key] = value
+            write_csv(self.output/COMPLETED_CSV, REVIEW_FIELDS, modified)
+            write_json(self.output/COMPLETED_PROVENANCE, {**provenance,
+                "completed_csv_sha256": sha256_file(self.output/COMPLETED_CSV)})
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                read_completed_assistance(self.config)
+
+    def test_completed_assistance_requires_exact_window_records_and_native_crop_hash(self):
+        _, provenance = self._completed_fixture()
+        view = provenance["window_evidence"][self.pending]
+        for key, value in (("display_low", view["display_low"]+1),
+                           ("native_crop_sha256", "changed")):
+            modified = {**provenance, "window_evidence": {self.pending: {**view, key: value}}}
+            write_json(self.output/COMPLETED_PROVENANCE, modified)
+            with self.subTest(key=key), self.assertRaisesRegex(ValueError, "view_"):
+                read_completed_assistance(self.config)
+
+    def test_completed_assistance_closure_still_requires_human_and_current_preparation(self):
+        self._completed_fixture()
+        prepared = read_completed_assistance(self.config)
+        response = {key: prepared[key] for key in ("draft_csv_sha256", "updates", "assisted_completion")}
+        response.update(confirm_entire_assisted_review=True, outcome_blinded=True,
+                        technical_tests_passed=True)
+        with self.assertRaisesRegex(ValueError, "confirmation_required"):
+            close_review(self.config, {**response, "confirm_entire_assisted_review": False}, "a"*40)
+        response["updates"][self.pending]["visualizable_yes_no"] = "NO"
+        with self.assertRaisesRegex(ValueError, "assistance_changed"):
+            close_review(self.config, response, "a"*40)
+        self.assertFalse((self.output/RECORD_FILE).exists())
+
+    def test_completed_assistance_closure_preserves_prepared_rows_and_reports_known_version(self):
+        rows, _ = self._completed_fixture()
+        prepared = read_completed_assistance(self.config)
+        response = {key: prepared[key] for key in ("draft_csv_sha256", "updates", "assisted_completion")}
+        response.update(confirm_entire_assisted_review=True, outcome_blinded=True,
+                        technical_tests_passed=True)
+        with patch("knee.roi_mcr004_review._source_studies", return_value=iter(self.studies)):
+            summary = close_review(self.config, response, "a"*40)
+        self.assertEqual(summary["review_entry_mode"], "codex_prepared")
+        self.assertEqual(summary["status"], "rejected_after_technical_review")
+        self.assertEqual(summary["non_evaluable_crops"], 1)
+        self.assertEqual(summary["abstained_knees"], 0)
+        with (self.output/"revision_tecnica_ciega.csv").open(encoding="utf-8-sig", newline="") as stream:
+            self.assertEqual(list(csv.DictReader(stream, delimiter=";")), rows)
+        self.assertEqual(summary["step_4_status"], "open")
+        self.assertTrue(all(summary[key] is False for key in BLOCKED))
 
     def test_reject_requires_failed_criterion_not_only_unpermitted_warning(self):
         rows = self._all_accepted()
