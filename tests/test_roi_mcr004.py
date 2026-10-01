@@ -1,7 +1,10 @@
 """Contract tests for MCR-2026-004; run in the isolated pinned environment."""
 
 import importlib.util
+import json
 import unittest
+from dataclasses import asdict
+from unittest.mock import patch
 
 import numpy as np
 
@@ -44,6 +47,25 @@ class RoiMcr004Tests(unittest.TestCase):
         self.assertTrue(np.array_equal(result, preprocess_and_crop(working, config)))
         self.assertEqual(result.shape, (trace.line_y1-trace.line_y0,
                                         trace.line_x1-trace.line_x0))
+
+    def test_detected_numpy_edge_coordinates_are_json_serializable(self):
+        working = normalize_half(synthetic_knee(), "MONOCHROME2")
+        vertical = lambda region, offset, config: [(np.int64(offset+2), np.int64(0))]
+        horizontal = lambda region, offset, config: [(np.int64(0), np.int64(offset+2))]
+        with (
+            patch("knee.roi_mcr004.find_vertical_line", side_effect=vertical),
+            patch("knee.roi_mcr004.find_horizontal_line", side_effect=horizontal),
+            patch("knee.third_party.emory_hiti.pipeline.find_vertical_line",
+                  side_effect=vertical),
+            patch("knee.third_party.emory_hiti.pipeline.find_horizontal_line",
+                  side_effect=horizontal),
+        ):
+            result, trace = preprocess_with_trace(working, CropConfig())
+            reference = preprocess_and_crop(working, CropConfig())
+        self.assertTrue(np.array_equal(result, reference))
+        serialized = json.dumps(asdict(trace), sort_keys=True)
+        self.assertEqual(json.loads(serialized), asdict(trace))
+        self.assertTrue(all(type(value) is int for value in asdict(trace).values()))
 
     def test_instrumented_core_preserves_upstream_crop_for_both_sides(self):
         working, _ = preprocess_with_trace(

@@ -26,6 +26,16 @@ La primera ejecución del investigador en Colab 2026.07/Python 3.12 se detuvo **
 
 ## Revisión y puerta posterior
 
+### Corrección operativa v1.3: serialización y diagnóstico
+
+La ejecución con código `359dcb6` creó recortes y vistas parciales en Drive, pero terminó sin los CSV finales ni el resumen de regresión. La salida guardada de Colab solo contiene `CalledProcessError`; no permite afirmar por sí sola cuál fue la excepción interna.
+
+Se reprodujo localmente un defecto del adaptador: las funciones de detección de líneas devuelven coordenadas NumPy y la traza podía contener `numpy.int64`. Al serializarla, el escritor JSON produce `TypeError: Object of type int64 is not JSON serializable`. Es compatible con una interrupción después de guardar una vista, aunque su atribución exacta a la ejecución real queda pendiente de confirmación en Colab.
+
+Se convierten las cuatro coordenadas de líneas a enteros Python conservando exactamente sus valores. La prueba de regresión comprueba igualdad de los píxeles de preprocesamiento con el núcleo fijado y serialización de toda la traza. El corredor serializa la traza antes de escribir los archivos y registra una abstención ante un fallo de serialización por rodilla. La libreta v1.3 captura y muestra el error interno completo del subproceso. Las 201 pruebas locales pasan y todas las celdas compilan. El núcleo externo, la geometría y los umbrales permanecen iguales.
+
+La salida incompleta se conserva como ejecución fallida en Drive antes de liberar la ruta de la repetición. La regresión histórica sigue sin completar y debe ejecutarla el investigador en Colab.
+
 La hoja `revision_tecnica_ciega.csv` conserva veinte filas, incluso abstenciones. Para cada candidata se registran lateralidad, cobertura, encuadre, visualización, contaminación crítica, advertencia periférica y decisión: `aceptable`, `aceptable_con_advertencia_periferica`, `rechazado` o `no_evaluable`. Una abstención permanece en el denominador y no se reclasifica como aceptada. La revisión cotejará la mitad original con la ROI, sin desenlace ni predicción. Esta entrega no llena respuestas ni simula una segunda lectura.
 
 La regresión histórica solo puede superar la puerta si `Q≥19/20`, `F=0`, `W≤2/20`, todas las candidatas tienen revisión técnica y las pruebas de integridad continúan pasando. Si falla, se documenta y se detiene; no se ajusta automáticamente. La selección nueva de veinte participantes de desarrollo se pospone hasta superar la regresión y fijar el código, la configuración y la guía. El procesamiento masivo, las particiones, el entrenamiento y la prueba reservada siguen bloqueados.

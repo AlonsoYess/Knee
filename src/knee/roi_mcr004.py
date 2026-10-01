@@ -127,10 +127,12 @@ def preprocess_with_trace(image: np.ndarray, cfg: CropConfig) -> tuple[np.ndarra
     right_line = find_vertical_line(right_region, int(width*(1-fraction)), config=cfg)
     top_line = find_horizontal_line(top_region, 0, config=cfg)
     bottom_line = find_horizontal_line(bottom_region, int(height*(1-fraction)), config=cfg)
-    lx0 = max((x for x, _ in left_line), default=0) if left_line else 0
-    lx1 = min((x for x, _ in right_line), default=width) if right_line else width
-    ly0 = max((y for _, y in top_line), default=0) if top_line else 0
-    ly1 = min((y for _, y in bottom_line), default=height) if bottom_line else height
+    # Edge segments contain NumPy scalars. Preserve their exact integer values
+    # while making the trace serializable by the historical runner's JSON writer.
+    lx0 = int(max((x for x, _ in left_line), default=0)) if left_line else 0
+    lx1 = int(min((x for x, _ in right_line), default=width)) if right_line else width
+    ly0 = int(max((y for _, y in top_line), default=0)) if top_line else 0
+    ly1 = int(min((y for _, y in bottom_line), default=height)) if bottom_line else height
     if not (0 <= lx0 < lx1 <= width and 0 <= ly0 < ly1 <= height):
         raise Abstain("invalid_line_crop")
     result = trimmed[ly0:ly1, lx0:lx1]

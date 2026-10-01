@@ -208,6 +208,7 @@ def run_historical_regression(config: dict[str, Any]) -> dict[str, Any]:
                 try:
                     crop_path = crops/f"{alias}_crop.npy"
                     preview_path = previews/f"{alias}_localizacion.png"
+                    trace_json = json.dumps(candidate["trace"], sort_keys=True)
                     crop_hash = _save_crop(crop_path, candidate["crop"])
                     _preview(native_half, photometric, candidate["native_half_box"],
                              preview_path, int(config["max_preview_width"]))
@@ -219,11 +220,11 @@ def run_historical_regression(config: dict[str, Any]) -> dict[str, Any]:
                         "crop_height_mm": candidate["crop_height_mm"],
                         "crop_width_mm": candidate["crop_width_mm"],
                         "native_crop_sha256": crop_hash,
-                        "trace_json": json.dumps(candidate["trace"], sort_keys=True),
+                        "trace_json": trace_json,
                         "preview_file": f"previews_ciegas/{preview_path.name}",
                         "native_crop_file": f"recortes_nativos/{crop_path.name}",
                     })
-                except (OSError, ValueError) as exc:
+                except (OSError, ValueError, TypeError) as exc:
                     crop_path.unlink(missing_ok=True)
                     preview_path.unlink(missing_ok=True)
                     row.update({
