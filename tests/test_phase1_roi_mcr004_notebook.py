@@ -50,6 +50,8 @@ class RoiMcr004NotebookTest(unittest.TestCase):
     def test_no_private_fixed_path_or_executed_cells(self):
         self.assertNotIn("/content/drive/MyDrive/", self.source)
         self.assertNotIn("C:\\Users\\", self.source)
+        self.assertNotIn('print("Salida existe:"', self.source)
+        self.assertNotIn('print("Código de salida:"', self.source)
         for cell in self.notebook["cells"]:
             if cell["cell_type"] == "code":
                 self.assertIsNone(cell["execution_count"])
