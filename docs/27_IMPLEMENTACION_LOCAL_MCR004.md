@@ -1,4 +1,4 @@
-# MCR-2026-004 — implementación preparada y publicada, regresión pendiente
+# MCR-2026-004 — regresión ejecutada, revisión técnica pendiente
 
 ## Estado y autorización
 
@@ -34,12 +34,22 @@ Se reprodujo localmente un defecto del adaptador: las funciones de detección de
 
 Se convierten las cuatro coordenadas de líneas a enteros Python conservando exactamente sus valores. La prueba de regresión comprueba igualdad de los píxeles de preprocesamiento con el núcleo fijado y serialización de toda la traza. El corredor serializa la traza antes de escribir los archivos y registra una abstención ante un fallo de serialización por rodilla. La libreta v1.3 captura y muestra el error interno completo del subproceso. Las 201 pruebas locales pasan y todas las celdas compilan. El núcleo externo, la geometría y los umbrales permanecen iguales.
 
-La salida incompleta se conserva como ejecución fallida en Drive antes de liberar la ruta de la repetición. La regresión histórica sigue sin completar y debe ejecutarla el investigador en Colab.
+La salida incompleta se conserva como ejecución fallida en Drive antes de liberar la ruta de la repetición. Ese fue el estado previo a la ejecución exitosa posterior del investigador.
 
-La hoja `revision_tecnica_ciega.csv` conserva veinte filas, incluso abstenciones. Para cada candidata se registran lateralidad, cobertura, encuadre, visualización, contaminación crítica, advertencia periférica y decisión: `aceptable`, `aceptable_con_advertencia_periferica`, `rechazado` o `no_evaluable`. Una abstención permanece en el denominador y no se reclasifica como aceptada. La revisión cotejará la mitad original con la ROI, sin desenlace ni predicción. Esta entrega no llena respuestas ni simula una segunda lectura.
+La hoja `revision_tecnica_ciega.csv` conserva veinte filas, incluso abstenciones. Para cada candidata se registran lateralidad, cobertura, encuadre, visualización, contaminación crítica, advertencia periférica y decisión: `aceptable`, `aceptable_con_advertencia_periferica`, `rechazado` o `no_evaluable`. Una abstención permanece en el denominador y no se reclasifica como aceptada. La revisión coteja la mitad original con la ROI, sin desenlace ni predicción. La asistencia técnica no constituye un segundo lector independiente.
 
 La regresión histórica solo puede superar la puerta si `Q≥19/20`, `F=0`, `W≤2/20`, todas las candidatas tienen revisión técnica y las pruebas de integridad continúan pasando. Si falla, se documenta y se detiene; no se ajusta automáticamente. La selección nueva de veinte participantes de desarrollo se pospone hasta superar la regresión y fijar el código, la configuración y la guía. El procesamiento masivo, las particiones, el entrenamiento y la prueba reservada siguen bloqueados.
 
 ## Siguiente acción
 
-Tras sincronizar esta revisión de la rama actual, el investigador podrá ejecutar la libreta 13 en Colab y devolver el resumen y las veinte vistas para revisión técnica. Esta publicación por sí sola no acredita el rendimiento del candidato ni autoriza una muestra nueva.
+El investigador completó la libreta 13 con el commit `e32c2c008addbe98a3060ebac558b147b902195a`: diez estudios históricos, veinte candidatas y cero abstenciones. Se verificaron el resumen y las veinte vistas guardadas. Esto acredita preparación de candidatas, no aceptabilidad.
+
+Con autorización del investigador se prepara un borrador privado de revisión asistida: trece propuestas aceptables, tres con advertencia periférica, una rechazada y tres filas sin decisión. Se preserva la plantilla original. La versión era conocida; no se consultaron desenlaces ni se simula revisión clínica. Las propuestas no son el resultado final.
+
+`src/knee/roi_mcr004_review.py` y la libreta 14 resuelven únicamente esta revisión. La visualización ajusta una ventana lineal para comparar la mitad original con la ROI ya guardada; no ejecuta el localizador ni altera recortes, parámetros o geometría. Las filas pendientes requieren cotejo, decisión, criterios y observación del investigador. Las restantes propuestas requieren confirmación conjunta y permiten correcciones explícitas. Los criterios desconocidos quedan vacíos y bloquean una aceptación.
+
+Antes de escribir el cierre se comprueban las huellas del resumen, plantilla, borrador y resultados; la auditoría y separación cerradas; y cada candidata nativa contra los píxeles originales, geometría inversa, lateralidad y espaciado. Se conservan el borrador y las respuestas privadas. Los registros distinguen commit de generación y commit de cierre. Si faltan entradas, falla una huella o existe un cierre previo, no se sobrescribe.
+
+El investigador ejecutará **la libreta 14** desde `03_notebooks`, resolverá las tres filas pendientes, confirmará o corregirá las propuestas y compartirá el resumen final. No debe repetir la libreta 13. Esta preparación no cierra la regresión, no cambia MCR-2026-004, no modifica documentos Word y no autoriza etapas posteriores.
+
+La batería local pasa **222/222**: incluye 18 pruebas nuevas de revisión/integridad con matrices sintéticas y tres comprobaciones de la libreta 14. Se verifican denominador, abstención frente a rechazo, advertencias, entradas humanas, huellas, píxeles, ventanas, geometría y conservación de evidencias. Las celdas de la libreta compilan y no contienen salidas ejecutadas ni rutas privadas fijas. Esto no acredita una ejecución de la libreta 14 en Colab ni anticipa el resultado de sus tres decisiones pendientes.
