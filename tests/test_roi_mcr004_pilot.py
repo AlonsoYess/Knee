@@ -11,6 +11,8 @@ from unittest.mock import patch
 
 import numpy as np
 
+from knee.dicom_audit import sha256_file
+
 DEPENDENCIES = all(importlib.util.find_spec(name) for name in ("cv2", "scipy"))
 if DEPENDENCIES:
     from knee.roi_mcr004_pilot import (
@@ -18,7 +20,7 @@ if DEPENDENCIES:
     )
 
 
-def closed_v04():
+def closed_v04(review_hash):
     return {
         "status": "rejected_after_blinded_review",
         "algorithm_version": "tibiofemoral_crop_v0.4_pilot",
@@ -30,32 +32,47 @@ def closed_v04():
         "parameters_frozen": False, "mass_processing_executed": False,
         "partitions_created": False, "training_executed": False,
         "reserved_test_opened": False,
-        "review_csv_sha256": "example-digest",
+        "review_csv_sha256": review_hash,
     }
 
 
 @unittest.skipUnless(DEPENDENCIES, "run in .venv-knee-crop with OpenCV and SciPy")
 class RoiMcr004PilotTests(unittest.TestCase):
-    def test_requires_both_matching_colab_closure_files(self):
+    def test_requires_matching_colab_closure_and_unchanged_review_csv(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as folder:
             root = Path(folder)
             summary = root/"summary.json"
             record = root/"record.json"
-            summary.write_text(json.dumps(closed_v04()), encoding="utf-8")
-            payload = {**closed_v04(),
+            review_csv = root/"review.csv"
+            review_csv.write_bytes(b"reviewed-cases\n")
+            review_hash = sha256_file(review_csv)
+            summary.write_text(json.dumps(closed_v04(review_hash)), encoding="utf-8")
+            payload = {**closed_v04(review_hash),
                        "closure_execution_environment": "Google Colab, libreta 12"}
+            # The actual notebook 12 record omits this field.
+            del payload["review_csv_sha256"]
             record.write_text(json.dumps(payload), encoding="utf-8")
-            result = validate_prior_v04_closure(summary, record)
+            result = validate_prior_v04_closure(summary, record, review_csv)
             self.assertIn("summary_sha256", result)
+            self.assertEqual(result["review_csv_sha256"], review_hash)
+            review_csv.write_bytes(b"changed-review\n")
+            with self.assertRaisesRegex(ValueError, "v04_review_csv_hash_mismatch"):
+                validate_prior_v04_closure(summary, record, review_csv)
+            review_csv.write_bytes(b"reviewed-cases\n")
             payload["acceptable_crops"] = 9
             record.write_text(json.dumps(payload), encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "v04_closure_mismatch"):
-                validate_prior_v04_closure(summary, record)
+                validate_prior_v04_closure(summary, record, review_csv)
             payload["acceptable_crops"] = 8
             payload["closure_execution_environment"] = "local"
             record.write_text(json.dumps(payload), encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "colab_closure_not_proven"):
-                validate_prior_v04_closure(summary, record)
+                validate_prior_v04_closure(summary, record, review_csv)
+            payload["closure_execution_environment"] = "Google Colab, libreta 12"
+            payload["review_csv_sha256"] = "wrong-hash"
+            record.write_text(json.dumps(payload), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "v04_review_csv_hash_mismatch"):
+                validate_prior_v04_closure(summary, record, review_csv)
 
     def test_historical_denominator_and_write_failure_becomes_abstain(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as folder:
@@ -67,6 +84,7 @@ class RoiMcr004PilotTests(unittest.TestCase):
                 "pilot_audit_json": root/"audit.json",
                 "v04_review_summary_json": root/"summary.json",
                 "v04_closure_record_json": root/"record.json",
+                "v04_review_csv": root/"review.csv",
                 "output_dir": root/"new-output",
                 "max_preview_width": 1600,
             }

@@ -4,6 +4,7 @@
   "bilateral_output_dir": "outputs/auditorias/fase_1/paso_3_separacion_bilateral",
   "v04_review_summary_json": "outputs/auditorias/fase_1/paso_4_localizacion_tibiofemoral/v0_4_piloto/resumen_revision_visual_publico.json",
   "v04_closure_record_json": "outputs/auditorias/fase_1/paso_4_localizacion_tibiofemoral/v0_4_piloto/registro_cierre_revision.json",
+  "v04_review_csv": "outputs/auditorias/fase_1/paso_4_localizacion_tibiofemoral/v0_4_piloto/revision_visual_ciega.csv",
   "output_dir": "outputs/auditorias/fase_1/paso_4_localizacion_tibiofemoral/mcr004_regresion_historica",
   "expected_unique_studies": 10,
   "expected_knees": 20,

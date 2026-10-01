@@ -25,6 +25,7 @@ class RoiMcr004NotebookTest(unittest.TestCase):
         self.assertIn("mcr004_regresion_historica", self.config["output_dir"])
         self.assertIn("v0_4_piloto", self.config["v04_closure_record_json"])
         self.assertIn("v0_4_piloto", self.config["v04_review_summary_json"])
+        self.assertIn("v0_4_piloto", self.config["v04_review_csv"])
         self.assertIn("test_roi_mcr004*.py", self.source)
         self.assertIn("revision_tecnica_ciega.csv", self.source)
 

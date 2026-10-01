@@ -53,8 +53,10 @@ def _read_json(path: Path) -> dict[str, Any]:
     return result
 
 
-def validate_prior_v04_closure(summary_path: Path, record_path: Path) -> dict[str, Any]:
-    """Refuse to bypass the Colab closure prerequisite."""
+def validate_prior_v04_closure(
+    summary_path: Path, record_path: Path, review_csv_path: Path,
+) -> dict[str, Any]:
+    """Verify the Colab closure and the reviewed CSV without rewriting either."""
     summary, record = _read_json(summary_path), _read_json(record_path)
     expected = {
         "status": "rejected_after_blinded_review",
@@ -74,10 +76,16 @@ def validate_prior_v04_closure(summary_path: Path, record_path: Path) -> dict[st
             raise ValueError(f"v04_closure_mismatch_{key}")
     if record.get("closure_execution_environment") != "Google Colab, libreta 12":
         raise ValueError("v04_colab_closure_not_proven")
-    if summary.get("review_csv_sha256") != record.get("review_csv_sha256"):
-        raise ValueError("v04_review_csv_hash_mismatch")
-    if not summary.get("review_csv_sha256"):
+    review_hash = summary.get("review_csv_sha256")
+    if not review_hash:
         raise ValueError("v04_review_csv_hash_missing")
+    # Notebook 12 records the CSV hash in the summary, not in its closure record.
+    # Check an optional record hash when present and always hash the actual CSV.
+    if ("review_csv_sha256" in record and
+            record["review_csv_sha256"] != review_hash):
+        raise ValueError("v04_review_csv_hash_mismatch")
+    if sha256_file(review_csv_path) != review_hash:
+        raise ValueError("v04_review_csv_hash_mismatch")
     for payload in (summary, record):
         if payload.get("rejection_reason_counts") != {
             "joint_not_centered": 9, "peripheral_artifact_present": 6
@@ -85,7 +93,7 @@ def validate_prior_v04_closure(summary_path: Path, record_path: Path) -> dict[st
             raise ValueError("v04_rejection_reasons_mismatch")
     return {"summary_sha256": sha256_file(summary_path),
             "record_sha256": sha256_file(record_path),
-            "review_csv_sha256": summary["review_csv_sha256"]}
+            "review_csv_sha256": review_hash}
 
 
 def _preview(
@@ -141,7 +149,8 @@ def run_historical_regression(config: dict[str, Any]) -> dict[str, Any]:
     if output.exists() and any(output.iterdir()):
         raise FileExistsError("historical_regression_output_must_be_new")
     closure_hashes = validate_prior_v04_closure(
-        config["v04_review_summary_json"], config["v04_closure_record_json"]
+        config["v04_review_summary_json"], config["v04_closure_record_json"],
+        config["v04_review_csv"],
     )
     bilateral = _load_closed_bilateral_pilot(
         bilateral_dir, 10, "bilateral_split_v0.2_pilot"
@@ -264,7 +273,7 @@ def load_config(path: Path) -> dict[str, Any]:
     config = _read_json(path)
     for key in (
         "source_dir", "pilot_audit_json", "bilateral_output_dir", "output_dir",
-        "v04_review_summary_json", "v04_closure_record_json",
+        "v04_review_summary_json", "v04_closure_record_json", "v04_review_csv",
     ):
         value = config.get(key)
         if not isinstance(value, str) or not value.strip():
