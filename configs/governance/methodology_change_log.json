@@ -1,6 +1,7 @@
 {
   "schema_version": "1.0",
-  "registry_version": "1.1",
+  "registry_version": "1.6",
+  "last_updated_at": "2026-10-01",
   "status": "approved_control_mechanism",
   "date": "2026-09-27",
   "governing_document": "docs/03_CONTROL_CAMBIOS_METODOLOGICOS.md",
@@ -23,7 +24,12 @@
     "implementada",
     "implementada_y_verificada"
   ],
-  "impact_classes": ["M1", "M2", "M3", "M4"],
+  "impact_classes": [
+    "M1",
+    "M2",
+    "M3",
+    "M4"
+  ],
   "proposals": [
     {
       "id": "MCR-2026-001",
@@ -33,7 +39,11 @@
       "proponent": "researcher",
       "impact_class": "M2",
       "status": "implementada_y_verificada",
-      "affected_rules": ["PEND-KL-001", "RES-KL-001", "INV-PROT-001"],
+      "affected_rules": [
+        "PEND-KL-001",
+        "RES-KL-001",
+        "INV-PROT-001"
+      ],
       "problem": "El capitulo I prometia estimar KL, pero el capitulo III no definia datos, modelo, entrenamiento ni evaluacion para esa tarea adicional.",
       "proposed_change": "Retirar la promesa de KL estimado y limitar el prototipo a probabilidad calibrada de progresion estructural a 48 meses y clasificacion por umbral.",
       "evidence": [
@@ -98,7 +108,12 @@
       "proponent": "researcher",
       "impact_class": "M3",
       "status": "implementada_y_verificada",
-      "affected_rules": ["INV-MOD-001", "INV-FUS-001", "INV-TST-001", "INV-REP-001"],
+      "affected_rules": [
+        "INV-MOD-001",
+        "INV-FUS-001",
+        "INV-TST-001",
+        "INV-REP-001"
+      ],
       "problem": "DenseNet121 y ViT-B/16 conservan valor como comparadores, pero por si solos no representan el conjunto actual de estrategias reproducibles de transferencia para radiografias musculoesqueleticas. El presupuesto de Colab permite una evaluacion mas amplia, aunque el tamano muestral exige limitar y preespecificar los candidatos.",
       "proposed_change": "Mantener los modelos comprometidos como lineas base y agregar un registro cerrado de candidatos modernos: ConvNeXt V2 Tiny, DINOv3 ViT-S/16 y SKELEX para la rama radiografica; concatenacion y fusion intermedia con compuertas o FiLM para el escenario multimodal. Evaluar como analisis complementario una variante bilateral con atencion cruzada usando el mejor codificador elegible. Seleccionar y promover modelos solo con predicciones fuera de pliegue del desarrollo agrupadas por participante; conservar cerrada la prueba reservada.",
       "evidence": [
@@ -164,6 +179,297 @@
           "tests/test_scope_contract.py"
         ],
         "verification": "Registry, scope and methodological guardrail tests pass; the reserved test remains closed and training_authorized remains false."
+      }
+    },
+    {
+      "id": "MCR-2026-003",
+      "title": "Sustituir perfiles de intensidad por localizacion tibiofemoral mediante puntos anatomicos preentrenados y congelados",
+      "record_kind": "prospective",
+      "registered_at": "2026-09-30",
+      "proponent": "Codex_at_researcher_request",
+      "impact_class": "M2",
+      "status": "retirada",
+      "document": "docs/23_MCR_2026_003_LOCALIZACION_ANATOMICA.md",
+      "document_version": "1.1",
+      "approved_technical_content_version": "1.0",
+      "affected_rules": [
+        "INV-RAD-001",
+        "INV-UNIT-001",
+        "INV-COH-001",
+        "INV-SPLIT-001",
+        "INV-CV-001",
+        "INV-TEST-001",
+        "INV-TRACE-001",
+        "INV-PRIV-001"
+      ],
+      "problem": "Las cuatro versiones deterministas aceptaron 9/20, 8/20, 0/20 y 8/20 recortes en el mismo piloto. El capitulo III 3.2.1 prescribe perfiles de intensidad y gradiente; sustituirlos requiere enmienda previa. El cierre operativo de v0.4 sigue pendiente de ejecucion y contraste de la libreta 12.",
+      "proposed_change": "Evaluar un localizador anatomico preentrenado y congelado, preferentemente KNEEL, solo con licencia y procedencia verificadas y sujetos disjuntos de toda la cohorte principal y del universo candidato de sensibilidad. Conservar separacion bilateral, campo fisico de 140 mm y salida de 224 pixeles; comprobar primero factibilidad del campo, anotar referencias humanas y validar en el piloto y 60 participantes nuevos reservados para desarrollo. No entrenar ni ajustar pesos en esta MCR.",
+      "evidence": [
+        "docs/22_REVISION_FASE_1_PASO_4_V04.md: 8 aceptables, 12 rechazados, 9 errores de centrado y 6 artefactos perifericos; cero exclusiones tecnicas.",
+        "SRC-THESIS-002, apartado 3.2.1: perfiles de intensidad/gradiente, revision sin desenlace y reserva para desarrollo de participantes usados en preprocesamiento.",
+        "https://arxiv.org/pdf/1907.12237: KNEEL y procedencia OAI; la trazabilidad del checkpoint actualizado debe auditarse por separado.",
+        "https://www.nature.com/articles/s41598-019-56527-3: antecedente de progresion multimodal con localizacion anatomica y recorte fisico.",
+        "https://github.com/imedslab/KNEEL y https://huggingface.co/imedslab/kneel: distribucion actual y condiciones de acceso; elegibilidad no confirmada.",
+        "https://link.springer.com/article/10.1007/s10278-026-01961-9 y https://github.com/Emory-HITI/knee-crop: alternativa determinista publicada; limitaciones de evidencia consignadas en la propuesta."
+      ],
+      "alternatives": [
+        {
+          "name": "Reajustar v0.4 sobre el mismo piloto",
+          "decision": "not_selected",
+          "reason": "No supero la revision y aumenta la reutilizacion del piloto."
+        },
+        {
+          "name": "KNEEL congelado con elegibilidad previa",
+          "decision": "proposed_conditional",
+          "reason": "Salida anatomica inspeccionable; no se admite procedencia desconocida o solapada."
+        },
+        {
+          "name": "BoneFinder o knee-crop publicado",
+          "decision": "documented_not_authorized",
+          "reason": "Alternativas con diferentes requisitos de acceso, procedencia o geometria; no reemplazan automaticamente al candidato."
+        },
+        {
+          "name": "Entrenamiento propio o detector de cajas",
+          "decision": "outside_requested_implementation_scope",
+          "reason": "Requiere otro presupuesto de anotacion, datos y validacion; no se infiere superioridad de una mayor complejidad."
+        }
+      ],
+      "impact": {
+        "chapter_1": "none",
+        "chapter_2": "Incorporar antecedentes de localizacion anatomica finalmente utilizados.",
+        "chapter_3": "Enmendar 3.2.1 antes de ejecutar; texto propuesto, referencia humana, preprocesador congelado disjunto, muestra tecnica y abstencion documentados.",
+        "objectives": "none",
+        "hypotheses": "none",
+        "cohort_and_outcome": "Mantener elegibilidad y desenlace; no excluir sujetos para acomodar pesos solapados.",
+        "comparisons_and_statistics": "Mantener escenarios, particiones predictivas, AP y contrastes; evaluar localizacion por participante y reservar sujetos tecnicos para desarrollo.",
+        "prototype": "Reutilizar inferencia anatomica congelada con rechazo explicito; sin nuevas salidas clinicas.",
+        "time_compute_data": "Dos lectores y adjudicacion; 140 rodillas tecnicas previstas; estimar inferencia en piloto, sin entrenamiento local.",
+        "bias_or_leakage": "Auditar toda la cadena de pesos y solapamiento por participante; muestra nueva no usada para ajustar; no usar desenlace para seleccion del localizador."
+      },
+      "proposed_validation": {
+        "historical_pilot_participants": 10,
+        "historical_pilot_knees": 20,
+        "new_qualification_participants": 60,
+        "new_qualification_knees_expected": 120,
+        "sampling_seed": 2026,
+        "all_technical_subjects_reserved_for_development": true,
+        "crop_size_mm": [
+          140,
+          140
+        ],
+        "predictor_input_size": [
+          224,
+          224
+        ],
+        "maximum_center_error_mm_per_knee": 3,
+        "maximum_landmark_median_error_mm": 2,
+        "maximum_landmark_p95_error_mm": 5,
+        "required_integral_acceptance_fraction": 1,
+        "annotation_reference": "independent_readers_with_expert_adjudication",
+        "thresholds_are_proposed_not_clinically_validated": true,
+        "weights_eligibility": "unconfirmed",
+        "unknown_provenance_is_ineligible": true,
+        "local_training_or_fine_tuning_in_scope": false
+      },
+      "test_block_consulted_before_decision": false,
+      "approval": {
+        "decision": "aprobada",
+        "approved_by": "researcher",
+        "date": "2026-09-30",
+        "approved_scope": "MCR-2026-003, contenido tecnico 1.0: registrar la enmienda M2 e iniciar comprobaciones previas; integrar y evaluar un unico localizador anatomico preentrenado y congelado solo tras cumplir G0-G2. Piloto historico y 60 participantes nuevos reservados para desarrollo; sin entrenamiento, ajuste fino, procesamiento masivo, particiones definitivas ni apertura de prueba.",
+        "evidence": "Respuesta directa del investigador: si apruebo, hazlo bien; a la confirmacion explicita de MCR-2026-003 y sus condiciones.",
+        "conditions": [
+          "Verificar el cierre operativo de v0.4 y la actualizacion trazable de metodologia y contratos antes de integrar.",
+          "Confirmar lectores, referencia anatomica y factibilidad del campo de 140 mm sin cambiar su geometria.",
+          "Verificar licencia, checkpoint y ausencia de solapamiento por participante en toda la cadena de pesos.",
+          "Conservar G0-G6, umbrales y reserva tecnica de desarrollo; no sustituir candidato ni ampliar alcance sin nueva revision.",
+          "Mantener originales Word sin sobrescritura; su incorporacion academica queda pendiente y no se presume realizada."
+        ]
+      },
+      "prerequisite_review": {
+        "checked_at": "2026-09-30",
+        "report": "docs/24_APROBACION_M2_Y_COMPROBACIONES_PREVIAS.md",
+        "v04_operational_closure_verified": false,
+        "academic_word_amendment_incorporated": false,
+        "expert_reference_available": false,
+        "crop_geometry_feasibility_verified": false,
+        "checkpoint_eligible": false,
+        "integration_ready": false,
+        "note": "False significa requisito no acreditado, no rechazo definitivo. La aprobacion de la MCR no acredita estas condiciones."
+      },
+      "implementation": {
+        "applied": false,
+        "applied_at": null,
+        "artifacts": [],
+        "model_code_changed": false,
+        "training_executed": false,
+        "mass_processing_executed": false,
+        "partitions_created": false,
+        "reserved_test_opened": false,
+        "verification": null,
+        "remaining_action": "Solicitud retirada y sustituida por MCR-2026-004. Se preservan aprobacion historica, contenido tecnico y comprobaciones; no implementar con esta autorizacion."
+      },
+      "supersession": {
+        "superseded_by": "MCR-2026-004",
+        "date": "2026-10-01",
+        "approved_by": "researcher",
+        "evidence": "OK DALE HAGAMOSLO, en respuesta al plan de aprobar MCR-2026-004 y sustituir MCR-2026-003 conservando su historial.",
+        "reason": "Reorientacion aprobada a ROI proporcional y revision tecnica; no se acreditan retrospectivamente los requisitos de la solicitud retirada."
+      }
+    },
+    {
+      "id": "MCR-2026-004",
+      "title": "Reorientar M2 a ROI proporcional y revision tecnica sin anotacion anatomica experta",
+      "record_kind": "prospective",
+      "registered_at": "2026-09-30",
+      "proponent": "Codex_at_researcher_request",
+      "impact_class": "M2",
+      "status": "aprobada_no_aplicada",
+      "document_version": "1.1",
+      "document": "docs/25_MCR_2026_004_RECORTE_ROI_Y_REVISION_TECNICA.md",
+      "proposes_to_supersede": "MCR-2026-003",
+      "supersession_effective": true,
+      "affected_rules": [
+        "INV-RAD-001",
+        "INV-UNIT-001",
+        "INV-COH-001",
+        "INV-SPLIT-001",
+        "INV-CV-001",
+        "INV-TEST-001",
+        "INV-TRACE-001",
+        "INV-PRIV-001"
+      ],
+      "problem": "MCR-2026-003 exige recursos de anotacion anatomica no disponibles y una evaluacion adicional no requerida por el objetivo de preprocesamiento. v0.4 sigue rechazada con 8/20 aceptables; retirar requisitos inviables no convierte sus recortes en correctos.",
+      "proposed_change": "Evaluar una adaptacion trazable de Emory-HITI/knee-crop en revision fija, sin pesos ni entrenamiento. Mantener separacion bilateral congelada y pixeles DICOM nativos; proponer ROI proporcional en vez de 140 mm, revision tecnica por el investigador, rechazo de defectos criticos y advertencias perifericas limitadas. Regresion en 20 rodillas y confirmacion en 20 participantes nuevos de desarrollo, con criterios fijados antes de ejecutar. No aplicar sin decision expresa sobre esta solicitud y sustitucion de la anterior.",
+      "evidence": [
+        "SRC-THESIS-001, 1.3/1.5: objetivo de prediccion multimodal y preparacion de datos, no desarrollo de puntos anatomicos.",
+        "SRC-THESIS-002, 3.1.5/3.2.1/3.2.3: etiquetas OAI, ventana proporcional, QC sin desenlace y participacion profesional posterior distinta de anotar recortes.",
+        "Declaracion directa del investigador: no dispone del lector anatomico requerido por MCR-2026-003.",
+        "docs/22_REVISION_FASE_1_PASO_4_V04.md y docs/24_APROBACION_M2_Y_COMPROBACIONES_PREVIAS.md: rechazo documentado y cierre operativo no verificado.",
+        "https://github.com/Emory-HITI/knee-crop/tree/c70a2314bdbeed0d2fba3c2c2c652782ce3a2b93: codigo, configuracion, licencia y dependencias inspeccionados sin ejecutarlos.",
+        "https://link.springer.com/article/10.1007/s10278-026-01961-9: fuente primaria con inconsistencia entre resumen y disponibilidad de datos; cifras no utilizadas para garantizar desempeno."
+      ],
+      "alternatives": [
+        {
+          "name": "Conservar MCR-2026-003",
+          "decision": "not_selected_for_new_proposal",
+          "reason": "Lectores y pesos elegibles no acreditados. No se modifica su historial ni se consideran cumplidas sus condiciones."
+        },
+        {
+          "name": "Adaptacion determinista de knee-crop en revision fija",
+          "decision": "proposed_for_evaluation",
+          "reason": "Codigo y licencia accesibles, sin checkpoint ni anotaciones para funcionar; exige adaptacion DICOM y evaluacion local, no se declara superioridad."
+        },
+        {
+          "name": "Seguir afinando v0.4",
+          "decision": "not_selected",
+          "reason": "Rechazada y sobre el mismo piloto ya reutilizado."
+        },
+        {
+          "name": "Entrenamiento de detector o recorte manual de produccion",
+          "decision": "not_selected",
+          "reason": "Nuevos recursos de datos/anotacion o divergencia respecto de inferencia automatica."
+        }
+      ],
+      "impact": {
+        "chapter_1": "none",
+        "chapter_2": "Referenciar el metodo efectivamente utilizado y limites de la evidencia.",
+        "chapter_3": "Enmienda propuesta de 3.2.1: ROI proporcional, revision tecnica no experta, advertencias perifericas y confirmacion acotada. No incorporada al Word.",
+        "objectives": "none",
+        "hypotheses": "none",
+        "cohort_and_outcome": "Elegibilidad y desenlace intactos; registrar rechazos y cohorte efectiva comun sin ocultar fallos.",
+        "comparisons_and_statistics": "Mismos modelos aprobados, AP, calibracion, contrastes y prueba; sujetos tecnicos reservados para desarrollo.",
+        "prototype": "Mismo recorte automatico y rechazo explicito. Sin nuevas salidas clinicas ni validacion experta declarada.",
+        "time_compute_data": "Sin lectores anatomicos adicionales ni entrenamiento. 60 revisiones iniciales previstas; entorno separado por incompatibilidad actual con NumPy <2 de upstream.",
+        "bias_or_leakage": "Una configuracion inicial y una confirmacion no usada para ajuste. Limitaciones de revisor unico, campo variable, artefactos y seleccion documentadas. Sin consulta de prueba ni desenlace para escoger candidato."
+      },
+      "candidate": {
+        "repository": "https://github.com/Emory-HITI/knee-crop",
+        "revision": "c70a2314bdbeed0d2fba3c2c2c652782ce3a2b93",
+        "license": "MIT",
+        "source_inspected": true,
+        "runtime_verified": true,
+        "local_performance_verified": false,
+        "pretrained_weights_required": false,
+        "local_training_or_fine_tuning_in_scope": false,
+        "input_adaptation": "unilateral_working_copy_8bit_to_native_dicom_coordinates",
+        "geometry": "upstream_width_proportional_roi_no_fixed_140mm",
+        "silent_fallback_allowed": false
+      },
+      "proposed_validation": {
+        "historical_pilot_participants": 10,
+        "historical_pilot_knees": 20,
+        "new_confirmation_participants": 20,
+        "new_confirmation_knees_expected": 40,
+        "sampling_seed": 2026,
+        "all_technical_subjects_reserved_for_development": true,
+        "reviewer": "researcher_technical_qc_not_expert_reference",
+        "expert_landmark_annotations_required": false,
+        "millimetric_accuracy_claims_allowed": false,
+        "minimum_useful_coverage_fraction": 0.95,
+        "maximum_peripheral_warning_fraction": 0.1,
+        "maximum_incorrect_or_unevaluable_candidates": 0,
+        "historical_minimum_acceptable_knees": 19,
+        "historical_maximum_peripheral_warnings": 2,
+        "confirmation_minimum_acceptable_knees": 38,
+        "confirmation_maximum_peripheral_warnings": 4,
+        "thresholds_are_proposed_not_clinically_validated": true,
+        "population_95_percent_reliability_claim_allowed": false,
+        "replace_failed_subjects_allowed": false,
+        "reinterpret_v04_results_allowed": false,
+        "sample_selected": false
+      },
+      "test_block_consulted_before_decision": false,
+      "approval": {
+        "decision": "aprobada",
+        "approved_by": "researcher",
+        "date": "2026-10-01",
+        "approved_scope": "MCR-2026-004, contenido tecnico 1.0: sustituir MCR-2026-003 por el candidato determinista fijado, ROI proporcional y revision tecnica de 4.1-4.4. Actualizar contratos y verificar cierre operativo de v0.4 antes de implementar. Regresion de 20 rodillas y, solo si supera criterios, confirmacion en 20 participantes nuevos de desarrollo.",
+        "evidence": "Respuesta directa del investigador: OK DALE HAGAMOSLO, al plan de aprobar MCR-2026-004, sustituir MCR-2026-003, verificar cierre de v0.4 y avanzar de forma condicionada.",
+        "conditions": [
+          "Conservar contenido tecnico 1.0, revision upstream, geometria, umbrales y secuencia 8.1-8.2 sin relajarlos.",
+          "Completar el CSV de revision de v0.4 con decisiones individuales acreditadas y contrastar ambos registros de cierre antes de implementar. No forzar los recuentos agregados.",
+          "Reservar todos los participantes tecnicos para desarrollo; no seleccionar la muestra nueva hasta superar la regresion.",
+          "No entrenar, ajustar pesos, procesar masivamente, crear particiones definitivas ni abrir prueba.",
+          "No publicar en Git/Drive ni editar Word bajo esta autorizacion; incorporacion academica y respaldos pendientes."
+        ]
+      },
+      "implementation": {
+        "applied": false,
+        "applied_at": null,
+        "artifacts": [],
+        "model_code_changed": false,
+        "training_executed": false,
+        "mass_processing_executed": false,
+        "partitions_created": false,
+        "reserved_test_opened": false,
+        "verification": null,
+        "remaining_action": "v0.4 cerrada en Colab y contrastada. Adaptador y libreta de regresion historica preparados, probados y autorizados para publicacion separada; aun no aplicados a las radiografias. Tras sincronizar la rama actual, ejecutar solo regresion de 10 estudios/20 rodillas y revisar sus candidatas; no seleccionar muestra nueva antes de superar las puertas fijadas."
+      },
+      "prerequisite_review": {
+        "checked_at": "2026-10-01",
+        "report": "docs/26_APROBACION_MCR_2026_004_Y_CIERRE_PENDIENTE.md",
+        "governance_contracts_updated": true,
+        "v04_operational_closure_verified": true,
+        "v04_review_rows": 20,
+        "v04_review_rows_with_all_six_answers_blank": 0,
+        "academic_word_amendment_incorporated": false,
+        "integration_ready": true,
+        "note": "El investigador ejecuto la libreta 12 en Google Colab el 2026-10-01. Los dos JSON del cierre v0.4 se contrastaron en Drive: 20 revisadas, 8 aceptables, 12 rechazadas, 0 exclusiones, 9 fallos de centrado, 6 artefactos y parametros no congelados. Es una nueva revision tecnica asistida, no transcripcion historica. La condicion 8.2 esta satisfecha; el paso 4 sigue abierto."
+      },
+      "preparation": {
+        "status": "code_prepared_publication_authorized_not_applied_to_radiographs",
+        "source": "src/knee/roi_mcr004.py",
+        "historical_runner": "src/knee/roi_mcr004_pilot.py",
+        "notebook": "notebooks/13_regresion_historica_roi_mcr004.ipynb",
+        "pinned_dependencies": "requirements-mcr004.txt",
+        "synthetic_tests_passed": 11,
+        "historical_pilot_executed": false,
+        "new_confirmation_sample_selected": false,
+        "git_or_drive_publication_executed": true,
+        "publication_authorization": "Respuesta directa del investigador: si, autorizado, para publicar los cambios en la rama actual y colocar la libreta 13 en 03_notebooks.",
+        "drive_notebook_copy_verified": true,
+        "drive_notebook_filename": "13_regresion_historica_roi_mcr004_v1.0.ipynb"
       }
     }
   ]

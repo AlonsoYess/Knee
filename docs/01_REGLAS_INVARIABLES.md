@@ -6,17 +6,17 @@
 | --- | --- |
 | Documento | Reglas metodológicas invariables y mecanismos de cumplimiento |
 | Estado | Aprobado por el investigador; vigente |
-| Versión | 1.2 |
-| Fecha de aprobación | 28 de septiembre de 2026 |
+| Versión | 1.4 |
+| Fecha de aprobación | 1 de octubre de 2026 |
 | Paso | Fase 0, paso 2 |
-| Contrato rector | `docs/00_ALCANCE_Y_TRAZABILIDAD.md`, versión 1.1 |
+| Contrato rector | `docs/00_ALCANCE_Y_TRAZABILIDAD.md`, versión 1.3 |
 | Contrato ejecutable | `configs/governance/scope_contract.json` |
 | Destino de respaldo | Drive privado autorizado; ubicación exacta en el inventario privado |
-| Estado del respaldo | Versión 1.2, contrato JSON 1.2 y registro de modelos 1.0 sincronizados y privados en Google Drive |
+| Estado del respaldo | Versiones anteriores preservadas en Drive; reglas 1.4 y contrato JSON 1.4 pendientes de sincronización |
 
 ## 1. Finalidad
 
-Este documento traduce el alcance aprobado y el Capítulo III en reglas con identificadores estables. Su propósito es que cada fase futura pueda demostrar, mediante configuración, pruebas, bitácoras y artefactos, que continúa dentro de la tesis. La versión 1.1 incorpora la ampliación prospectiva aprobada en `MCR-2026-002`; no autoriza entrenamiento.
+Este documento traduce el alcance aprobado y el Capítulo III en reglas con identificadores estables. Su propósito es que cada fase futura pueda demostrar, mediante configuración, pruebas, bitácoras y artefactos, que continúa dentro de la tesis. La versión 1.4 conserva la ampliación de modelos de `MCR-2026-002` y registra `MCR-2026-004`, aprobada y aún no aplicada, que sustituye a `MCR-2026-003`; no autoriza entrenamiento.
 
 Las reglas se dividen en tres clases:
 
@@ -84,6 +84,14 @@ La actualización del archivo Word del capítulo III permanece pendiente y será
 
 La decisión fue tomada expresamente por el investigador el 27 de septiembre de 2026. Cierra `PEND-KL-001` sin ampliar el alcance. La actualización del archivo Word del capítulo I permanece como acción documental necesaria y será realizada posteriormente por el investigador.
 
+### 4.3 Recorte proporcional y revisión técnica
+
+`MCR-2026-004`, aprobada el 1 de octubre de 2026, sustituye a `MCR-2026-003`, retirada sin aplicación. `INV-RAD-001` se desarrolla mediante una adaptación determinista versionada de knee-crop, ROI proporcional y revisión técnica por el investigador. No requiere pesos ni anotaciones expertas; no se declarará precisión anatómica, validación radiológica o garantía poblacional. Las secciones 4.1–4.4 de la [MCR vigente](25_MCR_2026_004_RECORTE_ROI_Y_REVISION_TECNICA.md) fijan algoritmo, coordenadas, defectos críticos, advertencias y umbrales.
+
+Se conservan separación bilateral congelada y píxeles nativos. El piloto histórico y los veinte participantes nuevos de confirmación pertenecen exclusivamente al desarrollo; estos últimos solo se seleccionan tras superar la regresión. Se prohíben reemplazos de fallos y ajustes guiados por la confirmación, desenlace o prueba. Las transformaciones aprendidas de los modelos mantienen el ajuste exclusivo en el entrenamiento correspondiente.
+
+La actualización académica en Word sigue pendiente, sin autorización para sobrescribir originales. El [acta 26](26_APROBACION_MCR_2026_004_Y_CIERRE_PENDIENTE.md) acredita actualización contractual, no implementación: el CSV de v0.4 no contiene respuestas y sus dos registros de cierre faltan. Verificar el cierre es requisito previo a integrar. Los criterios nuevos no reinterpretan el rechazo 8/20 de v0.4.
+
 ## 5. Asuntos pendientes que bloquean implementación
 
 | ID | Asunto | Trabajo permitido mientras esté pendiente | Trabajo bloqueado |
@@ -95,7 +103,7 @@ La decisión fue tomada expresamente por el investigador el 27 de septiembre de 
 
 | Mecanismo | Función | Estado en este paso |
 | --- | --- | --- |
-| `configs/governance/scope_contract.json` | Fuente legible por código de los compromisos, decisiones y bloqueos. | Aprobado como versión 1.2. |
+| `configs/governance/scope_contract.json` | Fuente legible por código de los compromisos, decisiones y bloqueos. | Versión 1.4; incluye MCR-2026-004 aprobada y no aplicada, con cierre de v0.4 pendiente. |
 | `configs/model_registry.json` | Define candidatos, elegibilidad, promoción, técnicas y prohibiciones del modelado. | Aprobado como versión 1.0 bajo `MCR-2026-002`; no autoriza entrenamiento. |
 | `tests/test_scope_contract.py` | Detecta eliminación o cambio silencioso de valores críticos. | Creado; debe aprobarse antes de cerrar el paso. |
 | Manifiesto privado de cohorte/particiones | Prueba unidad, lateralidad, elegibilidad, exclusiones y ausencia de cruce entre grupos. | Se construirá en fases 1 y 2. |

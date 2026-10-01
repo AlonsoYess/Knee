@@ -18,9 +18,9 @@ class MethodologyChangeControlTest(unittest.TestCase):
     def setUpClass(cls):
         cls.registry = json.loads(REGISTRY_PATH.read_text(encoding="utf-8"))
 
-    def test_controlled_registry_is_valid_but_authorizes_no_new_change(self):
+    def test_registry_is_valid_and_prior_decisions_cannot_be_reused(self):
         self.assertEqual(validate_registry(self.registry), [])
-        self.assertEqual(self.registry["registry_version"], "1.1")
+        self.assertEqual(self.registry["registry_version"], "1.6")
         self.assertEqual(self.registry["status"], "approved_control_mechanism")
         self.assertEqual(
             self.registry["mechanism_approval"]["approved_by"],
@@ -45,6 +45,44 @@ class MethodologyChangeControlTest(unittest.TestCase):
         proposal["implementation"] = {"applied": False}
         self.assertEqual(validate_registry(registry), [])
         self.assertTrue(proposal_is_authorized(registry, "MCR-2026-999"))
+
+    def test_localization_has_explicit_conditional_approval_not_implementation(self):
+        proposal = next(
+            item for item in self.registry["proposals"]
+            if item["id"] == "MCR-2026-004"
+        )
+        self.assertEqual(proposal["status"], "aprobada_no_aplicada")
+        self.assertEqual(proposal["approval"]["decision"], "aprobada")
+        self.assertEqual(proposal["approval"]["approved_by"], "researcher")
+        self.assertEqual(proposal["approval"]["date"], "2026-10-01")
+        self.assertTrue(proposal["approval"]["approved_scope"])
+        self.assertTrue(proposal["approval"]["conditions"])
+        self.assertFalse(proposal["implementation"]["applied"])
+        self.assertTrue(proposal_is_authorized(self.registry, proposal["id"]))
+        self.assertTrue(proposal["prerequisite_review"]["integration_ready"])
+
+    def test_promoting_localization_status_without_approval_is_blocked(self):
+        registry = copy.deepcopy(self.registry)
+        proposal = next(
+            item for item in registry["proposals"]
+            if item["id"] == "MCR-2026-004"
+        )
+        proposal["status"] = "aprobada_no_aplicada"
+        proposal["approval"]["decision"] = "pendiente"
+        self.assertIn(
+            "MCR-2026-004 lacks an approved decision", validate_registry(registry)
+        )
+        self.assertFalse(proposal_is_authorized(registry, proposal["id"]))
+
+    def test_localization_cannot_reuse_approval_after_application(self):
+        registry = copy.deepcopy(self.registry)
+        proposal = next(p for p in registry["proposals"] if p["id"] == "MCR-2026-004")
+        proposal["status"] = "implementada"
+        proposal["implementation"].update(
+            applied=True, applied_at="2099-01-01", artifacts=["synthetic-test-only"]
+        )
+        self.assertEqual(validate_registry(registry), [])
+        self.assertFalse(proposal_is_authorized(registry, proposal["id"]))
 
     def test_missing_researcher_approval_blocks_proposal(self):
         registry = copy.deepcopy(self.registry)

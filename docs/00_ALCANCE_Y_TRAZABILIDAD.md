@@ -6,11 +6,11 @@
 | --- | --- |
 | Documento | Contrato de alcance y matriz de trazabilidad de la tesis |
 | Estado | Aprobado por el investigador; vigente como contrato rector |
-| Versión | 1.1 |
-| Fecha de aprobación | 27 de septiembre de 2026 |
+| Versión | 1.3, MCR-2026-004 aprobada |
+| Fecha de aprobación de esta revisión | 1 de octubre de 2026 |
 | Documento rector del repositorio | `docs/00_ALCANCE_Y_TRAZABILIDAD.md` |
 | Destino de respaldo | Copia versionada en el Drive privado autorizado; ubicación exacta en el inventario privado |
-| Estado del respaldo | Versión 1.1 sincronizada, verificada y privada en Google Drive |
+| Estado del respaldo | Versión 1.1 preservada en Drive; versión 1.3 local pendiente de sincronización |
 | Fuentes académicas primarias | `SRC-THESIS-001` para los capítulos I y II; `SRC-THESIS-002` para el capítulo III |
 | Datos de referencia | Cohorte tabular OAI consolidada y documentación entregada al 23 de septiembre de 2026 |
 
@@ -249,7 +249,18 @@ Además de la PR-AUC principal, se reportarán según corresponda:
 
 Una mejora estadística no se presentará automáticamente como utilidad clínica. La calibración, los falsos negativos, la procedencia OAI y la ausencia de validación externa deberán acompañar la interpretación.
 
+### 6.5 Enmienda autorizada de localización: MCR-2026-004
+
+El 1 de octubre de 2026 el investigador aprobó el contenido técnico 1.0 de [MCR-2026-004](25_MCR_2026_004_RECORTE_ROI_Y_REVISION_TECNICA.md), clase M2, y la sustitución de MCR-2026-003. La solicitud anterior queda retirada sin aplicación; su aprobación y sus comprobaciones históricas se conservan.
+
+Se autoriza evaluar la adaptación determinista de `Emory-HITI/knee-crop` en la revisión fijada por la MCR, con ROI proporcional, sin campo fijo de 140 mm, pesos, entrenamiento local ni referencia anatómica experta. Se conservan separación bilateral v0.2, píxeles DICOM nativos, entrada principal de 224 × 224 y los compromisos predictivos. La guía de revisión técnica y los umbrales de 4.3–4.4 rigen el candidato nuevo, no las versiones rechazadas.
+
+La regresión cubre las veinte rodillas históricas. Solo si supera todas las puertas se seleccionan veinte participantes nuevos, con semilla 2026 y reserva exclusiva de desarrollo. Cobertura útil mínima 95 %, advertencias periféricas máximas 10 % y cero candidatas incorrectas o no evaluables, sin sustituir fallos ni relajar criterios después de observar resultados. La muestra nueva no se ha seleccionado.
+
+La enmienda textual de 3.2.1 está aprobada en la sección 6 de la MCR; su incorporación al Word académico permanece pendiente y no se sobrescriben originales. El [acta 26](26_APROBACION_MCR_2026_004_Y_CIERRE_PENDIENTE.md) registra el CSV de v0.4 sin respuestas y la ausencia de registros de cierre en Drive. Debe completarse y verificarse ese cierre antes de implementar. No se acredita rendimiento ni se habilitan procesamiento masivo, particiones, entrenamiento o prueba.
+
 ## 7. Interpretabilidad y prototipo
+
 
 ### 7.1 Interpretabilidad
 

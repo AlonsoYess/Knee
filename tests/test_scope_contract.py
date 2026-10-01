@@ -118,7 +118,7 @@ class ScopeContractTest(unittest.TestCase):
         )
 
     def test_safety_gates_remain_closed(self):
-        self.assertEqual(self.contract["contract_version"], "1.2")
+        self.assertEqual(self.contract["contract_version"], "1.5")
         self.assertEqual(self.contract["status"], "approved_by_researcher")
         self.assertFalse(self.contract["training_authorized"])
         self.assertEqual(
@@ -147,6 +147,30 @@ class ScopeContractTest(unittest.TestCase):
         self.assertFalse(self.contract["prototype"]["diagnostic_use"])
         self.assertFalse(
             self.contract["reporting"]["peruvian_population_generalization_allowed"]
+        )
+
+    def test_m2_approval_does_not_assert_operational_readiness(self):
+        change = self.contract["localization_change"]
+        self.assertEqual(change["mcr_id"], "MCR-2026-004")
+        self.assertEqual(change["status"], "aprobada_no_aplicada")
+        self.assertEqual(change["crop_geometry"], "upstream_width_proportional_roi_no_fixed_140mm")
+        self.assertFalse(change["fixed_crop_size_mm_required"])
+        self.assertEqual(change["new_confirmation_participants"], 20)
+        self.assertTrue(change["technical_participants_development_only"])
+        self.assertFalse(change["pretrained_weights_required"])
+        self.assertFalse(change["expert_reference_required"])
+        self.assertEqual(change["supersedes"], "MCR-2026-003")
+        self.assertFalse(change["local_training_or_fine_tuning_allowed"])
+        self.assertTrue(change["integration_ready"])
+        self.assertFalse(change["new_technical_sample_selected"])
+        self.assertTrue(change["academic_word_update_pending"])
+        registry = json.loads(
+            (CONTRACT_PATH.parent / "methodology_change_log.json").read_text(encoding="utf-8")
+        )
+        proposal = next(p for p in registry["proposals"] if p["id"] == change["mcr_id"])
+        self.assertEqual(proposal["status"], change["status"])
+        self.assertEqual(
+            proposal["prerequisite_review"]["integration_ready"], change["integration_ready"]
         )
 
 
