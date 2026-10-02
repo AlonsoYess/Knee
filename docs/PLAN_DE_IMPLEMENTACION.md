@@ -1,6 +1,6 @@
 # Plan de implementación por fases
 
-Este plan convierte el Capítulo III de la tesis en trabajo ejecutable con Codex, GitHub, Google Drive y Colab Pro. Las fechas son las del cronograma metodológico y deberán ajustarse a los tiempos reales de descarga y al calendario académico. La cohorte tabular auditada al 23 de septiembre de 2026 contiene 2 778 rodillas de 1 916 participantes (473 progresoras y 2 305 no progresoras); esas cifras son el punto de partida, no el tamaño definitivo después del control de imágenes.
+Este plan convierte el Capítulo III de la tesis en trabajo ejecutable con Codex, GitHub, Google Drive y Colab Pro. Las fechas son las del cronograma metodológico y deberán ajustarse a los tiempos reales de descarga y al calendario académico. La cohorte tabular auditada es el punto de partida, no el tamaño definitivo después del control de imágenes. Sus recuentos exactos permanecen en la auditoría privada.
 
 ## Reglas que rigen todas las fases
 
@@ -16,25 +16,55 @@ Este plan convierte el Capítulo III de la tesis en trabajo ejecutable con Codex
 
 **Cuándo:** inicio inmediato, en paralelo con la obtención de imágenes.
 
-**Trabajo:** preparar la estructura `src/knee/`, `notebooks/`, `configs/`, `tests/` y `app/`; definir dependencias reproducibles y la configuración de rutas de Drive sin valores privados; registrar la procedencia de la extracción Oracle/miNDAR (paquete 1249038, consultas, versión de cohorte); establecer un inventario de archivos y una plantilla de bitácora experimental. Agregar controles de Git para impedir subir datos o credenciales por accidente.
+**Trabajo:** preparar la estructura `src/knee/`, `notebooks/`, `configs/`, `tests/` y `app/`; definir dependencias reproducibles y la configuración de rutas de Drive sin valores privados; registrar en Drive la procedencia exacta de la extracción autorizada, sus consultas y la versión de cohorte; establecer un inventario de archivos y una plantilla de bitácora experimental. Agregar controles de Git para impedir subir datos o credenciales por accidente.
 
 **Entrega y cierre:** repositorio que ejecuta comprobaciones básicas en Colab y localmente, README actualizado, configuración de ejemplo y mapa entre CSV, manifiesto y DICOM. No es necesario subir a GitHub los CSV reales ni los DICOM.
+
+### Secuencia controlada de la Fase 0
+
+| Paso | Contenido | Estado |
+| ---: | --- | --- |
+| 1 | Contrato de alcance y trazabilidad basado en capítulos I, II y III. | Cerrado. |
+| 2 | Reglas metodológicas invariables y contrato ejecutable. | Cerrado. |
+| 3 | Estructura maestra de Drive e inventario de fuentes. | Cerrado. |
+| 4 | Mecanismo para registrar, evaluar y aprobar propuestas de cambio metodológico antes de aplicarlas. | Cerrado; versión 1.0 aprobada. |
+| 5 | Frontera reproducible GitHub–Colab–Drive: código central en `src/knee`, notebook de orquestación, pruebas y registro del commit. | Cerrado; arquitectura versión 1.0 aprobada. |
+| 6 | Ejecución completa en Colab con los archivos privados de Drive y verificación de las evidencias. | Cerrado; ejecución y evidencias verificadas. |
+
+La preparación o validación del entorno de Colab no corresponde al paso 4 y no sustituyó el control de cambios. Los seis pasos están cerrados y la Fase 0 cumplió su criterio técnico. El cierre está documentado en [`05_CIERRE_FASE_0.md`](05_CIERRE_FASE_0.md) y no autoriza entrenamiento ni apertura de la prueba reservada.
 
 ## Fase 1. Descarga selectiva y control radiográfico
 
 **Cuándo:** 24 de septiembre al 9 de octubre en el cronograma; pendiente de disponibilidad real de los archivos.
 
-**Trabajo:** corregir primero la auditoría piloto: `00829603` se registró dos veces como `.tar` y `.tar.gz`, mientras que falta auditar `00839603`. Confirmar los diez estudios únicos. Descargar selectivamente los archivos indicados por las 1 916 rutas únicas del manifiesto, sin trasladar el paquete OAI completo. Registrar disponibilidad, tamaño, huella de integridad, lectura DICOM, número de cuadros, profundidad, fotometría, dimensiones, modalidad y motivo de cualquier fallo.
+**Trabajo:** corregir primero la auditoría piloto resolviendo la duplicación y la omisión registradas en el manifiesto privado. Confirmar diez estudios únicos. Descargar selectivamente los archivos indicados por las rutas únicas del manifiesto, sin trasladar el paquete OAI completo. Registrar disponibilidad, tamaño, huella de integridad, lectura DICOM, número de cuadros, profundidad, fotometría, dimensiones, modalidad y motivo de cualquier fallo.
 
 Diseñar con casos de desarrollo una regla verificable para separar las dos rodillas de cada radiografía bilateral y localizar la región tibiofemoral. Verificar la lateralidad con anatomía y marcadores, pues el campo DICOM suele estar vacío. Revisar recortes y casos de baja confianza sin mirar la etiqueta de progresión. Conservar el original, el recorte, los parámetros usados y un registro de aceptación o rechazo. La operación de inferencia deberá poder reproducir el recorte sin una intervención manual privilegiada.
 
-**Entrega y cierre:** auditoría de las 1 916 adquisiciones o de las efectivamente obtenidas; manifiesto de recortes aceptados por rodilla; causas de exclusión; ejemplos visuales de control de calidad sin identificadores para uso permitido. No comenzar el entrenamiento final hasta conocer la cohorte común utilizable.
+**Entrega y cierre:** auditoría de todas las adquisiciones registradas o de las efectivamente obtenidas; manifiesto de recortes aceptados por rodilla; causas de exclusión; ejemplos visuales de control de calidad sin identificadores para uso permitido. No comenzar el entrenamiento final hasta conocer la cohorte común utilizable.
+
+### Secuencia controlada de la Fase 1
+
+| Paso | Contenido | Criterio de cierre | Estado |
+| ---: | --- | --- | --- |
+| 1 | Reconciliar el manifiesto piloto y auditar diez adquisiciones DICOM únicas por contenido. | Diez entradas esperadas, un paquete canónico legible por adquisición, diez huellas de píxeles distintas y evidencia privada reproducible en Drive. | Cerrado; ejecución Colab y evidencias verificadas. |
+| 2 | Consolidar el inventario de las adquisiciones basales de la cohorte y su descarga selectiva. | Cada ruta esperada queda clasificada como disponible, ausente, duplicada o ilegible, sin descargar imágenes ajenas a la cohorte. | Cerrado; 1,916 adquisiciones disponibles y legibles, cero pendientes y cero archivos inesperados. Los 20 lotes y sus evidencias fueron verificados. |
+| 3 | Diseñar y validar la separación bilateral y la lateralidad sin consultar el desenlace. | Regla determinista con casos de baja confianza y revisión visual documentada. | Cerrado; `bilateral_split_v0.2_pilot` congelado tras 10/10 separaciones y lateralidades aceptadas, un caso limítrofe revisado y cero exclusiones. |
+| 4 | Diseñar y validar la localización tibiofemoral y el recorte por rodilla. | Recorte reproducible, sin texto, bordes ni regla central, con parámetros versionados. | Abierto. `v0.1`, `v0.2`, `v0.3` y `v0.4` fueron rechazadas tras 9/20, 8/20, 0/20 y 8/20 recortes íntegramente aceptables. El cierre reproducible de `v0.3` fue ejecutado y verificado; la revisión de `v0.4` está documentada y su libreta de cierre está preparada para ejecución. Una nueva familia de localización requiere control de cambios previo. |
+| 5 | Ejecutar el control radiográfico sobre la cohorte obtenida. | Manifiesto privado de aceptación, exclusión y motivo; originales y recortes trazables. | Pendiente. |
+| 6 | Cerrar la Fase 1 y congelar la cohorte de imágenes utilizables. | Recuentos agregados, ejemplos desidentificados permitidos y autorización explícita para preparar las particiones de la Fase 2. | Pendiente. |
+
+Los pasos 1 a 4 son desarrollo del control de imágenes; ninguno autoriza entrenamiento ni consulta de la prueba reservada.
+
+[MCR-2026-003](23_MCR_2026_003_LOCALIZACION_ANATOMICA.md) queda retirada sin aplicación por sustitución expresa del 1 de octubre de 2026. Su aprobación previa y sus comprobaciones se conservan como historial, no como autorización vigente.
+
+[MCR-2026-004](25_MCR_2026_004_RECORTE_ROI_Y_REVISION_TECNICA.md) está aprobada y aún no aplicada a radiografías: adaptación determinista de knee-crop en revisión fija, ROI proporcional y revisión técnica por el investigador, sin pesos ni lector anatómico adicional. El [acta 26](26_APROBACION_MCR_2026_004_Y_CIERRE_PENDIENTE.md) confirma que el investigador ejecutó la libreta 12 en Colab y v0.4 quedó rechazada 8/20. El código y la libreta 13 de regresión histórica están preparados localmente y probados sobre matrices sintéticas, no publicados ni ejecutados sobre el piloto. Sigue la autorización de publicación, la ejecución de los diez estudios históricos y su revisión técnica; solo tras superar todas las puertas se seleccionarán veinte participantes nuevos de desarrollo. No hay nueva muestra, procesamiento masivo, particiones, entrenamiento ni apertura de prueba.
 
 ## Fase 2. Cohorte analítica y particiones congeladas
 
 **Cuándo:** 10 al 14 de octubre en el cronograma, después de la fase 1.
 
-**Trabajo:** unir el CSV con el manifiesto de imágenes aceptadas por `SRC_SUBJECT_ID`, `SIDE` y `BARCODE_BASE`. Comprobar unicidad, correspondencia, fecha V00 anterior a V06 y etiqueta definida como KL de V06 menos KL de V00 mayor o igual a uno. Documentar el tamaño final y las diferencias frente a las 2 778 rodillas auditadas inicialmente.
+**Trabajo:** unir la cohorte con el manifiesto de imágenes aceptadas mediante las claves privadas de participante, lateralidad y adquisición. Comprobar unicidad, correspondencia, fecha V00 anterior a V06 y etiqueta definida como KL de V06 menos KL de V00 mayor o igual a uno. Documentar el tamaño final y las diferencias frente a la cohorte auditada inicialmente.
 
 Con semilla 2026, asignar participantes a cinco bloques aproximadamente equilibrados; reservar el bloque 0 (aproximadamente 20 %) como prueba. Crear cinco pliegues agrupados dentro de los otros bloques de desarrollo. Los sujetos del piloto utilizados para ajustar recortes permanecerán en desarrollo. Comprobar sujetos, rodillas, positivos y negativos en cada división, sin probar semillas hasta obtener una partición favorable.
 
@@ -44,7 +74,7 @@ Con semilla 2026, asignar participantes a cinco bloques aproximadamente equilibr
 
 **Cuándo:** 15 al 21 de octubre en el cronograma.
 
-**Trabajo:** implementar pipelines con edad, sexo e IMC de V00 para regresión logística regularizada, XGBoost y perceptrón multicapa. Imputar los tres IMC ausentes con la mediana calculada en cada entrenamiento; codificar y escalar dentro del pliegue, nunca antes de dividir. Evaluar la referencia clínica que añade KL inicial y, de forma complementaria, una variante con cirugía previa y WOMAC, sin incorporarlas retroactivamente al contraste principal.
+**Trabajo:** implementar pipelines con edad, sexo e IMC de V00 para regresión logística regularizada, XGBoost y perceptrón multicapa. Imputar los valores ausentes de IMC con la mediana calculada en cada entrenamiento; codificar y escalar dentro del pliegue, nunca antes de dividir. Evaluar la referencia clínica que añade KL inicial y, de forma complementaria, una variante con cirugía previa y WOMAC, sin incorporarlas retroactivamente al contraste principal.
 
 **Entrega y cierre:** predicciones fuera de pliegue y métricas de desarrollo de todos los candidatos, configuración ganadora según PR-AUC definida como `average_precision_score`, transformaciones guardadas y registro de costos. Las métricas de desarrollo no serán el resultado final de la tesis.
 
@@ -52,7 +82,9 @@ Con semilla 2026, asignar participantes a cinco bloques aproximadamente equilibr
 
 **Cuándo:** 15 al 31 de octubre en el cronograma; puede solaparse con la fase clínica.
 
-**Trabajo:** hacer un ensayo corto en Colab Pro para medir tiempo, VRAM y tamaño de lote. Entrenar DenseNet121 y ViT-B/16 con pesos preentrenados, recortes de 224 × 224, primero con codificador congelado y después con ajuste fino acotado. Aplicar aumentos moderados solo en entrenamiento. Limitar la búsqueda a ocho configuraciones por codificador, máximo 60 épocas y parada temprana de ocho épocas, sujeto al presupuesto real registrado. Seleccionar por PR-AUC media agrupada en desarrollo; entrenar la configuración neuronal seleccionada con semillas 2026, 2027 y 2028.
+**Trabajo:** hacer un ensayo corto en Colab Pro para medir tiempo, VRAM y tamaño de lote. DenseNet121 y ViT-B/16 se mantienen como líneas base obligatorias a 224 × 224. El registro aprobado agrega ConvNeXt V2 Tiny, DINOv3 ViT-S/16 y SKELEX. Antes de cargar pesos se verifican licencia, acceso, riesgo de solapamiento de preentrenamiento, carga determinista y compatibilidad. Los candidatos modernos pasan primero por sonda lineal o codificador congelado; como máximo dos se promueven al ajuste fino controlado, sin eliminar las líneas base. Para los promovidos se permite una sensibilidad a 384 × 384 dentro de desarrollo.
+
+Aplicar aumentos radiográficamente seguros solo en entrenamiento después de congelarlos con el control visual de la Fase 1. Usar AdamW, precisión mixta, calentamiento y decaimiento cosenoidal; comparar descongelamiento gradual, decaimiento de tasa por capas y ajuste completo cuando corresponda. Mantener máximo 60 épocas y parada temprana de ocho épocas. Seleccionar por PR-AUC media agrupada en desarrollo y ejecutar finalistas neuronales con semillas 2026, 2027 y 2028. La variante bilateral con atención cruzada es complementaria y depende de que la Fase 1 confirme pares y lateralidad.
 
 **Entrega y cierre:** pesos y predicciones fuera de pliegue guardados fuera de GitHub, curvas, parámetros, consumo de recursos y verificación de que cada predicción de validación proviene de un codificador que no vio a ese participante.
 
@@ -60,7 +92,7 @@ Con semilla 2026, asignar participantes a cinco bloques aproximadamente equilibr
 
 **Cuándo:** 1 al 6 de noviembre en el cronograma.
 
-**Trabajo:** implementar la fusión intermedia de representación radiográfica y rama densa clínica (edad, sexo e IMC). Reutilizar por pliegue solo pesos visuales entrenados sin los participantes de validación de ese pliegue. Comparar, como análisis complementario, una fusión tardía con promedio fijo 0,5/0,5 de las probabilidades clínica y radiográfica. Mantener la misma cohorte y particiones en los tres escenarios principales. Limitar la búsqueda de fusión intermedia a ocho configuraciones y documentar si el presupuesto obliga a reducirla.
+**Trabajo:** implementar dos candidatos de fusión intermedia entre la representación radiográfica seleccionada y la rama clínica de edad, sexo e IMC: concatenación y compuertas o FiLM. Reutilizar por pliegue solo pesos visuales entrenados sin los participantes de validación de ese pliegue. Comparar, como análisis complementario, una fusión tardía con promedio fijo 0,5/0,5 de las probabilidades clínica y radiográfica. Mantener la misma cohorte y particiones en los tres escenarios principales. El registro cerrado y la selección por desarrollo, no el presupuesto disponible, limitan las variantes admisibles.
 
 **Entrega y cierre:** predicciones fuera de pliegue, selección del multimodal basada solo en desarrollo, comparación provisional y registro de todos los candidatos. Un resultado inferior del multimodal también se conserva y se reporta.
 
@@ -82,7 +114,7 @@ Evaluar una sola vez las predicciones finales de prueba con PR-AUC (AP) como com
 
 Revisar el prototipo con el traumatólogo mediante los casos autorizados y la ficha prevista. Esta revisión trata comprensión y pertinencia de la interfaz; no constituye validación externa del desempeño predictivo. No afirmar transportabilidad a pacientes peruanos sin una cohorte externa con desenlace comparable.
 
-**Decisión de alcance antes de implementar la interfaz:** el capítulo I menciona mostrar un grado KL estimado, mientras que el capítulo III no define ni evalúa un modelo para producirlo. Resolver la discrepancia de los capítulos antes de prometer esa salida. El modelo principal de progresión y sus comparaciones no dependen de esa función adicional.
+**Decisión de alcance resuelta (`RES-KL-001`):** el prototipo no estimará ni mostrará un grado KL. Esa función requeriría otro modelo no definido ni evaluado en el capítulo III. La interfaz mostrará únicamente la probabilidad calibrada de progresión estructural a 48 meses, su clasificación mediante el umbral congelado, la versión del sistema y sus limitaciones.
 
 **Entrega y cierre:** servicio e interfaz ejecutables, pruebas críticas aprobadas, paquete de modelo versionado y registro descriptivo de la valoración profesional.
 
@@ -97,7 +129,7 @@ Revisar el prototipo con el traumatólogo mediante los casos autorizados y la fi
 ## Primer bloque de trabajo con Codex
 
 1. Crear la estructura del proyecto, configuración de ejemplo y verificaciones de integridad del CSV y manifiesto.
-2. Corregir el recuento del piloto y ejecutar de nuevo la auditoría con `00839603`.
+2. Corregir el recuento del piloto y ejecutar de nuevo la auditoría con el estudio omitido registrado en el manifiesto privado.
 3. Preparar un notebook de Colab que monte Drive, compruebe dependencias y rutas, y audite una muestra de DICOM sin exponer claves.
 4. Revisar juntos los recortes y la lateralidad antes de procesar masivamente las imágenes.
 
@@ -112,4 +144,5 @@ Revisar el prototipo con el traumatólogo mediante los casos autorizados y la fi
 | Recursos de Colab Pro menores a lo previsto | Medir con un ensayo; reducir búsquedas dentro de desarrollo y documentar el cambio. |
 | Resultado multimodal sin mejora | Reportar el contraste y las limitaciones sin cambiar modelos usando la prueba. |
 | Ausencia de datos peruanos longitudinales | Mantener la evaluación interna OAI y la valoración del especialista separadas; no llamarlas validación externa. |
-| KL estimado en el capítulo I | Acordar si se elimina de esa promesa o se diseña y evalúa como tarea auxiliar independiente. |
+| Persistencia de la promesa de KL estimado en una versión documental | Aplicar `RES-KL-001`: retirar esa promesa sin añadir otro modelo; el investigador corregirá posteriormente el apartado 1.5.2 del Word. |
+| Pesos modernos con acceso o licencia incompatibles | Marcar el candidato como no elegible antes del cribado, conservar la evidencia y continuar con los candidatos autorizados restantes. |

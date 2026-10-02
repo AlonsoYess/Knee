@@ -1,0 +1,12 @@
+{
+  "manifest_xlsx": "data/cohort_manifest.xlsx",
+  "source_dirs": [
+    "dicom/originales/piloto_v1",
+    "dicom/originales/cohorte_v00"
+  ],
+  "output_dir": "outputs/auditorias/fase_1/paso_2_inventario",
+  "download_plan_csv": "outputs/auditorias/fase_1/paso_2_inventario/plan_descarga_congelado_privado.csv",
+  "expected_unique_acquisitions": 1916,
+  "download_batch_size": 100,
+  "workers": 4
+}
