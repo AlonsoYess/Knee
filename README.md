@@ -10,6 +10,8 @@ La [libreta 33](notebooks/33_verificar_modelos_finales_sin_entrenar.ipynb) se ej
 
 La [libreta 34](notebooks/34_preparar_ejecutor_entrenamiento_sin_entrenar.ipynb) prepara y verifica el ejecutor con CPU y los registros completos de la libreta 33. Tampoco inicia entrenamiento ni necesita paquetes de participantes. El código de ejecución exige una autorización separada para una solicitud exacta de un pliegue de desarrollo; el ajuste fino y las fusiones requieren además la selección documentada y los pesos del mismo pliegue. Los resultados de entrenamiento se guardarán únicamente en carpetas privadas nuevas.
 
+La [libreta 35](notebooks/35_prueba_breve_entrenamiento_gpu_desarrollo.ipynb) permite al investigador ejecutar en Colab una prueba técnica acotada con GPU: DenseNet121, el primer pliegue de desarrollo, semilla fija y exactamente dos actualizaciones de la capa de salida, sin descongelar el codificador. Requiere la comprobación completa de la libreta 34, el paquete de desarrollo verificado y una confirmación expresa para esa prueba. No admite la prueba reservada, no inicia el entrenamiento completo ni permite usar sus métricas para seleccionar modelos. La instalación y las salidas se mantienen separadas de los originales; la compatibilidad real con GPU solo queda acreditada después de su ejecución satisfactoria en Colab.
+
 ## Estado histórico de etapas iniciales
 
 El resumen siguiente conserva el contexto de las primeras etapas; no describe el estado actual de la preparación de modelos.
