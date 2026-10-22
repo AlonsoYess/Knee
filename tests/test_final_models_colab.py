@@ -329,6 +329,7 @@ class FinalModelsColabTests(unittest.TestCase):
     def test_notebook_has_no_outputs_private_paths_dataset_or_training_calls(self):
         notebook = builder.build("a" * 40)
         self.assertEqual(notebook["nbformat"], 4)
+        self.assertIn("Revisión 1.1", notebook["cells"][0]["source"])
         full = "\n".join(cell["source"] for cell in notebook["cells"])
         for cell in notebook["cells"]:
             if cell["cell_type"] == "code":

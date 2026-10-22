@@ -91,6 +91,8 @@ print('Revisión exacta del código preparada. No se abrieron datos de participa
 """.replace("__REVISION__", repr(code_revision))
     cells = [markdown("""# 33 · Verificar los modelos finales, sin entrenar
 
+**Revisión 1.1:** corregida la descarga de pesos desde los servidores regionales oficiales de Hugging Face. Si ejecutaste una copia anterior, abre esta revisión y reinicia el entorno antes de empezar.
+
 Selecciona **CPU** y ejecuta las celdas en orden. La lista queda cerrada con BiomedCLIP y MambaOut-Tiny como candidatos adicionales. Esta libreta comprueba **seis encoders accesibles de siete registrados**; DINOv3 sigue pendiente de acceso autorizado y no se sustituye por otro checkpoint.
 
 Solo se generan dos imágenes sintéticas en memoria. **No necesitas el paquete de desarrollo ni el reservado**, ni ejecutar las libretas anteriores. No se entrena, no se crean optimizadores y no se modifican originales o particiones.

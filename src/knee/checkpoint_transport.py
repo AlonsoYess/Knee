@@ -16,8 +16,22 @@ import urllib.request
 
 
 SOURCE_HOSTS = {"download.pytorch.org", "dl.fbaipublicfiles.com", "huggingface.co"}
+# Exact file-service domains published by Hugging Face on 2026-10-22:
+# https://huggingface.co/.well-known/meta.json (cdnDomains and lfsDomains).
+# Colab can be routed to a regional GCP edge instead of the AWS edge observed
+# locally. These hosts are redirect destinations only, never new origins.
+HUGGINGFACE_FILE_HOSTS = frozenset({
+    "cdn-lfs.hf.co", "cdn-lfs-us-1.hf.co", "cdn-lfs-eu-1.hf.co",
+    "transfer.xethub.hf.co", "transfer.xethub-eu.hf.co",
+    "aws.cdn.hf.co", "us.aws.cdn.hf.co", "us-east-1.aws.cdn.hf.co",
+    "us-west-2.aws.cdn.hf.co", "eu-west-3.aws.cdn.hf.co",
+    "ap-southeast-1.aws.cdn.hf.co", "us.gcp.cdn.hf.co",
+    "us-east1.us.gcp.cdn.hf.co", "us-central1.us.gcp.cdn.hf.co",
+    "us-west4.us.gcp.cdn.hf.co", "europe-west4.us.gcp.cdn.hf.co",
+    "asia-southeast1.us.gcp.cdn.hf.co",
+})
 REDIRECT_HOSTS = SOURCE_HOSTS | {"cdn-lfs.huggingface.co", "cdn-lfs-us-1.huggingface.co",
-    "cas-bridge.xethub.hf.co", "us.aws.cdn.hf.co", "cdn-lfs.hf.co"}
+    "cas-bridge.xethub.hf.co"} | HUGGINGFACE_FILE_HOSTS
 
 
 def file_digest(path):
@@ -32,7 +46,10 @@ def _https(url, hosts):
     parsed = urllib.parse.urlsplit(url)
     if (parsed.scheme != "https" or parsed.hostname not in hosts or parsed.username
             or parsed.password or parsed.port not in (None, 443) or parsed.fragment):
-        raise ValueError("official_https_checkpoint_source_required")
+        # Report only a bounded hostname, never signed queries or credentials.
+        host = parsed.hostname or ""
+        safe_host = host if re.fullmatch(r"[a-z0-9.-]{1,253}", host) else "invalid"
+        raise ValueError("official_https_checkpoint_source_required:host=" + safe_host)
 
 
 class _OfficialRedirects(urllib.request.HTTPRedirectHandler):

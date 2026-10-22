@@ -126,6 +126,47 @@ class CheckpointTransportTests(unittest.TestCase):
                     subject.acquire(url, self.path)
                 opener.assert_not_called()
 
+    def test_official_regional_gcp_and_aws_redirects_reach_verified_publication(self):
+        handler = subject._OfficialRedirects()
+        request = urllib.request.Request("https://huggingface.co/skhoha/SKELEX/resolve/revision/model.safetensors")
+        for host in ("us.gcp.cdn.hf.co", "us-central1.us.gcp.cdn.hf.co",
+                     "europe-west4.us.gcp.cdn.hf.co", "us-east-1.aws.cdn.hf.co",
+                     "eu-west-3.aws.cdn.hf.co", "cdn-lfs-us-1.hf.co", "cdn-lfs-eu-1.hf.co"):
+            with self.subTest(host=host):
+                url = "https://" + host + "/xet-bridge-us/synthetic?Signature=synthetic"
+                redirected = handler.redirect_request(request, None, 302, "Found", {}, url)
+                self.assertEqual(redirected.full_url, url)
+                result = self.download(Response(url=url), expected_sha256=SHA, expected_bytes=len(PAYLOAD))
+                self.assertEqual(result["sha256"], SHA)
+                self.assertEqual(self.path.read_bytes(), PAYLOAD)
+                self.path.unlink()
+
+    def test_regional_redirect_never_bypasses_checkpoint_hash_or_changes_origin_policy(self):
+        regional = "https://us-central1.us.gcp.cdn.hf.co/xet-bridge-us/synthetic"
+        with self.assertRaisesRegex(ValueError, "sha256_mismatch"):
+            self.download(Response(url=regional), expected_sha256="0" * 64)
+        self.assertFalse(self.path.exists())
+        self.assertFalse(self.path.with_name(self.path.name + ".partial").exists())
+        with patch.object(subject.urllib.request, "build_opener") as opener, self.assertRaisesRegex(ValueError, "official_https"):
+            subject.acquire(regional, self.path, expected_sha256=SHA)
+        opener.assert_not_called()
+
+    def test_regional_cdn_lookalikes_and_unsecured_urls_remain_rejected(self):
+        handler = subject._OfficialRedirects()
+        request = urllib.request.Request(URL)
+        for url in ("https://us.gcp.cdn.hf.co.attacker.invalid/file",
+                    "https://attacker-us.gcp.cdn.hf.co/file", "http://us.gcp.cdn.hf.co/file",
+                    "https://us.gcp.cdn.hf.co:444/file", "https://user:pass@us.gcp.cdn.hf.co/file",
+                    "https://us.gcp.cdn.hf.co/file#fragment", "https://unlisted-region.us.gcp.cdn.hf.co/file"):
+            with self.subTest(url=url), self.assertRaisesRegex(ValueError, "official_https"):
+                handler.redirect_request(request, None, 302, "Found", {}, url)
+
+    def test_rejected_redirect_reports_hostname_without_signed_query_or_credentials(self):
+        secret_url = "https://user:password@unlisted.invalid/file?Signature=secret"
+        with self.assertRaises(ValueError) as raised:
+            subject._https(secret_url, subject.REDIRECT_HOSTS)
+        self.assertEqual(str(raised.exception), "official_https_checkpoint_source_required:host=unlisted.invalid")
+
     def test_invalid_hashes_sizes_and_bool_limits_fail_before_network(self):
         cases = [{"expected_sha256": "abc"}, {"expected_sha256": "F" * 64},
                  {"sha256_prefix": "abc"}, {"maximum_bytes": True}, {"maximum_bytes": 0},
