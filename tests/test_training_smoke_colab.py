@@ -42,7 +42,9 @@ def result():
         "training_knees_seen": 32, "micro_batch_size": 2, "effective_batch_size": 16,
         "frozen_encoder_state_unchanged": True, "task_head_update_verified": True,
         "training_executed": True, "training_smoke_test_passed": True,
-        "gpu_resource_profile_recorded": True, "artifact_files_sha256": {}}
+        "gpu_resource_profile_recorded": True, "artifact_files_sha256": {},
+        "amp_numerical_repair_version": "same_effective_group_amp_replay_v1.0",
+        "amp_overflow_replays": 0, "amp_scale_audit": [{}, {}]}
 
 
 class TrainingSmokeColabTests(unittest.TestCase):
@@ -178,6 +180,22 @@ class TrainingSmokeColabTests(unittest.TestCase):
         core.run.assert_called_once()
         self.assertTrue(observed["training_smoke_test_passed"])
 
+    def test_result_requires_fixed_amp_version_nonnegative_count_and_two_update_audit(self):
+        subject.validate_result(result())
+        subject.validate_result({**result(), "amp_overflow_replays": 2})
+        for name, value in (("amp_numerical_repair_version", "legacy_skip_on_overflow"),
+                ("amp_numerical_repair_version", None), ("amp_overflow_replays", -1),
+                ("amp_overflow_replays", True), ("amp_overflow_replays", 1.0),
+                ("amp_scale_audit", []), ("amp_scale_audit", [{}, {}, {}]),
+                ("amp_scale_audit", ({}, {}))):
+            with self.subTest(name=name, value=value), self.assertRaisesRegex(RuntimeError, "amp_repair_audit"):
+                subject.validate_result({**result(), name: value})
+        for missing in ("amp_numerical_repair_version", "amp_overflow_replays", "amp_scale_audit"):
+            incomplete = result()
+            del incomplete[missing]
+            with self.subTest(missing=missing), self.assertRaisesRegex(RuntimeError, "amp_repair_audit"):
+                subject.validate_result(incomplete)
+
     def publication(self):
         local, persistent = self.root / "local", self.root / "private"
         persistent.mkdir()
@@ -304,6 +322,15 @@ class TrainingSmokeColabTests(unittest.TestCase):
         self.assertEqual(notebook, builder.build(revision, allow_unpublished_placeholder=revision == builder.UNPUBLISHED))
         self.assertNotIn("\ufffd", json.dumps(notebook, ensure_ascii=False))
 
+    def test_revision11_requires_fresh_session_and_same_group_amp_without_protocol_change(self):
+        notebook = builder.build("a" * 40)
+        opening = notebook["cells"][0]["source"]
+        for text in ("Revisión 1.1", "dos actualizaciones exitosas", "mismo grupo efectivo de 16 rodillas",
+                "no se descartan muestras", "gradientes finitos permanece activa", "reinicia completamente",
+                "copia actualizada desde Drive", "todas las celdas en orden", "No vuelvas a ejecutar únicamente",
+                "no se reanuda ni se reutilizan sus pesos", "No cambian el modelo, el pliegue, la semilla"):
+            self.assertIn(text, opening)
+
     def test_approval_statement_exactly_matches_core_contract(self):
         from knee.training_smoke import APPROVAL_STATEMENT
         self.assertEqual(subject.APPROVAL_STATEMENT, APPROVAL_STATEMENT)
@@ -323,6 +350,8 @@ class TrainingSmokeColabTests(unittest.TestCase):
             {"test_training_preparation", "test_pretrained_verification"})
         self.assertEqual(subject.GPU_INCOMPATIBLE_HISTORICAL_TEST_MODULES,
             ("test_training_preparation", "test_pretrained_verification"))
+        self.assertIn("test_training_amp", subject.TEST_MODULES)
+        self.assertNotIn("test_training_amp", subject.previous.TEST_MODULES)
         core = self.fake_core()
         core.validate_preparation.side_effect = ValueError("historical_cpu_preparation_required")
         self.patch_core(core)

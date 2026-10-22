@@ -62,6 +62,9 @@ def initial_state():
 
 
 def fake_engine_record():
+    audit = [{"epoch": 1, "update_index_within_epoch": index,
+        "start_scale": 65536., "successful_scale": 65536., "scale_after_update": 65536.,
+        "backoffs": 0, "attempts": 1, "gradient_norm_before_clip": 1.} for index in (1, 2)]
     return {"version": "prepared_neural_fold_engine_v1.0", "model_id": subject.MODEL_ID,
         "stage": "stage_1", "seed": 2026, "smoke": True, "scope": "development_only",
         "status": "bounded_training_smoke_complete", "eligible_for_model_selection": False,
@@ -70,7 +73,13 @@ def fake_engine_record():
         "effective_batch_size": 16, "device": "cuda:0", "precision": "float16_autocast_grad_scaler",
         "gpu_resource_profile_recorded": True, "restored_best_checkpoint": True,
         "resume_supported": False, "optimizer_state_saved": False,
-        "history": [{"epoch": 1, "phase": "head_only", "optimizer_updates": 2, "training_knees_seen": 32}],
+        "numerical_repair": {"version": subject.AMP_REPAIR_VERSION,
+            "maximum_backoffs_per_effective_group": 16, "same_effective_group_replayed": True,
+            "nonfinite_gradients_never_clipped": True},
+        "amp_overflow_replays": 0, "amp_scale_audit": audit,
+        "history": [{"epoch": 1, "phase": "head_only", "optimizer_updates": 2, "training_knees_seen": 32,
+            "amp_overflow_replays": 0, "amp_scale_audit": [
+                {key:value for key,value in row.items() if key != "epoch"} for row in audit]}],
         "resource_profile": {"device_type": "cuda", "cuda_peak_measured": True,
             "torch_version": "2.6.0+cu124", "cuda_version": "12.4", "device_name": "SYNTHETIC GPU",
             "total_memory_bytes": 10000, "peak_memory_allocated_bytes": 500,
@@ -166,7 +175,20 @@ class PreparationEvidenceTests(unittest.TestCase):
 
     def test_preserved_source_pins_match_repository_without_any_model_call(self):
         sources = subject._sources(ROOT)
-        self.assertEqual({name:sources[name] for name in subject.SOURCE_34}, subject.SOURCE_34)
+        expected = {**subject.SOURCE_34, **subject.RUNTIME_SOURCE_PATCHES}
+        self.assertEqual({name:sources[name] for name in subject.SOURCE_34}, expected)
+        self.assertEqual(subject.SOURCE_34["src/knee/training_engine.py"],
+            "2728f10a4e2bffb37558b9b65a0dbc2be0ac0edbe5ed5ece90472155b7f2ad93")
+        self.assertEqual(set(subject.RUNTIME_SOURCE_PATCHES), {"src/knee/training_engine.py"})
+
+    def test_unregistered_runtime_source_change_is_rejected_without_rewriting_history(self):
+        original = subject.sha_file
+        def drift(path):
+            return "0" * 64 if Path(path).name == "training_engine.py" else original(path)
+        with patch.object(subject, "sha_file", side_effect=drift), self.assertRaisesRegex(ValueError,
+                "verified_training_sources_changed"):
+            subject._sources(ROOT)
+        self.assertEqual(subject.validate_preparation(self.proof)["cpu_tests"]["tests_run"], 313)
 
     def test_request_has_only_fixed_densenet_fold_zero_seed_and_two_microbatch(self):
         request = subject.make_request("a"*64)
@@ -229,6 +251,35 @@ class SmokeResultTests(unittest.TestCase):
             job = fake_job(root, self.request, engine_change=change)
             with self.subTest(index=index), self.assertRaises(ValueError):
                 subject._validate_job(root, job, self.request)
+
+    def test_nonfinite_unbounded_or_inconsistent_amp_audit_cannot_pass(self):
+        changes = (
+            lambda v:v.pop("numerical_repair"),
+            lambda v:v.update(amp_overflow_replays=True),
+            lambda v:v["amp_scale_audit"][0].update(gradient_norm_before_clip=float("nan")),
+            lambda v:v["amp_scale_audit"][0].update(backoffs=17),
+            lambda v:v["amp_scale_audit"][0].update(attempts=0),
+            lambda v:v["amp_scale_audit"][1].update(start_scale=1.),
+            lambda v:v["history"][0].update(amp_overflow_replays=1),
+        )
+        for index, change in enumerate(changes):
+            root = self.root / str(index)
+            job = fake_job(root, self.request, engine_change=change)
+            with self.subTest(index=index), self.assertRaises(ValueError):
+                subject._validate_job(root, job, self.request)
+
+    def test_one_replay_records_two_successful_updates_without_claiming_extra_training(self):
+        record = fake_engine_record()
+        first, second = record["amp_scale_audit"]
+        first.update(successful_scale=32768., scale_after_update=32768., backoffs=1, attempts=2)
+        second.update(start_scale=32768., successful_scale=32768., scale_after_update=32768.)
+        record["amp_overflow_replays"] = 1
+        record["history"][0].update(amp_overflow_replays=1,
+            amp_scale_audit=[{key:value for key,value in row.items() if key != "epoch"}
+                for row in record["amp_scale_audit"]])
+        subject._validate_amp_audit(record)
+        self.assertEqual(record["optimizer_updates"], 2)
+        self.assertEqual(record["history"][0]["training_knees_seen"], 32)
 
     def test_missing_gpu_profile_or_nonfinite_resource_measurements_fail(self):
         for index, change in enumerate((lambda v:v.update(gpu_resource_profile_recorded=False),

@@ -26,6 +26,8 @@ from knee.final_model_release import PINS
 
 VERSION = "prepared_neural_fold_engine_v1.0"
 METRICS = ("average_precision_score", "roc_auc", "brier")
+AMP_NUMERICAL_REPAIR_VERSION = "same_effective_group_amp_replay_v1.0"
+AMP_MAX_BACKOFFS = 16
 
 
 def validate_recipe(plan):
@@ -214,38 +216,134 @@ def _new_optimizer(groups, plan):
     return torch.optim.AdamW(copied, betas=tuple(recipe["betas"]), eps=recipe["epsilon"])
 
 
+def _capture_group_state(model, device):
+    """Save only state a rejected forward may mutate, never fitted parameters."""
+    return {"python": random.getstate(), "numpy": np.random.get_state(),
+            "cpu": torch.get_rng_state().clone(),
+            "cuda": torch.cuda.get_rng_state(device).clone() if device.type == "cuda" else None,
+            "buffers": {name: value.detach().clone() for name, value in model.named_buffers()}}
+
+
+def _restore_group_state(model, state, device):
+    buffers = dict(model.named_buffers())
+    _require(set(buffers) == set(state["buffers"]), "stable_registered_model_buffers_required_for_amp_replay")
+    with torch.no_grad():
+        for name, cached in state["buffers"].items():
+            value = buffers[name]
+            _require(value.shape == cached.shape and value.dtype == cached.dtype and value.device == cached.device,
+                     "stable_registered_model_buffers_required_for_amp_replay")
+            value.copy_(cached)
+    random.setstate(state["python"])
+    np.random.set_state(state["numpy"])
+    torch.set_rng_state(state["cpu"])
+    if device.type == "cuda":
+        torch.cuda.set_rng_state(state["cuda"], device)
+
+
+def _gradient_parameters(optimizer):
+    parameters = [parameter for group in optimizer.param_groups for parameter in group["params"]
+                  if parameter.grad is not None]
+    _require(bool(parameters), "nonempty_accumulated_training_gradients_required")
+    return parameters
+
+
+def _gradients_finite(parameters):
+    return all(bool(torch.isfinite(parameter.grad).all().item()) for parameter in parameters)
+
+
+def _accumulate_group(model, batches, actual_knees, scaler, device, positive_weight):
+    group_loss = 0.0
+    for batch in batches:
+        with torch.autocast(device_type=device.type, dtype=torch.float16,
+                            enabled=device.type == "cuda"):
+            logits, target = _forward(model, batch, device)
+            summed_loss = torch.nn.functional.binary_cross_entropy_with_logits(
+                logits, target, pos_weight=positive_weight, reduction="sum")
+            _require(torch.isfinite(summed_loss).item(), "finite_weighted_training_loss_required")
+            normalized_loss = summed_loss / actual_knees
+        scaler.scale(normalized_loss).backward()
+        group_loss += float(summed_loss.detach().cpu())
+    return group_loss
+
+
+def _execute_effective_group(model, batches, actual_knees, optimizer, scaler, device, positive_weight):
+    """Back off AMP on the same retained group; never omit a training knee.
+
+    PyTorch's scaler skips the unsafe optimizer step before lowering its scale.
+    A rejected pass does not advance the loader, loss accounting, RNG, buffers,
+    scheduler or successful-update count. Invalid inputs/losses remain fatal.
+    """
+    state = _capture_group_state(model, device)
+    start_scale = float(scaler.get_scale())
+    _require(math.isfinite(start_scale) and start_scale > 0, "finite_positive_amp_scale_required")
+    backoffs = 0
+    while True:
+        optimizer.zero_grad(set_to_none=True)
+        may_restore = True
+        try:
+            group_loss = _accumulate_group(model, batches, actual_knees, scaler, device, positive_weight)
+            scaler.unscale_(optimizer)
+            parameters = _gradient_parameters(optimizer)
+            if not _gradients_finite(parameters):
+                _require(device.type == "cuda" and scaler.is_enabled(),
+                         "nonfinite_unscaled_gradients_without_amp_recovery")
+                previous_scale = float(scaler.get_scale())
+                _require(backoffs < AMP_MAX_BACKOFFS and math.isfinite(previous_scale) and previous_scale > 1,
+                         "amp_nonfinite_gradients_persist_after_bounded_replay")
+                # unscale_ has already registered inf/NaN with GradScaler.
+                # Its public step API must skip optimizer.step in this branch.
+                scaler.step(optimizer)
+                scaler.update()
+                next_scale = float(scaler.get_scale())
+                _require(math.isfinite(next_scale) and next_scale >= 1
+                         and next_scale == previous_scale * 0.5,
+                         "amp_overflow_requires_finite_standard_backoff")
+                backoffs += 1
+                optimizer.zero_grad(set_to_none=True)
+                _restore_group_state(model, state, device)
+                continue
+            norm = torch.nn.utils.clip_grad_norm_(parameters, max_norm=1.0, error_if_nonfinite=True)
+            norm = float(norm)
+            _require(math.isfinite(norm), "finite_unscaled_gradient_norm_required")
+            previous_scale = float(scaler.get_scale())
+            _require(math.isfinite(previous_scale) and previous_scale > 0,
+                     "finite_positive_amp_scale_required")
+            # No rejected-pass restoration is allowed after a valid optimizer
+            # step may have changed parameters and optimizer moments.
+            may_restore = False
+            scaler.step(optimizer)
+            scaler.update()
+            successful_scale = float(scaler.get_scale())
+            _require(math.isfinite(successful_scale) and successful_scale >= previous_scale,
+                     "amp_overflow_after_finite_gradient_check_requires_numerical_review")
+            optimizer.zero_grad(set_to_none=True)
+            return {"summed_loss": group_loss, "amp_overflow_replays": backoffs,
+                    "amp_scale_audit": {"start_scale": start_scale,
+                        "successful_scale": previous_scale, "scale_after_update": successful_scale,
+                        "backoffs": backoffs, "attempts": backoffs + 1,
+                        "gradient_norm_before_clip": norm}}
+        except Exception:
+            optimizer.zero_grad(set_to_none=True)
+            if may_restore:
+                _restore_group_state(model, state, device)
+            raise
+
+
 def _execute_training_epoch(model, loader, optimizer, scaler, device, positive_weight,
                             effective_batch_size, maximum_updates=None):
     """Execute only when explicitly called by an authorized public runner."""
-    loss_sum, knees_seen, updates = 0.0, 0, 0
+    loss_sum, knees_seen, updates, replays = 0.0, 0, 0, 0
+    scale_audit = []
     weight = torch.tensor(float(positive_weight), device=device, dtype=torch.float32)
     try:
         for batches, actual_knees in _batch_groups(loader, effective_batch_size):
-            optimizer.zero_grad(set_to_none=True)
-            group_loss = 0.0
-            for batch in batches:
-                with torch.autocast(device_type=device.type, dtype=torch.float16,
-                                    enabled=device.type == "cuda"):
-                    logits, target = _forward(model, batch, device)
-                    summed_loss = torch.nn.functional.binary_cross_entropy_with_logits(
-                        logits, target, pos_weight=weight, reduction="sum")
-                    _require(torch.isfinite(summed_loss).item(), "finite_weighted_training_loss_required")
-                    normalized_loss = summed_loss / actual_knees
-                scaler.scale(normalized_loss).backward()
-                group_loss += float(summed_loss.detach().cpu())
-            scaler.unscale_(optimizer)
-            torch.nn.utils.clip_grad_norm_([p for group in optimizer.param_groups
-                                           for p in group["params"] if p.grad is not None],
-                                          max_norm=1.0, error_if_nonfinite=True)
-            previous_scale = scaler.get_scale()
-            scaler.step(optimizer)
-            scaler.update()
-            _require(scaler.get_scale() >= previous_scale,
-                     "amp_overflow_restart_fold_without_skipping_updates")
-            optimizer.zero_grad(set_to_none=True)
-            loss_sum += group_loss
+            group = _execute_effective_group(model, batches, actual_knees, optimizer,
+                                             scaler, device, weight)
+            loss_sum += group["summed_loss"]
             knees_seen += actual_knees
             updates += 1
+            replays += group["amp_overflow_replays"]
+            scale_audit.append({"update_index_within_epoch": updates, **group["amp_scale_audit"]})
             if maximum_updates is not None and updates >= maximum_updates:
                 break
     except torch.cuda.OutOfMemoryError as exc:
@@ -253,7 +351,8 @@ def _execute_training_epoch(model, loader, optimizer, scaler, device, positive_w
         raise RuntimeError("cuda_oom_restart_entire_fold_same_seed_with_smaller_registered_micro_batch") from exc
     _require(knees_seen > 0, "nonempty_training_epoch_required")
     return {"weighted_loss_per_knee": loss_sum / knees_seen,
-            "training_knees_seen": knees_seen, "optimizer_updates": updates}
+            "training_knees_seen": knees_seen, "optimizer_updates": updates,
+            "amp_overflow_replays": replays, "amp_scale_audit": scale_audit}
 
 
 def _evaluate(model, loader, device):
@@ -499,6 +598,12 @@ def train_neural_fold(model, training_loader, validation_loader, plan, *, device
               "resource_profile": resource_profile,
               "micro_batch_size": micro, "effective_batch_size": 64 if clinical else 16,
               "device": str(selected_device), "precision": "float16_autocast_grad_scaler" if selected_device.type == "cuda" else "float32",
+              "numerical_repair": {"version": AMP_NUMERICAL_REPAIR_VERSION,
+                  "maximum_backoffs_per_effective_group": AMP_MAX_BACKOFFS,
+                  "same_effective_group_replayed": True, "nonfinite_gradients_never_clipped": True},
+              "amp_overflow_replays": sum(item.get("amp_overflow_replays", 0) for item in history),
+              "amp_scale_audit": [{"epoch": item["epoch"], **audit}
+                  for item in history for audit in item.get("amp_scale_audit", [])],
               "checkpoint_sha256": {"best_model.safetensors": best_hash, "last_model.safetensors": last_hash},
               "history": history, "reserved_test_accessed": False, "provenance": binding}
     best_predictions["identities"] = [list(identity) for identity in validation_loader.dataset.identities]

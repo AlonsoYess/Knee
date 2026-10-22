@@ -42,6 +42,13 @@ SOURCE_34 = {
     "src/knee/training_preparation_colab.py": "9b62a6a53d0d06fa66d3146d26d24532a62f519a39883057782b1f1929adb852",
     "requirements-training-runner.txt": "03a794914de5aa5f08d0b48875fa3e21e2fdb8da5f6db808f2063fbb69a86100",
 }
+# Historical notebook34 proof remains bound to SOURCE_34 above. Only this
+# explicitly reviewed numerical repair may differ in the current executor;
+# neither the proof nor the immutable modeling release is reclassified.
+AMP_REPAIR_VERSION = "same_effective_group_amp_replay_v1.0"
+RUNTIME_SOURCE_PATCHES = {
+    "src/knee/training_engine.py": "e732048d416011f70ed1322e03ddbf3a874af7d1c6b184fe19c5831f650d1c06",
+}
 GPU_PACKAGES = {**preparation.EXTRA_PACKAGES,
     "torch": "2.6.0+cu124", "torchvision": "0.21.0+cu124", "numpy": "1.26.4"}
 JOB_FILES = {"best_model.safetensors", "last_model.safetensors", "training_record.json",
@@ -125,6 +132,7 @@ def verify_gpu_environment(execution_environment):
 
 def _sources(repository):
     expected = {**preparation.SOURCE_33, **SOURCE_34}
+    expected.update(RUNTIME_SOURCE_PATCHES)
     require(all(sha_file(repository / name) == checksum for name, checksum in expected.items()),
         "verified_training_sources_changed_since_colab34")
     for name in ("src/knee/training_smoke.py", "src/knee/training_gpu_runtime.py", "requirements-training-gpu.txt"):
@@ -188,6 +196,7 @@ def _validate_job(job_root, job, request):
         and history[0].get("phase") == "head_only" and history[0].get("optimizer_updates") == 2
         and history[0].get("training_knees_seen") == 32,
         "two_updates_of_sixteen_knees_without_unfreezing_required")
+    _validate_amp_audit(engine)
     resource = engine.get("resource_profile", {})
     require(resource.get("device_type") == "cuda" and resource.get("cuda_peak_measured") is True
         and resource.get("torch_version") == GPU_PACKAGES["torch"] and resource.get("cuda_version") == "12.4"
@@ -199,6 +208,46 @@ def _validate_job(job_root, job, request):
         and math.isfinite(resource["elapsed_seconds"]) and resource["elapsed_seconds"] > 0,
         "measured_finite_gpu_resource_profile_required")
     return engine
+
+
+def _validate_amp_audit(engine):
+    """Only finite successful updates count; no skipped or reassigned knees."""
+    require(engine.get("numerical_repair") == {
+        "version": AMP_REPAIR_VERSION, "maximum_backoffs_per_effective_group": 16,
+        "same_effective_group_replayed": True, "nonfinite_gradients_never_clipped": True,
+    }, "exact_same_effective_group_amp_repair_required")
+    audit = engine.get("amp_scale_audit")
+    require(isinstance(audit, list) and len(audit) == 2,
+        "two_successful_update_scale_audits_required")
+    fields = {"epoch", "update_index_within_epoch", "start_scale", "successful_scale",
+        "scale_after_update", "backoffs", "attempts", "gradient_norm_before_clip"}
+    replays = 0
+    previous_scale = None
+    for index, row in enumerate(audit, start=1):
+        require(isinstance(row, dict) and set(row) == fields
+            and type(row["epoch"]) is int and row["epoch"] == 1
+            and type(row["update_index_within_epoch"]) is int
+            and row["update_index_within_epoch"] == index
+            and type(row["backoffs"]) is int and 0 <= row["backoffs"] <= 16
+            and type(row["attempts"]) is int and row["attempts"] == row["backoffs"] + 1,
+            "bounded_amp_replay_and_successful_update_accounting_required")
+        for name in ("start_scale", "successful_scale", "scale_after_update", "gradient_norm_before_clip"):
+            value = row[name]
+            require(type(value) in {int, float} and math.isfinite(value)
+                and value >= (0 if name == "gradient_norm_before_clip" else 1),
+                "finite_successful_amp_scale_and_gradient_norm_required")
+        require(row["successful_scale"] == row["start_scale"] * 0.5 ** row["backoffs"]
+            and row["scale_after_update"] == row["successful_scale"]
+            and (previous_scale is None or row["start_scale"] == previous_scale),
+            "same_group_half_scale_backoff_without_omitted_update_required")
+        previous_scale = row["scale_after_update"]
+        replays += row["backoffs"]
+    history = engine["history"][0]
+    require(type(engine.get("amp_overflow_replays")) is int
+        and engine["amp_overflow_replays"] == replays
+        and history.get("amp_overflow_replays") == replays
+        and [{"epoch": 1, **row} for row in history.get("amp_scale_audit", [])] == audit,
+        "consistent_epoch_and_total_amp_replay_audit_required")
 
 
 def _verify_frozen_encoder(job_root, initial):
@@ -275,6 +324,9 @@ def run(repository_root, preparation_dir, package_dir, reference_path, weights_r
         "request": request, "request_sha256": digest(request), "model_id": MODEL_ID,
         "validation_fold": 0, "seed": 2026, "stage": "stage_1", "smoke": True,
         "optimizer_updates": 2, "training_knees_seen": 32, "micro_batch_size": 2,
+        "amp_numerical_repair_version": AMP_REPAIR_VERSION,
+        "amp_overflow_replays": engine["amp_overflow_replays"],
+        "amp_scale_audit": engine["amp_scale_audit"],
         "effective_batch_size": 16, "training_authorized": True, "training_executed": True,
         "optimizer_created": True, "backward_executed": True, "participant_data_opened": True,
         "training_smoke_test_passed": True, "gpu_resource_profile_recorded": True,
@@ -288,6 +340,11 @@ def run(repository_root, preparation_dir, package_dir, reference_path, weights_r
         "model_input_reference_sha256": sealed[reference],
         "previous_colab34_preparation_record_sha256": prepared["preparation_record_sha256"],
         "previous_colab33_checkpoint_record_sha256": PREVIOUS_CHECKPOINT_SHA256,
+        "historical_training_source_files_sha256": SOURCE_34,
+        "numerical_repair_source_lineage": {name: {
+            "historical_sha256": SOURCE_34[name], "runtime_sha256": checksum,
+            "repair_version": AMP_REPAIR_VERSION,
+        } for name, checksum in RUNTIME_SOURCE_PATCHES.items()},
         "training_job_record_sha256": job["record_sha256"], "artifact_files_sha256": files,
         "release_component_canonical_sha256": PINS, "source_files_sha256": sources,
         "public_checkpoint_files_sha256": {path.name: sealed[path] for path in paths},

@@ -46,7 +46,11 @@ def build(code_revision, *, allow_unpublished_placeholder=False):
         "La prueba breve se detuvo. Conserva el error; no intentes entrenamiento completo.")
     cells = [markdown("""# 35 · Prueba breve de entrenamiento en GPU, solo desarrollo
 
-**Revisión 1.0.** Selecciona **GPU** y ejecuta las celdas en orden. Esta prueba sí actualiza pesos, pero su alcance es únicamente **DenseNet121, cabeza de clasificación, pliegue 0, semilla 2026 y dos actualizaciones del optimizador**. El codificador preentrenado permanece congelado. No se inicia el entrenamiento completo, no se comparan modelos y no se abre la prueba reservada.
+**Revisión 1.1.** Selecciona **GPU** y ejecuta las celdas en orden. Esta prueba sí actualiza pesos, pero su alcance es únicamente **DenseNet121, cabeza de clasificación, pliegue 0, semilla 2026 y dos actualizaciones exitosas del optimizador**. El codificador preentrenado permanece congelado. No se inicia el entrenamiento completo, no se comparan modelos y no se abre la prueba reservada.
+
+Esta revisión corrige el manejo del desbordamiento numérico de la precisión mixta (AMP). Si ocurre, se reduce la escala de AMP y se repite el mismo grupo efectivo de 16 rodillas; no se descartan muestras ni se cuenta el intento como actualización. La comprobación de gradientes finitos permanece activa. No cambian el modelo, el pliegue, la semilla, la pérdida, la tasa de aprendizaje ni la precisión aprobados.
+
+**Si ejecutaste la revisión anterior, reinicia completamente el entorno de Colab, vuelve a abrir esta copia actualizada desde Drive y ejecuta todas las celdas en orden.** No vuelvas a ejecutar únicamente la celda que falló ni reutilices la sesión o los resultados temporales anteriores. Un intento fallido pudo haber alcanzado una actualización antes de detenerse; no se reanuda ni se reutilizan sus pesos.
 
 Se comprobarán las referencias de las libretas 32 y 34, se reconstruirá únicamente el paquete de desarrollo ya aprobado y se descargará solo el checkpoint público de DenseNet121 en el almacenamiento temporal de Colab. No se necesitan imágenes nuevas ni volver a ejecutar las libretas anteriores. Se conservan la geometría de 224 × 224 y las particiones por participante.
 
@@ -88,7 +92,7 @@ transport = orchestration.stage_development(REMOTE_PACKAGE_DIR, LOCAL_PACKAGE_DI
 print('Preparación 34 localizada. Solo desarrollo se reconstruyó y verificó; los originales siguen sin cambios.')
 """), markdown("""## 4. Ejecutar únicamente las dos actualizaciones autorizadas
 
-**Esta celda sí realiza entrenamiento breve.** Escribe `AUTORIZO PRUEBA GPU` para confirmar el alcance mostrado. Solo se actualiza la cabeza de DenseNet121 durante dos pasos; no se reutilizan estos pesos para seleccionar un modelo ni se inicia el entrenamiento completo. Se mide la memoria GPU y se comprueba que el codificador permanezca congelado. La validación usa exclusivamente el pliegue de desarrollo correspondiente.
+**Esta celda sí realiza entrenamiento breve.** Escribe `AUTORIZO PRUEBA GPU` para confirmar el alcance mostrado. Solo se actualiza la cabeza de DenseNet121 durante dos pasos exitosos; los intentos con desbordamiento de AMP se repiten sobre las mismas rodillas y no cuentan como pasos. No se reutilizan estos pesos para seleccionar un modelo ni se inicia el entrenamiento completo. Se mide la memoria GPU y se comprueba que el codificador permanezca congelado. La validación usa exclusivamente el pliegue de desarrollo correspondiente.
 
 Si aparece un error, no cambies el modelo, el pliegue o el número de pasos por tu cuenta. Conserva el mensaje para revisarlo."""),
         code("""confirmation = input('Escribe AUTORIZO PRUEBA GPU para ejecutar solo la prueba descrita: ').strip()
@@ -98,7 +102,7 @@ import uuid
 WEIGHTS_ROOT = SESSION_ROOT / 'public_weight_cache'
 WEIGHTS_ROOT.mkdir(exist_ok=False)
 LOCAL_OUTPUT = SESSION_ROOT / ('gpu_smoke_' + uuid.uuid4().hex)
-print('Ejecutando solo DenseNet121, codificador congelado y cabeza entrenable, pliegue 0 y dos actualizaciones…')
+print('Ejecutando solo DenseNet121, codificador congelado y cabeza entrenable, pliegue 0 y dos actualizaciones exitosas; AMP conserva el mismo grupo si necesita reducir la escala…')
 smoke_log = checked_run([str(NEURAL_PYTHON), '-B', str(REPO_DIR / 'scripts/check_training_smoke_colab.py'), '--operation', 'smoke', '--repository-root', str(REPO_DIR), '--preparation-dir', str(PREPARATION_DIR), '--package-dir', str(LOCAL_PACKAGE_DIR), '--reference-path', str(LOCAL_REFERENCE), '--weights-root', str(WEIGHTS_ROOT), '--output-dir', str(LOCAL_OUTPUT), '--approval-statement', orchestration.APPROVAL_STATEMENT], cwd=REPO_DIR, env=RUN_ENV)
 result = json.loads((LOCAL_OUTPUT / 'training_smoke.json').read_text(encoding='utf-8'))
 orchestration.validate_result(result)

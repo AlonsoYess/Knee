@@ -30,7 +30,7 @@ APPROVAL_STATEMENT = (
 GPU_INCOMPATIBLE_HISTORICAL_TEST_MODULES = ("test_training_preparation", "test_pretrained_verification")
 TEST_MODULES = tuple(name for name in previous.TEST_MODULES
     if name not in GPU_INCOMPATIBLE_HISTORICAL_TEST_MODULES) + (
-    "test_training_gpu_runtime", "test_training_smoke", "test_training_smoke_colab",
+    "test_training_gpu_runtime", "test_training_smoke", "test_training_smoke_colab", "test_training_amp",
 )
 MAX_DIRECT_CHILDREN = previous.MAX_DIRECT_CHILDREN
 MAX_PREVIOUS_RECORDS = previous.MAX_PREVIOUS_RECORDS
@@ -159,6 +159,10 @@ def validate_result(result):
         and result.get("frozen_encoder_state_unchanged") is True
         and result.get("task_head_update_verified") is True,
         "verified_head_only_smoke_and_frozen_encoder_required")
+    require(result.get("amp_numerical_repair_version") == "same_effective_group_amp_replay_v1.0"
+        and type(result.get("amp_overflow_replays")) is int and result["amp_overflow_replays"] >= 0
+        and isinstance(result.get("amp_scale_audit"), list) and len(result["amp_scale_audit"]) == 2,
+        "same_effective_group_amp_repair_audit_required")
 
 
 def smoke(repository_root, preparation_dir, package_dir, reference_path, weights_root, output_dir,
