@@ -2,7 +2,15 @@
 
 Proyecto de tesis de Ingeniería de Sistemas: desarrollo y evaluación de un sistema multimodal que integra una radiografía basal de rodilla y variables clínicas basales para estimar la progresión estructural radiográfica en la cohorte OAI.
 
-## Estado
+## Preparación vigente de los modelos
+
+La búsqueda de arquitecturas queda cerrada con la incorporación aprobada de BiomedCLIP y MambaOut-Tiny. La entrada vigente de esta etapa es [`configs/modeling_release_v1_1.json`](configs/modeling_release_v1_1.json), que vincula el registro, la configuración y la aprobación acotada; las versiones anteriores se conservan como historial reproducible.
+
+La [libreta 33](notebooks/33_verificar_modelos_finales_sin_entrenar.ipynb) se ejecuta personalmente en Colab con **CPU**, sin cargar paquetes de participantes. Comprueba seis codificadores accesibles mediante pesos oficiales e imágenes sintéticas; DINOv3 conserva su acceso pendiente. No entrena, no abre la prueba reservada y no sustituye la futura comprobación de entrenamiento en GPU. El ejecutor de entrenamiento aún debe implementarse y revisarse antes de autorizar esa ejecución.
+
+## Estado histórico de etapas iniciales
+
+El resumen siguiente conserva el contexto de las primeras etapas; no describe el estado actual de la preparación de modelos.
 
 La Fase 0 está cerrada técnicamente. En la Fase 1 están cerrados los pasos 1, 2 y 3: el piloto DICOM fue reconciliado con diez adquisiciones únicas, la descarga selectiva completó las 1,916 adquisiciones basales esperadas y `bilateral_split_v0.2_pilot` quedó congelado después de una revisión visual ciega. Las diez separaciones y lateralidades fueron aceptadas, incluido un caso limítrofe correctamente derivado a revisión, sin exclusiones. En el paso 4, `tibiofemoral_crop_v0.1_pilot`, `v0.2`, `v0.3` y `v0.4` fueron rechazados tras aceptar integralmente 9/20, 8/20, 0/20 y 8/20 recortes, respectivamente; sus evidencias permanecen preservadas y sus parámetros no se congelaron. La revisión de `v0.4` está documentada y su libreta de cierre reproducible está preparada para ejecución en Colab. El procesamiento masivo, las particiones definitivas, el entrenamiento y la evaluación del prototipo permanecen bloqueados. No se reportan métricas predictivas hasta completar los experimentos.
 

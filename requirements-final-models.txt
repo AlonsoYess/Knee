@@ -1,0 +1,16 @@
+# Add only to the isolated notebook 32 CPU runtime; never the Colab kernel.
+# All transitive additions pinned; install with --no-deps, then pip check.
+transformers==4.50.2
+tokenizers==0.21.1
+regex==2024.11.6
+safetensors==0.5.3
+huggingface-hub==0.30.2
+packaging==26.3
+requests==2.34.2
+PyYAML==6.0.3
+tqdm==4.70.1
+timm==1.0.15
+certifi==2026.7.22
+charset-normalizer==3.5.2
+idna==3.20
+urllib3==2.8.0
