@@ -6,7 +6,9 @@ Proyecto de tesis de Ingeniería de Sistemas: desarrollo y evaluación de un sis
 
 La búsqueda de arquitecturas queda cerrada con la incorporación aprobada de BiomedCLIP y MambaOut-Tiny. La entrada vigente de esta etapa es [`configs/modeling_release_v1_1.json`](configs/modeling_release_v1_1.json), que vincula el registro, la configuración y la aprobación acotada; las versiones anteriores se conservan como historial reproducible.
 
-La [libreta 33](notebooks/33_verificar_modelos_finales_sin_entrenar.ipynb) se ejecuta personalmente en Colab con **CPU**, sin cargar paquetes de participantes. Comprueba seis codificadores accesibles mediante pesos oficiales e imágenes sintéticas; DINOv3 conserva su acceso pendiente. No entrena, no abre la prueba reservada y no sustituye la futura comprobación de entrenamiento en GPU. El ejecutor de entrenamiento aún debe implementarse y revisarse antes de autorizar esa ejecución.
+La [libreta 33](notebooks/33_verificar_modelos_finales_sin_entrenar.ipynb) se ejecuta personalmente en Colab con **CPU**, sin cargar paquetes de participantes. Comprueba seis codificadores accesibles mediante pesos oficiales e imágenes sintéticas; DINOv3 conserva su acceso pendiente. No entrena, no abre la prueba reservada y no sustituye la futura comprobación de entrenamiento en GPU.
+
+La [libreta 34](notebooks/34_preparar_ejecutor_entrenamiento_sin_entrenar.ipynb) prepara y verifica el ejecutor con CPU y los registros completos de la libreta 33. Tampoco inicia entrenamiento ni necesita paquetes de participantes. El código de ejecución exige una autorización separada para una solicitud exacta de un pliegue de desarrollo; el ajuste fino y las fusiones requieren además la selección documentada y los pesos del mismo pliegue. Los resultados de entrenamiento se guardarán únicamente en carpetas privadas nuevas.
 
 ## Estado histórico de etapas iniciales
 
