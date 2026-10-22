@@ -30,3 +30,6 @@ knee-change-check = "knee.change_control:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+knee = ["licenses/*.txt"]
+
