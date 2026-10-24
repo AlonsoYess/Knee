@@ -1,0 +1,133 @@
+{
+  "schema_version": "1.1",
+  "registry_version": "1.1-public",
+  "status": "private_metadata_verified_public_summary",
+  "verification_date": "2026-09-27",
+  "public_view": true,
+  "training_authorized": false,
+  "private_inventory_location": "Google Drive autorizado; referencia exacta omitida de la version publica",
+  "files": [
+    {
+      "artifact_id": "SRC-THESIS-001",
+      "category": "academic_source",
+      "role": "chapters_1_and_2",
+      "authority": "primary_academic_scope",
+      "sensitivity": "private_academic_document",
+      "private_metadata_verified": true,
+      "status": "available_private"
+    },
+    {
+      "artifact_id": "SRC-THESIS-002",
+      "category": "academic_source",
+      "role": "chapter_3_methodology",
+      "authority": "primary_methodological_scope",
+      "sensitivity": "private_academic_document",
+      "private_metadata_verified": true,
+      "status": "available_private"
+    },
+    {
+      "artifact_id": "SRC-RULES-001",
+      "category": "institutional_source",
+      "role": "degree_guidelines",
+      "authority": "institutional_normative_source",
+      "sensitivity": "private_working_document",
+      "private_metadata_verified": true,
+      "status": "available_private"
+    },
+    {
+      "artifact_id": "SRC-CONTEXT-001",
+      "category": "historical_context",
+      "role": "consolidated_methodology_context",
+      "authority": "supporting_not_governing",
+      "sensitivity": "private_context",
+      "private_metadata_verified": true,
+      "status": "available_private"
+    },
+    {
+      "artifact_id": "SRC-CONTEXT-002",
+      "category": "historical_context",
+      "role": "prior_conversation_context",
+      "authority": "supporting_not_governing",
+      "sensitivity": "private_context",
+      "private_metadata_verified": true,
+      "status": "available_private"
+    },
+    {
+      "artifact_id": "DATA-COHORT-001",
+      "category": "restricted_data",
+      "role": "baseline_cohort_table",
+      "authority": "technical_evidence_not_scope_authority",
+      "sensitivity": "restricted_oai_data",
+      "private_metadata_verified": true,
+      "status": "available_private"
+    },
+    {
+      "artifact_id": "DATA-MANIFEST-001",
+      "category": "restricted_data",
+      "role": "cohort_documentation_and_manifest",
+      "authority": "technical_evidence_not_scope_authority",
+      "sensitivity": "restricted_oai_data",
+      "private_metadata_verified": true,
+      "status": "available_private"
+    },
+    {
+      "artifact_id": "DATA-PROV-001",
+      "category": "data_provenance",
+      "role": "package_description",
+      "authority": "technical_evidence_not_scope_authority",
+      "sensitivity": "private_technical_document",
+      "private_metadata_verified": true,
+      "status": "available_private"
+    },
+    {
+      "artifact_id": "DATA-PROV-002",
+      "category": "data_provenance",
+      "role": "master_extraction_query",
+      "authority": "technical_evidence_not_scope_authority",
+      "sensitivity": "private_technical_document",
+      "private_metadata_verified": true,
+      "status": "available_private"
+    },
+    {
+      "artifact_id": "DATA-PILOT-001",
+      "category": "pilot_evidence",
+      "role": "received_pilot_selection",
+      "authority": "historical_technical_evidence",
+      "sensitivity": "restricted_oai_data",
+      "private_metadata_verified": true,
+      "status": "available_private_pending_replacement"
+    },
+    {
+      "artifact_id": "DATA-PILOT-002",
+      "category": "pilot_evidence",
+      "role": "received_inspection_record",
+      "authority": "historical_technical_evidence",
+      "sensitivity": "private_technical_document",
+      "private_metadata_verified": true,
+      "status": "available_private_not_final_evidence"
+    },
+    {
+      "artifact_id": "DATA-PILOT-003",
+      "category": "pilot_evidence",
+      "role": "received_audit_utility",
+      "authority": "reference_not_validated_repository_code",
+      "sensitivity": "private_technical_document",
+      "private_metadata_verified": true,
+      "status": "available_private_reference_only"
+    }
+  ],
+  "duplicates": [
+    {
+      "canonical_artifact_id": "DATA-MANIFEST-001",
+      "verified_exact_duplicate": true,
+      "action": "no_second_upload_exact_duplicate",
+      "private_metadata_verified": true
+    }
+  ],
+  "publication_rules": {
+    "exact_names_paths_sizes_hashes": "private_drive_inventory_only",
+    "drive_ids_and_urls": "private_drive_inventory_only",
+    "individual_identifiers": "never_public",
+    "public_repository": "abstract_roles_authority_sensitivity_and_verification_state_only"
+  }
+}

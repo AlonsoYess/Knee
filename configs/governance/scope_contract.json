@@ -1,0 +1,238 @@
+{
+  "schema_version": "1.0",
+  "contract_version": "1.5",
+  "status": "approved_by_researcher",
+  "approval_date": "2026-10-01",
+  "approved_scope_contract_version": "1.4",
+  "sources": {
+    "chapters_1_and_2": "SRC-THESIS-001",
+    "chapter_3": "SRC-THESIS-002",
+    "governing_document": "docs/00_ALCANCE_Y_TRAZABILIDAD.md",
+    "invariant_rules": "docs/01_REGLAS_INVARIABLES.md"
+  },
+  "study": {
+    "source": "OAI",
+    "design": [
+      "quantitative",
+      "non_experimental",
+      "longitudinal",
+      "retrospective",
+      "secondary_analysis"
+    ],
+    "analysis_unit": "knee",
+    "group_unit": "participant",
+    "baseline_visit": "V00",
+    "outcome_visit": "V06",
+    "horizon_months": 48,
+    "baseline_kl_included": [
+      2,
+      3
+    ]
+  },
+  "outcome": {
+    "name": "PROGRESION_48M",
+    "positive_rule": "KL_V06 - KL_V00 >= 1",
+    "negative_rule": "KL_V06 - KL_V00 < 1",
+    "kind": "radiographic_structural_progression"
+  },
+  "predictors": {
+    "clinical_main": [
+      "AGEYEARS_V00",
+      "SEX",
+      "BMI_V00"
+    ],
+    "radiographic_main": "V00_tibiofemoral_knee_crop_from_bilateral_PA_fixed_flexion",
+    "forbidden_main": [
+      "KL_V06",
+      "PROGRESION_48M",
+      "V06_clinical_variables",
+      "V06_image",
+      "future_information"
+    ],
+    "kl_baseline_usage": "complementary_reference_only"
+  },
+  "scenarios": {
+    "main": [
+      "clinical",
+      "radiographic",
+      "multimodal_intermediate_fusion"
+    ],
+    "complementary": [
+      "clinical_plus_baseline_kl",
+      "clinical_plus_baseline_surgery_and_womac",
+      "multimodal_late_fusion"
+    ],
+    "same_cohort_and_partitions_required": true
+  },
+  "model_families": {
+    "clinical": [
+      "regularized_logistic_regression",
+      "xgboost",
+      "mlp"
+    ],
+    "radiographic": [
+      "densenet121",
+      "vit_b_16",
+      "convnext_v2_tiny",
+      "dinov3_vits16",
+      "skelex_vit_mae"
+    ],
+    "radiographic_mandatory_baselines": [
+      "densenet121",
+      "vit_b_16"
+    ],
+    "radiographic_modern_challengers": [
+      "convnext_v2_tiny",
+      "dinov3_vits16",
+      "skelex_vit_mae"
+    ],
+    "radiographic_complementary": "bilateral_cross_attention_with_selected_encoder",
+    "multimodal_primary": [
+      "intermediate_concatenation",
+      "intermediate_gated_film"
+    ],
+    "multimodal_complementary": "late_fusion_fixed_mean_0.5_0.5"
+  },
+  "images": {
+    "input_size": [
+      224,
+      224
+    ],
+    "promoted_model_resolution_sensitivity": [
+      384,
+      384
+    ],
+    "region": "tibiofemoral",
+    "laterality_specific": true
+  },
+  "localization_change": {
+    "mcr_id": "MCR-2026-004",
+    "status": "aprobada_no_aplicada",
+    "approved_technical_content_version": "1.0",
+    "document": "docs/25_MCR_2026_004_RECORTE_ROI_Y_REVISION_TECNICA.md",
+    "prerequisite_report": "docs/26_APROBACION_MCR_2026_004_Y_CIERRE_PENDIENTE.md",
+    "strategy": "external_deterministic_proportional_roi",
+    "preferred_candidate": "Emory-HITI/knee-crop",
+    "candidate_revision": "c70a2314bdbeed0d2fba3c2c2c652782ce3a2b93",
+    "bilateral_split_version": "bilateral_split_v0.2_pilot",
+    "crop_geometry": "upstream_width_proportional_roi_no_fixed_140mm",
+    "fixed_crop_size_mm_required": false,
+    "pretrained_weights_required": false,
+    "local_training_or_fine_tuning_allowed": false,
+    "expert_reference_required": false,
+    "new_confirmation_participants": 20,
+    "technical_participants_development_only": true,
+    "minimum_useful_coverage_fraction": 0.95,
+    "maximum_peripheral_warning_fraction": 0.1,
+    "maximum_incorrect_or_unevaluable_candidates": 0,
+    "integration_ready": true,
+    "academic_word_update_pending": true,
+    "new_technical_sample_selected": false,
+    "supersedes": "MCR-2026-003"
+  },
+  "splitting": {
+    "seed": 2026,
+    "test_block": 0,
+    "test_participant_fraction_approx": 0.2,
+    "group_by": "participant",
+    "development_cv_folds": 5,
+    "development_cv": "stratified_grouped",
+    "test_in_development_cv": false,
+    "test_openings_allowed": 1
+  },
+  "selection": {
+    "primary_metric": "average_precision_score",
+    "display_name": "PR-AUC (AP)",
+    "computed_on": "development_out_of_fold_predictions",
+    "candidate_registry": "configs/model_registry.json",
+    "modern_candidate_promotion": "development_only_predefined_screening",
+    "test_driven_selection_forbidden": true,
+    "near_tie_ap_difference_below": 0.01,
+    "tie_break_order": [
+      "roc_auc",
+      "brier_score"
+    ]
+  },
+  "training": {
+    "neural_seeds": [
+      2026,
+      2027,
+      2028
+    ],
+    "imbalance_loss": "weighted_binary_cross_entropy",
+    "class_weights_source": "training_partition_only",
+    "artificial_test_balancing": false,
+    "smote_for_images": false,
+    "maximum_epochs": 60,
+    "early_stopping_patience_epochs": 8,
+    "optimizer": "adamw"
+  },
+  "calibration_and_threshold": {
+    "fit_source": "development_out_of_fold_predictions_only",
+    "calibration_methods": [
+      "temperature_scaling",
+      "logistic_calibration"
+    ],
+    "threshold_rule": "youden_index",
+    "tie_break": "prefer_sensitivity"
+  },
+  "confirmatory_statistics": {
+    "bootstrap_resamples": 2000,
+    "bootstrap_unit": "participant",
+    "paired_model_differences": true,
+    "main_contrasts": [
+      "multimodal_vs_clinical",
+      "multimodal_vs_radiographic"
+    ],
+    "multiplicity_adjustment": "holm",
+    "confidence_level": 0.95,
+    "superiority_rule": "ci_difference_strictly_positive_and_adjusted_p_below_0.05"
+  },
+  "reporting": {
+    "preserve_negative_results": true,
+    "external_validation_claim_allowed": false,
+    "peruvian_population_generalization_allowed": false
+  },
+  "prototype": {
+    "purpose": "academic",
+    "diagnostic_use": false,
+    "treatment_recommendations": false,
+    "outputs": [
+      "calibrated_progression_probability",
+      "threshold_classification"
+    ],
+    "estimated_kl_output": "removed_from_scope_by_researcher_decision"
+  },
+  "privacy": {
+    "public_repository_forbidden": [
+      "dicom",
+      "individual_identifiers",
+      "private_manifests",
+      "case_level_predictions",
+      "credentials",
+      "model_weights"
+    ],
+    "private_storage": "authorized_google_drive"
+  },
+  "resolved_decisions": [
+    {
+      "id": "RES-KL-001",
+      "date": "2026-09-27",
+      "decision": "remove_estimated_kl_output_from_chapter_1_and_prototype",
+      "chapter_1_word_update_pending": true,
+      "chapter_1_word_update_owner": "researcher"
+    },
+    {
+      "id": "RES-MOD-001",
+      "date": "2026-09-28",
+      "decision": "expand_predefined_model_candidates_under_MCR-2026-002",
+      "chapter_3_word_update_pending": true,
+      "chapter_3_word_update_owner": "researcher"
+    }
+  ],
+  "pending_blockers": [
+    "PEND-DATA-001",
+    "PEND-PILOT-001"
+  ],
+  "training_authorized": false
+}

@@ -1,0 +1,6 @@
+{
+  "output_dir": "outputs/auditorias/fase_1/paso_3_separacion_bilateral",
+  "expected_unique_studies": 10,
+  "expected_algorithm_version": "bilateral_split_v0.2_pilot",
+  "expected_boundary_review_count": 1
+}
