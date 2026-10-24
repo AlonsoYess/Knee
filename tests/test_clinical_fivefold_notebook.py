@@ -144,6 +144,7 @@ class ClinicalFivefoldNotebookTests(unittest.TestCase):
             with patch.object(sys, "argv", ["build", "--code-revision", "b" * 40, "--output", str(output)]):
                 builder.main()
             self.assertEqual(json.loads(output.read_text(encoding="utf-8")), builder.build("b" * 40))
+            self.assertNotIn(b"\r\n", output.read_bytes())
             self.assertEqual({path.name for path in Path(temporary).iterdir()}, {"notebook.ipynb"})
 
 

@@ -172,7 +172,7 @@ def main():
     args = parser.parse_args()
     args.output.write_text(json.dumps(build(args.code_revision,
         allow_unpublished_placeholder=args.allow_unpublished_placeholder), ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8")
+        encoding="utf-8", newline="\n")
 
 
 if __name__ == "__main__":
