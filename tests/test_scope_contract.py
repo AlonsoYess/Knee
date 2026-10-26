@@ -86,13 +86,102 @@ class ScopeContractTest(unittest.TestCase):
         self.assertEqual(statistics["bootstrap_resamples"], 2000)
         self.assertEqual(statistics["bootstrap_unit"], "participant")
         self.assertTrue(statistics["paired_model_differences"])
-        self.assertEqual(statistics["multiplicity_adjustment"], "holm")
+        self.assertEqual(statistics["multiplicity_adjustment"], "none")
+        self.assertEqual(statistics["confidence_level"], 0.95)
+        self.assertFalse(statistics["p_value_required_for_hypothesis_decision"])
         calibration = self.contract["calibration_and_threshold"]
         self.assertEqual(
             calibration["fit_source"],
             "development_out_of_fold_predictions_only",
         )
         self.assertEqual(calibration["threshold_rule"], "youden_index")
+
+    def test_hypothesis_decisions_follow_the_approved_chapter_3(self):
+        statistics = self.contract["confirmatory_statistics"]
+        discrimination = statistics["discrimination"]
+        self.assertEqual(discrimination["hypotheses"], ["HE2", "HE3", "HE4"])
+        self.assertEqual(discrimination["metric"], "roc_auc")
+        self.assertEqual(discrimination["reference"], 0.5)
+        self.assertEqual(
+            discrimination["evidence_rule"],
+            "lower_95pct_confidence_bound_strictly_greater_than_0.5",
+        )
+        superiority = statistics["superiority"]
+        self.assertEqual(superiority["hypothesis"], "HE5")
+        self.assertEqual(superiority["metric"], "average_precision_score")
+        self.assertEqual(superiority["difference_direction"], "multimodal_minus_unimodal")
+        self.assertEqual(superiority["comparators"], ["clinical", "radiographic"])
+        self.assertTrue(superiority["both_comparisons_required"])
+        self.assertEqual(
+            statistics["main_contrasts"],
+            ["multimodal_vs_clinical", "multimodal_vs_radiographic"],
+        )
+        self.assertEqual(
+            statistics["superiority_rule"],
+            "lower_95pct_paired_AP_difference_bound_strictly_greater_than_zero_for_each_unimodal",
+        )
+        self.assertEqual(
+            statistics["unmet_condition_interpretation"],
+            "insufficient_evidence_not_equivalence",
+        )
+
+    def test_statistics_alignment_is_approved_and_not_evaluation_authority(self):
+        record_path = CONTRACT_PATH.parents[1] / "governance" / "statistics_alignment_v1.json"
+        self.assertEqual(
+            self.contract["statistics_alignment_record"],
+            "configs/governance/statistics_alignment_v1.json",
+        )
+        record = json.loads(record_path.read_text(encoding="utf-8"))
+        self.assertEqual(record["id"], "MCR-2026-016")
+        self.assertEqual(record["scope_contract_version"], self.contract["contract_version"])
+        self.assertEqual(record["change_scope"],
+                         "confirmatory_statistics_only_other_historical_contract_sections_not_reapproved")
+        self.assertEqual(record["approval"]["source"], "direct_user_message")
+        self.assertIn("sin modificar el Word", record["approval"]["statement"])
+        self.assertEqual(record["academic_reference"], "researcher_approved_chapter_3_section_3.3.2")
+        statistics = self.contract["confirmatory_statistics"]
+        for field in ("bootstrap_unit", "paired_model_differences", "multiplicity_adjustment",
+                      "p_value_required_for_hypothesis_decision", "unmet_condition_interpretation"):
+            self.assertEqual(record[field], statistics[field])
+        for field in ("hypotheses", "metric", "evidence_rule"):
+            self.assertEqual(record["discrimination"][field], statistics["discrimination"][field])
+        for field in ("hypothesis", "metric", "difference_direction", "comparators",
+                      "both_comparisons_required"):
+            self.assertEqual(record["superiority"][field], statistics["superiority"][field])
+        self.assertEqual(record["superiority"]["evidence_rule"], statistics["superiority_rule"])
+        for field in ("final_evaluator_implemented_by_this_change", "academic_word_modified",
+                      "training_authorized", "reserved_test_access_authorized", "new_data_selected"):
+            self.assertFalse(record[field])
+
+    def test_current_references_do_not_reactivate_historical_settings(self):
+        root = CONTRACT_PATH.parents[2]
+        references = self.contract["current_operational_references"]
+        self.assertEqual(references, {
+            "modeling_release": "configs/modeling_release_v1_2.json",
+            "training_plan": "configs/training_plan_v1_2.json",
+            "model_registry": "configs/model_registry_v1_1.json",
+            "tensor_preparation": "configs/model_input_tensor_v1.json",
+            "participant_split": "configs/participant_split_v1.json",
+            "confirmatory_statistics": "configs/governance/statistics_alignment_v1.json",
+        })
+        for path in references.values():
+            self.assertTrue((root / path).is_file())
+        release = json.loads((root / references["modeling_release"]).read_text(encoding="utf-8"))
+        self.assertEqual(release["training_plan"], references["training_plan"])
+        self.assertEqual(release["registry"], references["model_registry"])
+        self.assertFalse(release["training_authorized"])
+        self.assertFalse(release["reserved_test_access_authorized"])
+        history = self.contract["historical_sections_policy"]
+        self.assertEqual(history["execution_authority"],
+                         "use_current_operational_references_for_corresponding_execution_settings")
+        self.assertEqual(history["scope_of_this_update"],
+                         "confirmatory_statistics_alignment_and_current_reference_index_only")
+        self.assertEqual(set(history["legacy_settings_not_reapproved"]), {
+            "model_families", "localization_change", "images.promoted_model_resolution_sensitivity",
+            "selection.candidate_registry",
+        })
+        self.assertFalse(history["training_authorized"])
+        self.assertFalse(history["reserved_test_access_authorized"])
 
     def test_approved_model_expansion_is_closed_and_traceable(self):
         families = self.contract["model_families"]
@@ -118,7 +207,8 @@ class ScopeContractTest(unittest.TestCase):
         )
 
     def test_safety_gates_remain_closed(self):
-        self.assertEqual(self.contract["contract_version"], "1.5")
+        self.assertEqual(self.contract["contract_version"], "1.6")
+        self.assertEqual(self.contract["approved_scope_contract_version"], "1.4")
         self.assertEqual(self.contract["status"], "approved_by_researcher")
         self.assertFalse(self.contract["training_authorized"])
         self.assertEqual(
