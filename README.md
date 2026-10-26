@@ -4,7 +4,13 @@ Proyecto de tesis de Ingeniería de Sistemas: desarrollo y evaluación de un sis
 
 ## Preparación vigente de los modelos
 
-La búsqueda de arquitecturas queda cerrada con la incorporación aprobada de BiomedCLIP y MambaOut-Tiny. La entrada vigente de esta etapa es [`configs/modeling_release_v1_1.json`](configs/modeling_release_v1_1.json), que vincula el registro, la configuración y la aprobación acotada; las versiones anteriores se conservan como historial reproducible.
+La versión vigente para las próximas campañas es [`modeling_release_v1_2.json`](configs/modeling_release_v1_2.json), aprobada para implementación y comprobación sin entrenamiento. Restablece los compromisos del Capítulo III: referencia clínica con KL inicial, variante clínica con cirugía previa y WOMAC, fusión tardía con pesos fijos 0,5/0,5 y aumento leve de intensidad solo en entrenamiento. La comparación principal mantiene edad, sexo e IMC. No cambia la cohorte, sus particiones ni el registro de arquitecturas.
+
+El [plan de concordancia e implementación](docs/ALINEACION_METODOLOGICA_ENTRENAMIENTO.md) describe las entradas, los comandos de preparación, la procedencia de predicciones y las verificaciones pendientes con datos reales. Ninguna solicitud preparada concede permiso para entrenar. Las libretas 33–37 descritas debajo pertenecen a la receta histórica 1.1; no ejecutan por sí mismas los complementos de la versión 1.2. Sus revisiones y resultados se conservan sin reescritura.
+
+### Antecedentes reproducibles de la versión 1.1
+
+La búsqueda de arquitecturas queda cerrada con la incorporación aprobada de BiomedCLIP y MambaOut-Tiny. La entrada histórica de esta etapa es [`configs/modeling_release_v1_1.json`](configs/modeling_release_v1_1.json), que vincula el registro, la configuración y la aprobación acotada; las versiones anteriores se conservan como historial reproducible.
 
 La [libreta 33](notebooks/33_verificar_modelos_finales_sin_entrenar.ipynb) se ejecuta personalmente en Colab con **CPU**, sin cargar paquetes de participantes. Comprueba seis codificadores accesibles mediante pesos oficiales e imágenes sintéticas; DINOv3 conserva su acceso pendiente. No entrena, no abre la prueba reservada y no sustituye la futura comprobación de entrenamiento en GPU.
 
