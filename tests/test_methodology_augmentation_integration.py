@@ -13,6 +13,7 @@ from knee import methodology_release as release
 from knee import training_augmentation as augmentation
 from knee import training_data as historical_data
 from knee.aligned_training import authority, data, engine, models
+from knee.training_plan import _read_json
 from test_model_inputs_preflight import synthetic_development
 
 
@@ -55,7 +56,9 @@ class MethodologyAugmentationIntegrationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         _, cls.catalog, cls.plan, cls.registry = release.load_release(ROOT)
-        _, _, cls.old_plan, cls.old_registry = historical.load_release(ROOT)
+        cls.old_plan = _read_json(ROOT / "configs/training_plan_v1_1.json")
+        cls.old_registry = _read_json(ROOT / "configs/model_registry_v1_1.json")
+        historical.validate_plan(cls.old_plan, cls.old_registry)
         cls.previous_threads = torch.get_num_threads()
         torch.set_num_threads(1)
 

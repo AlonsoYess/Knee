@@ -6,7 +6,7 @@ import numpy as np
 
 from knee import clinical_fold_inputs as historical
 from knee import clinical_scenarios as subject
-from tests.test_clinical_fold_inputs import synthetic_rows
+from test_clinical_fold_inputs import synthetic_rows
 
 
 def enriched_rows():

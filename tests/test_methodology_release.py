@@ -8,6 +8,7 @@ from knee import final_model_release as previous
 from knee.aligned_training import authority
 from knee.clinical_scenarios import SCENARIOS
 from knee.training_augmentation import VERSION as AUGMENTATION_VERSION, policy_document
+from knee.training_plan import _read_json
 from test_training_runner import request as old_request, authority as old_authority
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -17,7 +18,9 @@ class MethodologyReleaseTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         _, cls.catalog, cls.plan, cls.registry = aligned.load_release(ROOT)
-        _, _, cls.old_plan, cls.old_registry = previous.load_release(ROOT)
+        cls.old_plan = _read_json(ROOT / "configs/training_plan_v1_1.json")
+        cls.old_registry = _read_json(ROOT / "configs/model_registry_v1_1.json")
+        previous.validate_plan(cls.old_plan, cls.old_registry)
 
     def request(self, scenario="clinical_main", image=False):
         value = old_request("a" * 64, model_id="image_densenet121" if image else "clinical_logistic")

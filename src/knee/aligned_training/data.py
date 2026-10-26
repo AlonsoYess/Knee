@@ -128,6 +128,66 @@ def loaders(fold, *, seed, micro_batch_size):
         shuffle=False, num_workers=0, drop_last=False))
 
 
+MAX_REFERENCE_TEXT_BYTES = 1024 * 1024
+
+
+def pinned_text_source_proof(path, expected_sha256, *, relative_name):
+    """Match a registered source pin exactly or through LF/CRLF spelling only.
+
+    The reference produced on Windows may pin CRLF while a Git/Colab checkout
+    contains LF. Both complete byte variants must hash to the *existing* pin;
+    no semantic JSON normalization, whitespace trimming, BOM removal, code
+    changes or new reference hashes are accepted. Private input files are not
+    eligible. This match alone does not establish runtime equivalence: the
+    loader still replays every historical fold state and transformed matrix.
+
+    Returns an aggregate proof dictionary on success, or None on mismatch.
+    """
+    from knee.model_inputs_colab import SCIENTIFIC_FILES
+    from knee.colab_data import valid_sha
+    registered = set(SCIENTIFIC_FILES.values()) | {
+        "configs/model_inputs_preflight_v1.json", "configs/model_registry.json"}
+    if (relative_name not in registered or not valid_sha(expected_sha256)
+            or Path(relative_name).suffix not in {".py", ".json", ".txt"}):
+        return None
+    source = checked_path(path)
+    if (source.name != Path(relative_name).name or not source.is_file()
+            or not 0 < source.stat().st_size <= MAX_REFERENCE_TEXT_BYTES):
+        return None
+    with source.open("rb") as stream:
+        raw = stream.read(MAX_REFERENCE_TEXT_BYTES + 1)
+    if not 0 < len(raw) <= MAX_REFERENCE_TEXT_BYTES:
+        return None
+    try:
+        raw.decode("utf-8", errors="strict")
+    except UnicodeDecodeError:
+        return None
+    # A lone CR cannot be interpreted as a platform line ending here.
+    without_crlf = raw.replace(b"\r\n", b"")
+    if b"\r" in without_crlf:
+        return None
+    actual = hashlib.sha256(raw).hexdigest()
+    matched_variant = "exact_bytes"
+    if actual != expected_sha256:
+        # Variant matching accepts canonical LF or canonical CRLF source files,
+        # not a newly mixed-EOL file whose raw hash is absent from the reference.
+        if b"\r\n" in raw and b"\n" in without_crlf:
+            return None
+        lf = raw.replace(b"\r\n", b"\n")
+        candidates = (("lf_bytes", lf), ("crlf_bytes", lf.replace(b"\n", b"\r\n")))
+        matched_variant = next((name for name, value in candidates
+            if hashlib.sha256(value).hexdigest() == expected_sha256), None)
+        if matched_variant is None:
+            return None
+    return {"relative_name": relative_name, "expected_sha256": expected_sha256,
+        "actual_sha256": actual, "bytes": len(raw), "matched_variant": matched_variant,
+        "line_endings_only_equivalence": matched_variant != "exact_bytes"}
+
+
+def verified_text_source_matches(path, expected_sha256, *, relative_name):
+    return pinned_text_source_proof(path, expected_sha256, relative_name=relative_name) is not None
+
+
 def load_sealed_inputs(package_dir, reference_path, repository_root, expected_package_sha256):
     """Future training path: authenticate notebook32 inputs before opening ZIP."""
     from knee.model_inputs_colab import _reference, SCIENTIFIC_FILES, _read_json
@@ -135,13 +195,18 @@ def load_sealed_inputs(package_dir, reference_path, repository_root, expected_pa
     require(package.is_dir() and reference_file.is_file(), "existing_development_package_and_reference_required")
     reference = _read_json(reference_file)
     _reference(reference)
+    text_proofs = []
     for name, relative in SCIENTIFIC_FILES.items():
-        require(sha_file(root / relative) == reference["implementation_sha256"][name],
+        proof = pinned_text_source_proof(root / relative, reference["implementation_sha256"][name], relative_name=relative)
+        require(proof is not None,
             "verified_clinical_or_input_implementation_changed")
+        text_proofs.append({"reference_field": "implementation_sha256/" + name, **proof})
     for name, relative in (("policy", "configs/model_inputs_preflight_v1.json"),
                            ("registry", "configs/model_registry.json")):
-        require(sha_file(root / relative) == reference["sources_sha256"][name],
+        proof = pinned_text_source_proof(root / relative, reference["sources_sha256"][name], relative_name=relative)
+        require(proof is not None,
                 "verified_input_policy_or_registry_changed")
+        text_proofs.append({"reference_field": "sources_sha256/" + name, **proof})
     handoff_path = package / "handoff.json"
     require(sha_file(handoff_path) == reference["sources_sha256"]["handoff"], "sealed_handoff_changed")
     handoff = _read_json(handoff_path)
@@ -164,6 +229,7 @@ def load_sealed_inputs(package_dir, reference_path, repository_root, expected_pa
         and loaded["verification"]["participants"] == development.get("participants") == reference["development_participants"],
         "verified_development_membership_changed")
     verify_clinical_reference(loaded["manifest"]["rows"], reference, root)
+    loaded["source_text_verification"] = text_proofs
     return loaded
 
 

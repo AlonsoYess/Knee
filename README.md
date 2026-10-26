@@ -8,6 +8,8 @@ La versión vigente para las próximas campañas es [`modeling_release_v1_2.json
 
 El [plan de concordancia e implementación](docs/ALINEACION_METODOLOGICA_ENTRENAMIENTO.md) describe las entradas, los comandos de preparación, la procedencia de predicciones y las verificaciones pendientes con datos reales. Ninguna solicitud preparada concede permiso para entrenar. Las libretas 33–37 descritas debajo pertenecen a la receta histórica 1.1; no ejecutan por sí mismas los complementos de la versión 1.2. Sus revisiones y resultados se conservan sin reescritura.
 
+La [libreta 38](notebooks/38_comprobar_complementos_clinicos_y_aumento_sin_entrenar.ipynb) comprueba en **CPU**, antes de entrenar, KL inicial, cirugía previa y WOMAC total de desarrollo, los tres escenarios clínicos y el aumento leve de intensidad. Reutiliza las mismas carpetas privadas de registros y de desarrollo. Verifica los cinco pliegues, conserva los originales y presenta tres vistas de desarrollo: una variación que aclara, otra que oscurece y un control. No descarga pesos ni crea permisos para entrenar. La [guía de esta comprobación](docs/COMPROBACION_38_ENTRADAS_Y_AUMENTO.md) explica sus entradas y el alcance de su resultado.
+
 ### Antecedentes reproducibles de la versión 1.1
 
 La búsqueda de arquitecturas queda cerrada con la incorporación aprobada de BiomedCLIP y MambaOut-Tiny. La entrada histórica de esta etapa es [`configs/modeling_release_v1_1.json`](configs/modeling_release_v1_1.json), que vincula el registro, la configuración y la aprobación acotada; las versiones anteriores se conservan como historial reproducible.

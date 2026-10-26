@@ -210,8 +210,11 @@ class MethodologyClinicalIntegrationTests(unittest.TestCase):
                                weights_root=None, output_dir="absent")
 
     def test_legacy_request_cannot_enable_complementary_features(self):
-        from knee.final_model_release import load_release
-        _, _, legacy_plan, registry = load_release(ROOT)
+        from knee.final_model_release import validate_plan
+        from knee.training_plan import _read_json
+        legacy_plan = _read_json(ROOT / "configs/training_plan_v1_1.json")
+        registry = _read_json(ROOT / "configs/model_registry_v1_1.json")
+        validate_plan(legacy_plan, registry)
         req = request("a" * 64, "clinical_plus_baseline_kl", sidecar_sha256="b" * 64)
         with self.assertRaisesRegex(ValueError, "methodology_training_plan_changed"):
             authority.validate_request(req, legacy_plan, registry)

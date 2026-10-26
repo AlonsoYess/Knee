@@ -42,9 +42,51 @@ def validate_plan(plan, registry):
             "plan_canonical_sha256": PINS[PLAN_PATH], "registry_canonical_sha256": _digest(registry)}
 
 
-def load_release(repository_root):
+def _portable_base_release(repository_root):
+    """Authenticate the base release without changing historical byte guards.
+
+    The original source pins were measured with Windows CRLF. A Git archive on
+    Linux stores LF. Only those two representations of exactly the pinned UTF-8
+    text are interchangeable here; configuration content and archive hashes are
+    still authenticated independently. All historical entrypoints stay intact.
+    """
     from knee import final_model_release as previous
-    _, catalog, _, registry = previous.load_release(repository_root)
+    from knee.pretrained_verification import CATALOG_CANONICAL_SHA256, SOURCE_PINS
+    from knee.aligned_training.data import pinned_text_source_proof
+    root = Path(repository_root).resolve()
+    base = {}
+    for name, expected in previous.PINS.items():
+        path = root / name
+        _require(not path.is_symlink() and path.resolve().is_relative_to(root), "release_path_escape")
+        value = _read_json(path)
+        _require(_digest(value) == expected, "approved_release_component_changed:" + name)
+        base[name] = value
+    descriptor = base[previous.RELEASE_PATH]
+    plan, registry, catalog = (base[descriptor[key]] for key in ("training_plan", "registry", "weights_catalog"))
+    previous.validate_plan(plan, registry)
+    old_catalog = _read_json(root / "configs/pretrained_weights_v1.json")
+    _require(_digest(old_catalog) == CATALOG_CANONICAL_SHA256, "reviewed_checkpoint_catalog_changed")
+    for name, expected in SOURCE_PINS.items():
+        _require(pinned_text_source_proof(root / name, expected, relative_name=name) is not None,
+                 "previously_verified_input_source_changed:" + name)
+    projected = deepcopy(catalog)
+    for key in ("version", "registry_version", "governing_change", "reviewed_on"):
+        projected[key] = old_catalog[key]
+    projected["input"].pop("normalization_selection")
+    for model_id in previous.ADDED_IDS:
+        projected["models"].pop(model_id)
+    _require(projected == old_catalog, "historical_checkpoint_contract_changed")
+    from knee.training_plan import registered_model_ids
+    image_ids = {item["id"] for key in ("mandatory_baselines", "modern_challengers")
+                 for item in registry["radiographic"][key]}
+    _require(len(image_ids) == 7 and set(catalog["models"]) == image_ids
+             and set(catalog["models"]) | set(catalog["models_without_external_pretrained_checkpoint"])
+             == set(registered_model_ids(registry)), "exact_final_model_coverage_required")
+    return descriptor, catalog, plan, registry
+
+
+def load_release(repository_root):
+    _, catalog, _, registry = _portable_base_release(repository_root)
     root = Path(repository_root).resolve()
     values = {}
     for name, expected in PINS.items():
