@@ -486,10 +486,11 @@ def _seeded_execution(seed):
 def train_neural_fold(model, training_loader, validation_loader, plan, *, device, seed,
                       positive_weight, stage="stage_1", output_dir, phase_callback=None,
                       groups_callback=None, maximum_steps=None, smoke=False,
-                      execution_authority=None):
+                      execution_authority=None, epoch_checkpoint=None):
     """Future fold training; caller must validate separate execution authority.
 
-    No resumes, silent OOM retries, split changes, or hyperparameter searches.
+    Epoch recovery is opt-in for the five frozen-image jobs only. No silent OOM
+    retries, split changes, smoke recovery, or hyperparameter searches.
     ``maximum_steps`` is reserved for an explicitly authorized <=2-update smoke;
     smoke metrics cannot be promoted into full five-fold model selection.
     """
@@ -497,6 +498,10 @@ def train_neural_fold(model, training_loader, validation_loader, plan, *, device
     validate_recipe(plan)
     model_id = getattr(model, "model_id", None)
     require_permit(execution_authority, model_id=model_id, stage=stage, smoke=smoke)
+    if epoch_checkpoint is not None:
+        from knee.training_epoch_resume import EpochCheckpoint
+        _require(isinstance(epoch_checkpoint, EpochCheckpoint), "registered_epoch_checkpoint_required")
+        epoch_checkpoint.validate(execution_authority, smoke=smoke, stage=stage)
     from knee.methodology_release import recipe_sha256
     _require(execution_authority.plan_sha256 == recipe_sha256(plan), "training_recipe_must_match_execution_authority")
     _require(getattr(model, "clinical_scenario", "clinical_main") == execution_authority.clinical_scenario,
@@ -560,7 +565,15 @@ def train_neural_fold(model, training_loader, validation_loader, plan, *, device
         training_loader.generator.manual_seed(seed)
         optimizer = _new_optimizer(groups, plan)
         scaler = torch.amp.GradScaler("cuda", enabled=selected_device.type == "cuda")
-        for epoch in range(1, recipe["maximum_epochs"] + 1):
+        first_epoch = 1
+        if epoch_checkpoint is not None:
+            restored = epoch_checkpoint.restore(model, optimizer, scaler, training_loader, monitor,
+                selected_device, binding)
+            if restored is not None:
+                history, total_updates = restored["history"], restored["total_updates"]
+                best_state, best_predictions = restored["best_state"], restored["best_predictions"]
+                first_epoch = recipe["maximum_epochs"] + 1 if restored["stopped"] else restored["epoch"] + 1
+        for epoch in range(first_epoch, recipe["maximum_epochs"] + 1):
             training_loader.dataset.set_epoch(epoch)
             phase = epoch_phase(model_id, stage, epoch)
             model.train()
@@ -583,6 +596,10 @@ def train_neural_fold(model, training_loader, validation_loader, plan, *, device
                 best_state, best_predictions = _cpu_state(model), predictions
             history.append({"epoch": epoch, "phase": phase, "learning_rate_factor": factor,
                             **training, "validation": metrics, "selected_best": improved})
+            if epoch_checkpoint is not None:
+                epoch_checkpoint.save(model, optimizer, scaler, training_loader, monitor, selected_device, binding,
+                    epoch=epoch, history=history, total_updates=total_updates, best_state=best_state,
+                    best_predictions=best_predictions, stopped=stop)
             if stop or (maximum_steps is not None and total_updates >= maximum_steps):
                 break
         _require(best_state is not None, "monitored_best_checkpoint_required")
@@ -623,6 +640,12 @@ def train_neural_fold(model, training_loader, validation_loader, plan, *, device
                   for item in history for audit in item.get("amp_scale_audit", [])],
               "checkpoint_sha256": {"best_model.safetensors": best_hash, "last_model.safetensors": last_hash},
               "history": history, "reserved_test_accessed": False, "provenance": binding}
+    if epoch_checkpoint is not None:
+        from knee.training_epoch_resume import VERSION as EPOCH_CHECKPOINT_VERSION
+        result.update(resume_supported=True, optimizer_state_saved=True,
+            epoch_checkpoint_version=EPOCH_CHECKPOINT_VERSION,
+            resumed_from_epoch=epoch_checkpoint.resumed_from_epoch,
+            epoch_checkpoint_scope="completed_epochs_only_frozen_encoder_reloaded_from_verified_public_weights")
     best_predictions["identities"] = [list(identity) for identity in validation_loader.dataset.identities]
     for filename, content in (("training_record.json", result), ("best_validation_predictions.json", best_predictions)):
         with (output / filename).open("x", encoding="utf-8") as handle:

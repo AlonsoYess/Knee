@@ -9,7 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 
 def main():
-    from knee import methodology_campaign_colab as orchestration
+    from knee import image_campaign_recovery as orchestration
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--operation", required=True, choices=("setup", "tests", "locate", "train"))
     parser.add_argument("--campaign", required=True, choices=("remaining_encoders_frozen",))

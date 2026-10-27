@@ -32,31 +32,37 @@ def build(code_revision, *, allow_unpublished_placeholder=False):
         allow_unpublished_placeholder=allow_unpublished_placeholder)
     value["cells"][0]["source"] = (
         "# 41 · Comparación de los demás codificadores radiográficos\n\n"
-        "**Revisión 1.0 · Plan metodológico v1.2 · GPU T4.**\n\n"
-        "Se ejecutarán **25 trabajos**, en este orden: **ViT-B/16, ConvNeXtV2-Tiny, Skelex, "
+        "**Revisión 2.0 · Plan metodológico v1.2 · GPU T4.**\n\n"
+        "La campaña contiene **25 trabajos**; se ejecutan solo los pendientes, en este orden: **ViT-B/16, ConvNeXtV2-Tiny, Skelex, "
         "BiomedCLIP y MambaOut-Tiny**; cinco pliegues por codificador, con semilla 2026. "
         "Los codificadores permanecen congelados: solo se entrena la cabeza de predicción. "
-        "Cada trabajo comienza desde el checkpoint externo registrado, sin reutilizar pesos entrenados de otro pliegue.\n\n"
+        "Cada pliegue nuevo comienza desde el checkpoint externo registrado. Si existe un guardado compatible de una época "
+        "de ese mismo pliegue, se restaura sin reutilizar pesos de otro pliegue.\n\n"
         "Se mantienen el conjunto de desarrollo, las particiones por participante, las entradas de 224 × 224 "
         "y el aumento gamma v1.2 únicamente en entrenamiento. La validación conserva su transformación "
         "determinista y cada codificador utiliza su normalización registrada.\n\n"
         "Se necesitan los registros completos de las libretas **33 y 38** ya guardados en Drive. "
         "Se autentican automáticamente; no tienes que volver a ejecutarlas. Revisa las tres vistas del aumento "
-        "de la libreta 38 antes de confirmar. Tras la confirmación, se comprobarán los pesos y un forward "
-        "sintético en GPU de cada codificador. Después se hará una **prueba breve de dos actualizaciones "
-        "por codificador en el pliegue 0 de desarrollo**, para verificar gradientes y recursos con la receta "
+        "de la libreta 38 antes de iniciar la campaña. Al ejecutar la celda 4, se comprobarán los pesos y un forward "
+        "sintético en GPU únicamente de los codificadores pendientes. Se recuperan las pruebas breves compatibles ya "
+        "guardadas; solo si faltan se ejecutan dos actualizaciones en el pliegue 0 de desarrollo para verificar gradientes "
+        "y recursos con la receta "
         "aprobada. Estos cinco controles se registran aparte, no participan en la selección del modelo y "
         "sus pesos no se reutilizan en los 25 trabajos completos.\n\n"
         "Cada trabajo completo se guarda y verifica en Drive antes de continuar. Una reconexión recupera "
-        "solo trabajos completos de esta misma revisión y configuración; el trabajo interrumpido se reinicia. "
-        "Ejecuta una sola sesión de esta campaña.\n\n"
+        "los trabajos completos compatibles guardados por la revisión anterior o esta revisión, sin copiar sus pesos. "
+        "Los trabajos nuevos guardan al final de cada época el estado necesario para retomarse después de un corte. "
+        "Una época interrumpida antes del guardado debe repetirse. El progreso dentro de un pliegue antiguo no guardado "
+        "no se puede recuperar. Ejecuta una sola sesión de esta campaña.\n\n"
         "DenseNet121 ya tiene su campaña en la libreta 40 y no se vuelve a entrenar aquí. DINOv3 permanece "
         "fuera por acceso pendiente. Esta libreta no descongela codificadores, no ejecuta fusión multimodal, "
         "calibración, selección de umbral ni ajuste final. Los originales y las particiones se conservan; "
-        "la prueba reservada permanece cerrada. **El entrenamiento comienza solo con la confirmación indicada.**")
+        "la prueba reservada permanece cerrada. **Esta campaña ya fue autorizada. El entrenamiento comienza "
+        "al ejecutar la celda 4; no tienes que escribir rutas ni repetir una frase de autorización.**")
     bootstrap = value["cells"][1]["source"]
     bootstrap = _replace_once(bootstrap, "knee_methodology40_", "knee_image_screening41_")
     bootstrap = _replace_once(bootstrap, "CAMPAIGN = 'densenet_frozen'", "CAMPAIGN = 'remaining_encoders_frozen'")
+    bootstrap = _replace_once(bootstrap, "from knee import methodology_campaign_colab as orchestration", "from knee import image_campaign_recovery as orchestration")
     value["cells"][1]["source"] = bootstrap
     for cell in value["cells"]:
         if cell["cell_type"] == "code":
@@ -69,21 +75,63 @@ def build(code_revision, *, allow_unpublished_placeholder=False):
         "de PyTorch para GPU; la GPU queda oculta en este paso. No se entrenan datos de participantes.")
     value["cells"][6]["source"] = (
         "## 3. Localizar las comprobaciones previas y reconstruir desarrollo\n\n"
-        "Indica las mismas carpetas de registros privados y desarrollo, donde está `transport.json`. "
+        "Las carpetas de registros privados y desarrollo se leen de la configuración privada guardada en Drive. "
+        "No es necesario escribir rutas. Si esa configuración no es válida, la celda se detiene sin buscar otras carpetas. "
         "Se autentican las comprobaciones 33 y 38 y la integridad del paquete de desarrollo. "
         "Esta celda no descarga ni abre el paquete reservado de prueba.")
+    locate = value["cells"][7]["source"]
+    start = locate.index("PERSISTENT_ROOT = orchestration.checked_path(input(")
+    stop = locate.index("proof = json.loads(checked_run(")
+    locate = locate[:start] + """MY_DRIVE_ROOT = Path('/content/drive/MyDrive').resolve()
+PROJECT_ROOT = orchestration.checked_path(os.environ.get('KNEE_DATA_ROOT') or MY_DRIVE_ROOT / 'KneeOAI').resolve()
+if not PROJECT_ROOT.is_dir() or not PROJECT_ROOT.is_relative_to(MY_DRIVE_ROOT):
+    raise RuntimeError('No se encontró la carpeta privada configurada dentro de tu Drive montado.')
+SETTINGS_PATH = orchestration.checked_path(PROJECT_ROOT / 'colab_runtime_paths.json')
+if not SETTINGS_PATH.is_file() or not 0 < SETTINGS_PATH.stat().st_size <= 16384:
+    raise RuntimeError('Falta la configuración privada de las carpetas de Colab.')
+settings = orchestration._json(SETTINGS_PATH)
+if not isinstance(settings, dict) or set(settings) != {'version', 'records_relative', 'development_relative'} or settings.get('version') != 'knee_colab_runtime_paths_v1.0':
+    raise RuntimeError('La configuración privada de carpetas no tiene el formato esperado.')
+selected_paths = []
+for key in ('records_relative', 'development_relative'):
+    relative = settings[key]
+    if not isinstance(relative, str) or not relative or len(relative) > 1024 or '\\\\' in relative or ':' in relative:
+        raise RuntimeError('La configuración debe contener rutas relativas válidas.')
+    parts = PurePosixPath(relative)
+    if parts.is_absolute() or not parts.parts or any(part in ('', '.', '..') for part in relative.split('/')):
+        raise RuntimeError('La configuración no puede salir de la carpeta del proyecto.')
+    selected = orchestration.checked_path(PROJECT_ROOT.joinpath(*parts.parts)).resolve()
+    if not selected.is_dir() or not selected.is_relative_to(PROJECT_ROOT):
+        raise RuntimeError('Una de las carpetas privadas configuradas no existe dentro del proyecto.')
+    selected_paths.append(selected)
+PERSISTENT_ROOT, REMOTE_PACKAGE_DIR = selected_paths
+if PERSISTENT_ROOT.is_relative_to(REMOTE_PACKAGE_DIR) or REMOTE_PACKAGE_DIR.is_relative_to(PERSISTENT_ROOT):
+    raise RuntimeError('Las carpetas de registros y desarrollo deben estar separadas.')
+if not orchestration.checked_path(REMOTE_PACKAGE_DIR / 'transport.json').is_file():
+    raise RuntimeError('La carpeta de desarrollo configurada no contiene transport.json.')
+print('Carpetas privadas localizadas automáticamente. No se inició entrenamiento.')
+""" + locate[stop:]
+    value["cells"][7]["source"] = locate
     value["cells"][8]["source"] = (
-        "## 4. Confirmar y ejecutar los 25 trabajos\n\n"
+        "## 4. Iniciar la campaña autorizada: cinco pruebas breves y 25 trabajos\n\n"
         "Orden: **ViT-B/16 → ConvNeXtV2-Tiny → Skelex → BiomedCLIP → MambaOut-Tiny**. "
-        "Primero se verifican los cinco codificadores, incluida una prueba breve de dos actualizaciones por "
-        "codificador en el pliegue 0 de desarrollo. Después se completan cinco pliegues por codificador, "
-        "siempre con el codificador congelado y aumento gamma v1.2. Cada trabajo completo comienza desde "
-        "los pesos externos registrados; los controles breves no aportan pesos ni métricas a esa comparación. "
+        "Se reconocen y omiten los trabajos completos guardados. Solo se verifican en GPU los codificadores pendientes, "
+        "reutilizando sus pruebas breves ya guardadas cuando correspondan. Después se completan únicamente los pliegues pendientes, "
+        "siempre con el codificador congelado y aumento gamma v1.2. Un trabajo pendiente retoma su última época guardada "
+        "si existe; de lo contrario comienza desde los pesos externos registrados. Los controles breves no aportan "
+        "pesos ni métricas a esa comparación. "
         "El progreso identifica modelo y pliegue. Los checkpoints grandes requieren espacio local y tiempo "
         "de copia a Drive. Cada trabajo se guarda y verifica antes de continuar.\n\n"
-        "La confirmación cubre únicamente esta campaña de desarrollo. Si Colab se desconecta, vuelve a abrir "
-        "esta misma revisión y ejecuta con las mismas carpetas: se recuperan los trabajos completos compatibles.")
+        "**Al ejecutar esta celda se retoma la campaña que ya autorizaste; no se solicita otra frase.** "
+        "La autorización se limita a los cinco codificadores y los cinco pliegues descritos. Si Colab se desconecta, "
+        "vuelve a abrir esta misma revisión y ejecuta las celdas: se recuperan los trabajos completos compatibles.")
     train = value["cells"][9]["source"]
+    train = _replace_once(train,
+        "confirmation = input('Escribe ' + orchestration.CONFIRMATIONS[CAMPAIGN] + ' para ejecutar solo esta campaña: ').strip()\n"
+        "if confirmation != orchestration.CONFIRMATIONS[CAMPAIGN]:\n"
+        "    raise RuntimeError('No se confirmó la campaña. No se inició entrenamiento.')",
+        "if CAMPAIGN != 'remaining_encoders_frozen':\n"
+        "    raise RuntimeError('Esta libreta no autoriza una campaña distinta.')")
     train = _replace_once(train, "if CAMPAIGN == 'densenet_frozen':", "if CAMPAIGN == 'remaining_encoders_frozen':")
     train = _replace_once(train,
         "orchestration._save(TEST_RECEIPT, CPU_TESTS)\norchestration._save(RUNTIME_RECEIPT, runtime)",
@@ -94,7 +142,7 @@ def build(code_revision, *, allow_unpublished_placeholder=False):
         "    else:\n"
         "        orchestration._save(receipt_path, payload)")
     train = _replace_once(train, "Iniciando únicamente la campaña confirmada del plan v1.2. Cada trabajo completo se guardará en Drive…",
-        "Iniciando los 25 trabajos confirmados; ViT-B/16 primero. Cada trabajo completo se guardará en Drive…")
+        "Buscando trabajos completos para omitirlos; se entrenarán solo los pendientes…")
     value["cells"][9]["source"] = train
     for cell in value["cells"]:
         if cell["cell_type"] == "code":

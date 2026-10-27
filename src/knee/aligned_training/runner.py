@@ -215,7 +215,7 @@ def _fit_conventional(model_id, fold, plan, seed, output):
 
 def execute(request, authority, *, repository_root, package_dir, reference_path, weights_root,
             output_dir, device="cpu", allow_download=False, selection_evidence=None, image_job_dir=None,
-            baseline_sidecar_path=None):
+            baseline_sidecar_path=None, epoch_checkpoint=None):
     """Future one-fold execution; no default authority, test or refit operation."""
     require(authority is not None, "separate_training_authority_required_before_execution")
     request, authority = deepcopy(request), deepcopy(authority)
@@ -225,6 +225,14 @@ def execute(request, authority, *, repository_root, package_dir, reference_path,
     selected_release_loader = aligned.load_release if methodology else load_release
     _, catalog, plan, registry = selected_release_loader(root)
     permit = validate_authority(authority, request, plan, registry)
+    if epoch_checkpoint is not None:
+        from knee.training_epoch_resume import EpochCheckpoint
+        require(isinstance(epoch_checkpoint, EpochCheckpoint), "registered_epoch_checkpoint_required")
+        epoch_checkpoint.validate(permit, smoke=request["operation"] == "single_fold_smoke", stage=permit.stage)
+        require(all(not epoch_checkpoint.directory.is_relative_to(checked_path(path))
+            and not checked_path(path).is_relative_to(epoch_checkpoint.directory)
+            for path in (repository_root, package_dir, Path(reference_path).parent, output_dir, weights_root)),
+            "epoch_checkpoint_must_be_separate_from_code_inputs_weights_and_output")
     request_hash, authority_hash = digest(request), digest(authority)
     require(type(allow_download) is bool, "explicit_download_flag_required")
     source = checked_path(package_dir).resolve()
@@ -291,9 +299,10 @@ def execute(request, authority, *, repository_root, package_dir, reference_path,
             _reuse_fold_encoder(model, image_job_dir, request, rows, plan, registry)
         training, validation = loaders(fold, seed=permit.seed,
             micro_batch_size=64 if permit.model_id == "clinical_mlp" else permit.image_micro_batch_size)
+        resume_options = {} if epoch_checkpoint is None else {"epoch_checkpoint": epoch_checkpoint}
         result = train_neural_fold(model, training, validation, plan, device=device, seed=permit.seed,
             positive_weight=fold.class_weight["positive_weight"], stage=permit.stage, output_dir=output,
-            maximum_steps=2 if smoke else None, smoke=smoke, execution_authority=permit)
+            maximum_steps=2 if smoke else None, smoke=smoke, execution_authority=permit, **resume_options)
         predictions = read_json(output / "best_validation_predictions.json")
         metrics = binary_metrics(predictions["targets"], predictions["logits"])
     require(digest(request) == request_hash and digest(authority) == authority_hash,

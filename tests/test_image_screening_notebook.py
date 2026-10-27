@@ -4,7 +4,7 @@ from contextlib import redirect_stdout
 import importlib.util
 import io
 import json
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import tempfile
 from types import SimpleNamespace
 import unittest
@@ -23,7 +23,7 @@ class ImageScreeningNotebookTests(unittest.TestCase):
         self.assertEqual(notebook["metadata"]["accelerator"], "GPU")
         intro = notebook["cells"][0]["source"]
         self.assertIn("25 trabajos", intro)
-        self.assertIn("Revisión 1.0", intro)
+        self.assertIn("Revisión 2.0", intro)
         for name in builder.MODEL_NAMES:
             self.assertIn(name, intro)
         self.assertEqual([intro.index(name) for name in builder.MODEL_NAMES],
@@ -34,9 +34,13 @@ class ImageScreeningNotebookTests(unittest.TestCase):
         self.assertIn(repr(REVISION), bootstrap)
         self.assertIn("knee_image_screening41_", bootstrap)
         self.assertIn("CAMPAIGN = 'remaining_encoders_frozen'", bootstrap)
+        self.assertIn("image_campaign_recovery as orchestration", bootstrap)
         for cell in notebook["cells"]:
             if cell["cell_type"] == "code":
                 ast.parse(cell["source"])
+                self.assertFalse(any(isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+                    and node.func.id == "input" for node in ast.walk(ast.parse(cell["source"]))),
+                    "The authorized recovery notebook must not ask for an interactive input")
                 self.assertEqual(cell["outputs"], [])
                 self.assertIsNone(cell["execution_count"])
                 if "scripts/train_" in cell["source"]:
@@ -107,8 +111,9 @@ class ImageScreeningNotebookTests(unittest.TestCase):
                 _save=Mock(side_effect=save), _json=lambda path: json.loads(Path(path).read_text(encoding="utf-8")),
                 validate_result=Mock())
             launch_mock = Mock(side_effect=launch)
-            namespace = {"input": Mock(return_value=confirmation if approved else "INVALID"),
-                "orchestration": orchestration, "CAMPAIGN": campaign, "SESSION_ROOT": session,
+            input_mock = Mock(side_effect=AssertionError("Interactive input is forbidden in recovery"))
+            namespace = {"input": input_mock,
+                "orchestration": orchestration, "CAMPAIGN": campaign if approved else "reserved_test", "SESSION_ROOT": session,
                 "CPU_TESTS": {"synthetic": "tests"}, "runtime": {"synthetic": "runtime"},
                 "NEURAL_PYTHON": Path("synthetic_python"), "REPO_DIR": repository,
                 "PREPARATION_DIR": proof, "LOCAL_PACKAGE_DIR": package,
@@ -118,11 +123,12 @@ class ImageScreeningNotebookTests(unittest.TestCase):
             before = set(session.iterdir())
             with redirect_stdout(io.StringIO()):
                 if not approved:
-                    with self.assertRaisesRegex(RuntimeError, "No se confirmó"):
+                    with self.assertRaises(RuntimeError):
                         exec(compile(tree, "notebook41_cell", "exec"), namespace)
                     self.assertEqual(set(session.iterdir()), before)
                     launch_mock.assert_not_called()
                     orchestration._save.assert_not_called()
+                    input_mock.assert_not_called()
                     return
                 exec(compile(tree, "notebook41_cell", "exec"), namespace)
                 first_output = namespace["LOCAL_OUTPUT"]
@@ -141,6 +147,7 @@ class ImageScreeningNotebookTests(unittest.TestCase):
                 self.assertEqual(launch_mock.call_count, expected_calls)
                 self.assertEqual(orchestration._save.call_count, 2)
                 self.assertEqual(namespace["FINAL_CHECK"], summary)
+                input_mock.assert_not_called()
 
     def test_generated_cell_creates_cache_before_launch(self):
         self._launch()
@@ -151,8 +158,99 @@ class ImageScreeningNotebookTests(unittest.TestCase):
     def test_changed_receipt_stops_before_relaunch(self):
         self._launch(repeat=True, changed_receipt=True)
 
-    def test_bad_confirmation_launches_nothing(self):
+    def test_unregistered_campaign_launches_nothing(self):
         self._launch(approved=False)
+
+    def _configured_paths(self, *, updates=None, missing_transport=False,
+            raw_settings=None, external_project=False, lexical_escape=False, project_override=False):
+        """Run the real generated locator cell; replace only Drive mounting and subprocess I/O."""
+        from knee.colab_data import checked_path
+        source = builder.build(REVISION)["cells"][7]["source"]
+        tree = ast.parse(source)
+        tree.body = [node for node in tree.body if not (
+            isinstance(node, ast.ImportFrom) and node.module == "google.colab"
+            or isinstance(node, ast.Expr) and isinstance(node.value, ast.Call)
+                and isinstance(node.value.func, ast.Attribute) and node.value.func.attr == "mount"
+                and isinstance(node.value.func.value, ast.Name) and node.value.func.value.id == "drive"
+            or isinstance(node, ast.Assign) and any(isinstance(target, ast.Name)
+                and target.id == "MY_DRIVE_ROOT" for target in node.targets))]
+        with tempfile.TemporaryDirectory(prefix="n41_paths_") as directory:
+            root = Path(directory)
+            drive_root = root / "mounted_drive"
+            project = (root / "outside") if external_project or lexical_escape else (
+                drive_root / ("custom_project" if project_override else "KneeOAI"))
+            records, development = project / "private_records", project / "private_development"
+            session, repository, preparation = root / "session", root / "repository", root / "proof"
+            for path in (drive_root, project, records, development, session, repository, preparation):
+                path.mkdir(parents=True, exist_ok=True)
+            # These exist so dotted/repeated-separator paths cannot pass merely
+            # because their normalized destination happens to be absent.
+            (records / "child").mkdir()
+            if not missing_transport:
+                (development / "transport.json").write_text("{}", encoding="utf-8")
+            settings = {"version": "knee_colab_runtime_paths_v1.0", "records_relative": "private_records",
+                "development_relative": "private_development"}
+            settings.update(updates or {})
+            (project / "colab_runtime_paths.json").write_text(
+                raw_settings if raw_settings is not None else json.dumps(settings), encoding="utf-8")
+            environ = {}
+            if external_project or project_override:
+                environ["KNEE_DATA_ROOT"] = str(project)
+            if lexical_escape:
+                environ["KNEE_DATA_ROOT"] = str(drive_root / ".." / "outside")
+            stage = Mock(return_value={"synthetic": True})
+            locate = Mock(return_value=json.dumps({"preparation_dir": str(preparation)}))
+            input_mock = Mock(side_effect=AssertionError("No path questions are allowed"))
+            namespace = {"Path": Path, "PurePosixPath": PurePosixPath, "json": json,
+                "os": SimpleNamespace(environ=environ), "MY_DRIVE_ROOT": drive_root,
+                "orchestration": SimpleNamespace(checked_path=checked_path,
+                    _json=lambda p: json.loads(Path(p).read_text(encoding="utf-8")), stage_development=stage),
+                "checked_run": locate, "NEURAL_PYTHON": Path("synthetic_python"),
+                "REPO_DIR": repository, "RUN_ENV": {"synthetic": "no_training"},
+                "CAMPAIGN": builder.CAMPAIGN, "SESSION_ROOT": session, "input": input_mock}
+            invalid = bool(updates or missing_transport or raw_settings is not None or external_project or lexical_escape)
+            with redirect_stdout(io.StringIO()):
+                if invalid:
+                    with self.assertRaises((RuntimeError, ValueError)):
+                        exec(compile(tree, "notebook41_paths", "exec"), namespace)
+                    locate.assert_not_called()
+                    stage.assert_not_called()
+                    self.assertEqual(list(session.iterdir()), [])
+                else:
+                    exec(compile(tree, "notebook41_paths", "exec"), namespace)
+                    self.assertEqual(namespace["PROJECT_ROOT"], project)
+                    self.assertEqual(namespace["PERSISTENT_ROOT"], records)
+                    self.assertEqual(namespace["REMOTE_PACKAGE_DIR"], development)
+                    locate.assert_called_once()
+                    stage.assert_called_once_with(development, session / "development",
+                        session / "reference" / "model_inputs_loading_reference_v1.json")
+                input_mock.assert_not_called()
+
+    def test_private_path_configuration_locates_and_stages_without_input(self):
+        self._configured_paths()
+
+    def test_project_override_must_still_be_within_mounted_drive(self):
+        self._configured_paths(project_override=True)
+        self._configured_paths(external_project=True)
+        self._configured_paths(lexical_escape=True)
+
+    def test_wrong_path_configuration_version_fails_before_staging(self):
+        self._configured_paths(updates={"version": "unknown"})
+
+    def test_path_configuration_rejects_escape_absolute_and_ambiguous_paths(self):
+        for relative in ("../outside", "/outside", "C:/outside", "private_records/../outside",
+                "private_records\\child", "private_records/./child", "private_records//child", ""):
+            with self.subTest(relative=relative):
+                self._configured_paths(updates={"records_relative": relative})
+
+    def test_path_configuration_requires_bounded_object_without_extra_fields(self):
+        self._configured_paths(raw_settings=" " * 16385)
+        self._configured_paths(raw_settings="[]")
+        self._configured_paths(updates={"extra": "not allowed"})
+
+    def test_path_configuration_rejects_missing_transport_and_overlap(self):
+        self._configured_paths(missing_transport=True)
+        self._configured_paths(updates={"records_relative": "private_development"})
 
     def test_cli_exposes_only_one_registered_campaign_and_no_test_operation(self):
         source = (ROOT / "scripts/train_image_screening_colab.py").read_text(encoding="utf-8")
