@@ -225,9 +225,12 @@ def execute(request, authority, *, repository_root, package_dir, reference_path,
     selected_release_loader = aligned.load_release if methodology else load_release
     _, catalog, plan, registry = selected_release_loader(root)
     permit = validate_authority(authority, request, plan, registry)
+    gradual_recovery = False
     if epoch_checkpoint is not None:
         from knee.training_epoch_resume import EpochCheckpoint
-        require(isinstance(epoch_checkpoint, EpochCheckpoint), "registered_epoch_checkpoint_required")
+        from knee.gradual_epoch_resume import GradualEpochCheckpoint
+        require(isinstance(epoch_checkpoint, (EpochCheckpoint, GradualEpochCheckpoint)), "registered_epoch_checkpoint_required")
+        gradual_recovery = isinstance(epoch_checkpoint, GradualEpochCheckpoint)
         epoch_checkpoint.validate(permit, smoke=request["operation"] == "single_fold_smoke", stage=permit.stage)
         require(all(not epoch_checkpoint.directory.is_relative_to(checked_path(path))
             and not checked_path(path).is_relative_to(epoch_checkpoint.directory)
@@ -256,7 +259,7 @@ def execute(request, authority, *, repository_root, package_dir, reference_path,
         protected.append(checked_path(image_job_dir).resolve())
     output = _new_private_output(output_dir, protected)
     selection = None
-    if request["stage"] != "stage_1":
+    if request["stage"] != "stage_1" and not gradual_recovery:
         selection = validate_selection(selection_evidence, request, plan, registry)
     sealed_sources = {path: sha_file(path) for path in
         (source / "development_package.zip", source / "handoff.json", reference)}
@@ -272,6 +275,9 @@ def execute(request, authority, *, repository_root, package_dir, reference_path,
     from knee.aligned_training.data import load_sealed_inputs, prepare_fold, loaders
     loaded = load_sealed_inputs(source, reference, root, permit.package_sha256)
     rows = loaded["manifest"]["rows"]
+    if gradual_recovery:
+        from knee.gradual_selection import validate_selection_evidence
+        selection = validate_selection_evidence(selection_evidence, request, plan, registry, rows)
     fold = prepare_fold(rows, loaded["tensors"], permit.validation_fold,
         encoder_id=permit.image_encoder_id, package_sha256=permit.package_sha256,
         clinical_scenario=permit.clinical_scenario, baseline_sidecar=baseline_sidecar,

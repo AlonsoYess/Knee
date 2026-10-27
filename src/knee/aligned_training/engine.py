@@ -3,8 +3,8 @@
 The public runner must authenticate development-only execution authority, fold
 identity, checkpoint eligibility, and stage eligibility BEFORE calling
 ``train_neural_fold``. This module never opens a dataset/package or authorizes
-itself. Notebook 34 does not call the training function. Checkpoints contain
-model tensors only: optimizer/scaler continuation is deliberately unsupported.
+itself. Notebook 34 does not call the training function. Final model exports
+contain tensors only. Separately registered epoch recovery is explicitly opt-in.
 """
 from __future__ import annotations
 
@@ -489,7 +489,7 @@ def train_neural_fold(model, training_loader, validation_loader, plan, *, device
                       execution_authority=None, epoch_checkpoint=None):
     """Future fold training; caller must validate separate execution authority.
 
-    Epoch recovery is opt-in for the five frozen-image jobs only. No silent OOM
+    Epoch recovery is opt-in for registered frozen or gradual image jobs. No silent OOM
     retries, split changes, smoke recovery, or hyperparameter searches.
     ``maximum_steps`` is reserved for an explicitly authorized <=2-update smoke;
     smoke metrics cannot be promoted into full five-fold model selection.
@@ -500,7 +500,8 @@ def train_neural_fold(model, training_loader, validation_loader, plan, *, device
     require_permit(execution_authority, model_id=model_id, stage=stage, smoke=smoke)
     if epoch_checkpoint is not None:
         from knee.training_epoch_resume import EpochCheckpoint
-        _require(isinstance(epoch_checkpoint, EpochCheckpoint), "registered_epoch_checkpoint_required")
+        from knee.gradual_epoch_resume import GradualEpochCheckpoint
+        _require(isinstance(epoch_checkpoint, (EpochCheckpoint, GradualEpochCheckpoint)), "registered_epoch_checkpoint_required")
         epoch_checkpoint.validate(execution_authority, smoke=smoke, stage=stage)
     from knee.methodology_release import recipe_sha256
     _require(execution_authority.plan_sha256 == recipe_sha256(plan), "training_recipe_must_match_execution_authority")
@@ -572,6 +573,10 @@ def train_neural_fold(model, training_loader, validation_loader, plan, *, device
             if restored is not None:
                 history, total_updates = restored["history"], restored["total_updates"]
                 best_state, best_predictions = restored["best_state"], restored["best_predictions"]
+                if isinstance(epoch_checkpoint, GradualEpochCheckpoint):
+                    phase_callback(model, restored["phase"])
+                    _require(sorted(name for name, p in model.named_parameters() if p.requires_grad)
+                        == restored["trainable_parameters"], "restored_gradual_phase_trainable_parameters_mismatch")
                 first_epoch = recipe["maximum_epochs"] + 1 if restored["stopped"] else restored["epoch"] + 1
         for epoch in range(first_epoch, recipe["maximum_epochs"] + 1):
             training_loader.dataset.set_epoch(epoch)
@@ -642,10 +647,12 @@ def train_neural_fold(model, training_loader, validation_loader, plan, *, device
               "history": history, "reserved_test_accessed": False, "provenance": binding}
     if epoch_checkpoint is not None:
         from knee.training_epoch_resume import VERSION as EPOCH_CHECKPOINT_VERSION
+        gradual = isinstance(epoch_checkpoint, GradualEpochCheckpoint)
         result.update(resume_supported=True, optimizer_state_saved=True,
-            epoch_checkpoint_version=EPOCH_CHECKPOINT_VERSION,
+            epoch_checkpoint_version=epoch_checkpoint.version if gradual else EPOCH_CHECKPOINT_VERSION,
             resumed_from_epoch=epoch_checkpoint.resumed_from_epoch,
-            epoch_checkpoint_scope="completed_epochs_only_frozen_encoder_reloaded_from_verified_public_weights")
+            epoch_checkpoint_scope=epoch_checkpoint.scope if gradual else
+                "completed_epochs_only_frozen_encoder_reloaded_from_verified_public_weights")
     best_predictions["identities"] = [list(identity) for identity in validation_loader.dataset.identities]
     for filename, content in (("training_record.json", result), ("best_validation_predictions.json", best_predictions)):
         with (output / filename).open("x", encoding="utf-8") as handle:
