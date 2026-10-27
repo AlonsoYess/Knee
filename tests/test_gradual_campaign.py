@@ -82,6 +82,33 @@ class GradualCampaignTests(unittest.TestCase):
         self.assertTrue(value["full_encoder_training_authorized"])
         self.assertFalse(value["reserved_test_access_authorized"])
 
+    def test_real_preparation_ignores_old_incomplete_campaign_and_seals_exact_selection(self):
+        from test_gradual_selection import screening_sources
+        from knee import gradual_selection
+        with tempfile.TemporaryDirectory() as directory, ExitStack() as stack:
+            root=Path(directory)
+            value=synthetic_preflight(root)
+            sources,_=screening_sources(value["records"],value,self.plan,self.registry)
+            old=value["records"]/"methodology_v1_2_campaign_densenet_frozen_old_incomplete"
+            old.mkdir()
+            identity=runner.read_json(sources["40"]/"campaign_identity.json")
+            runner.save_json(old/"campaign_identity.json",identity)
+            for name in ("torch.optim.AdamW","torch.Tensor.backward","urllib.request.OpenerDirector.open"):
+                stack.enter_context(patch(name,side_effect=AssertionError("Preparation must not train or download")))
+            stack.enter_context(patch.object(runner,"execute",side_effect=AssertionError("Preparation must not execute jobs")))
+            gradual_selection._VALIDATED.clear()
+            first=subject.prepare(ROOT,value["records"],value["package"],value["reference_path"],root/"proof42a",code_revision="a"*40)
+            second=subject.prepare(ROOT,value["records"],value["package"],value["reference_path"],root/"proof42b",code_revision="a"*40)
+            self.assertEqual(first,second)
+            self.assertEqual(first["model_order"],list(subject.MODELS))
+            self.assertEqual(first["job_count"],20)
+            self.assertFalse(first["training_executed"])
+            self.assertFalse(first["optimizer_created"])
+            self.assertFalse(first["reserved_test_accessed"])
+            self.assertEqual(subject._find_stage_one(value["records"],"densenet_frozen",value["package_sha256"]),sources["40"])
+            self.assertEqual((root/"proof42a"/subject.SELECTION_FILENAME).read_bytes(),
+                (root/"proof42b"/subject.SELECTION_FILENAME).read_bytes())
+
     def test_source_change_rejected_before_any_training(self):
         with tempfile.TemporaryDirectory() as directory:
             root=Path(directory)

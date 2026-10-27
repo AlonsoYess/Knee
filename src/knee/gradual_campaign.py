@@ -65,23 +65,12 @@ def _separate(target, protected):
 
 
 def _find_stage_one(records, campaign, package_sha256):
-    matches = []
-    for count, path in enumerate(records.iterdir(), 1):
-        require(count <= transport.MAX_DIRECT_CHILDREN, "bounded_gradual_records_inventory_required")
-        if not path.name.startswith(transport.CAMPAIGN_PREFIX) or not path.is_dir():
-            continue
-        manifest = path / transport.CAMPAIGN_FILENAME
-        if not manifest.is_file():
-            continue
-        value = read_json(checked_path(manifest))
-        identity = value.get("identity", {})
-        if identity.get("campaign") == campaign and identity.get("development_package_sha256") == package_sha256:
-            require(identity.get("training_plan_sha256") == release.PINS[release.PLAN_PATH]
-                and identity.get("modeling_release_sha256") == release.PINS[release.RELEASE_PATH],
-                "stage_one_selection_requires_same_frozen_recipe")
-            matches.append(checked_path(path))
-    require(len(matches) == 1, "one_complete_stage_one_campaign_per_family_required")
-    return matches[0]
+    # An earlier failed run may have created its identity before any job was
+    # trained. The privately approved completed summary determines the source;
+    # directory presence, timestamps and enumeration order grant no eligibility.
+    from knee.gradual_selection import find_authorized_campaign
+    return find_authorized_campaign(records, campaign, package_sha256,
+        authority_path=checked_path(records) / AUTHORITY_FILENAME)
 
 
 def prepare(repository_root, records_root, package_dir, reference_path, output_dir, *,

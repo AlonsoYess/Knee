@@ -73,14 +73,15 @@ def screening_sources(root, value, plan, registry):
         common[flag] = False
     summaries, roots = {}, {}
     for number,campaign in (("40","densenet_frozen"),("41","remaining_encoders_frozen")):
-        campaign_dir=root/("campaign"+number)
+        campaign_dir=root/(previous.CAMPAIGN_PREFIX+campaign+"_artificial")
         campaign_dir.mkdir()
         roots[number]=campaign_dir
         identity={key:common[key] for key in ("seed","stage","code_revision","training_plan_sha256","modeling_release_sha256",
             "development_package_sha256","model_input_reference_sha256")}
         identity["campaign"]=campaign
         runner.save_json(campaign_dir/previous.CAMPAIGN_FILENAME,{"version":previous.VERSION,"identity":identity})
-        summary={**common,"campaign":campaign,"job_results":[],"model_results":{},"private_job_locations":{},"artifact_files_sha256":{}}
+        summary={**common,"campaign":campaign,"persistent_campaign_folder":campaign_dir.name,
+            "job_results":[],"model_results":{},"private_job_locations":{},"artifact_files_sha256":{}}
         groups={}
         for index,request in enumerate(core.requests(campaign,value["package_sha256"],"0"*64,plan,registry)):
             directory,job,predictions,receipt=fake_job(campaign_dir/("job_attempt_"+str(index)),request,value["rows"],registry)
@@ -144,6 +145,100 @@ class GradualSelectionTests(unittest.TestCase):
             if r["model_id"]==model and r["validation_fold"]==0)
         request.update(stage="stage_2",selection_evidence_sha256=sha_file(path))
         return request
+
+    def discovery_records(self, root):
+        """Only small campaign records; discovery must never need fitted weights."""
+        for number, source in self.sources.items():
+            target = root / source.name
+            target.mkdir()
+            names = [previous.CAMPAIGN_FILENAME]
+            if number == "40":
+                names += [core.FILENAME, previous.SUMMARY_FILENAME]
+            else:
+                (target / "recovery_completion_artificial").mkdir()
+                names.append("recovery_completion_artificial/" + recovery.SUMMARY_FILENAME)
+            for name in names:
+                (target / name).write_bytes((source / name).read_bytes())
+        (root / subject.AUTHORITY_FILENAME).write_bytes((self.root / subject.AUTHORITY_FILENAME).read_bytes())
+
+    def test_discovery_ignores_incomplete_and_unapproved_complete_attempts_in_both_families(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.discovery_records(root)
+            for number, campaign in (("40", "densenet_frozen"), ("41", "remaining_encoders_frozen")):
+                authorized = root / self.sources[number].name
+                incomplete = root / (previous.CAMPAIGN_PREFIX + campaign + "_old_incomplete")
+                incomplete.mkdir()
+                (incomplete / previous.CAMPAIGN_FILENAME).write_bytes((authorized / previous.CAMPAIGN_FILENAME).read_bytes())
+                wrong = root / (previous.CAMPAIGN_PREFIX + campaign + "_other_complete")
+                wrong.mkdir()
+                (wrong / previous.CAMPAIGN_FILENAME).write_bytes((authorized / previous.CAMPAIGN_FILENAME).read_bytes())
+                summary = {**self.summaries[number], "persistent_campaign_folder": wrong.name,
+                    "executed_at_utc": "unapproved_other_completion"}
+                if number == "40":
+                    runner.save_json(wrong / previous.SUMMARY_FILENAME, summary)
+                else:
+                    completion = wrong / "recovery_completion_other"
+                    completion.mkdir()
+                    runner.save_json(completion / recovery.SUMMARY_FILENAME, summary)
+                    # A normal second close has a different digest and is not selected.
+                    newer = authorized / "recovery_completion_newer"
+                    newer.mkdir()
+                    runner.save_json(newer / recovery.SUMMARY_FILENAME,
+                        {**self.summaries[number], "executed_at_utc": "different_later_completion"})
+                self.assertEqual(subject.find_authorized_campaign(root, campaign, self.value["package_sha256"]), authorized)
+
+    def test_discovery_missing_approved_source_or_copied_approved_campaign_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.discovery_records(root)
+            source = root / self.sources["40"].name
+            path = source / previous.SUMMARY_FILENAME
+            raw = path.read_bytes()
+            value = json.loads(raw)
+            path.write_text(json.dumps({**value, "unapproved": True}), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "one_privately_authorized_completed"):
+                subject.find_authorized_campaign(root, "densenet_frozen", self.value["package_sha256"])
+            path.write_bytes(raw)
+            duplicate = root / (previous.CAMPAIGN_PREFIX + "densenet_frozen_duplicate")
+            duplicate.mkdir()
+            (duplicate / previous.SUMMARY_FILENAME).write_bytes(raw)
+            with self.assertRaisesRegex(ValueError, "one_privately_authorized_completed"):
+                subject.find_authorized_campaign(root, "densenet_frozen", self.value["package_sha256"])
+
+    def test_discovery_duplicate_identical_41_closures_are_rejected_not_ordered_by_date(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.discovery_records(root)
+            source = root / self.sources["41"].name
+            duplicate = source / "recovery_completion_identical_copy"
+            duplicate.mkdir()
+            (duplicate / recovery.SUMMARY_FILENAME).write_bytes(
+                (source / "recovery_completion_artificial" / recovery.SUMMARY_FILENAME).read_bytes())
+            with self.assertRaisesRegex(ValueError, "one_exact_privately_authorized_screening_summary"):
+                subject.find_authorized_campaign(root, "remaining_encoders_frozen", self.value["package_sha256"])
+
+    def test_discovery_authenticates_package_family_manifest_and_original_folder(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.discovery_records(root)
+            with self.assertRaisesRegex(ValueError, "family_or_package_mismatch"):
+                subject.find_authorized_campaign(root, "densenet_frozen", "f" * 64)
+            with self.assertRaisesRegex(ValueError, "registered_screening_source_family"):
+                subject.find_authorized_campaign(root, "clinical", self.value["package_sha256"])
+            source = root / self.sources["40"].name
+            manifest = source / previous.CAMPAIGN_FILENAME
+            raw = manifest.read_bytes()
+            value = json.loads(raw)
+            value["identity"]["campaign"] = "remaining_encoders_frozen"
+            manifest.write_text(json.dumps(value), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "campaign_manifest_binding"):
+                subject.find_authorized_campaign(root, "densenet_frozen", self.value["package_sha256"])
+            manifest.write_bytes(raw)
+            moved = root / (previous.CAMPAIGN_PREFIX + "densenet_frozen_renamed")
+            source.rename(moved)
+            with self.assertRaisesRegex(ValueError, "must_name_its_campaign_folder"):
+                subject.find_authorized_campaign(root, "densenet_frozen", self.value["package_sha256"])
 
     def test_exact_30_job_selection_is_deterministic_and_does_not_open_weights(self):
         original=Path.open

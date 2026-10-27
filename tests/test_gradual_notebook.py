@@ -24,7 +24,7 @@ class GradualNotebookTests(unittest.TestCase):
         self.assertEqual(notebook["metadata"]["accelerator"], "GPU")
         intro = notebook["cells"][0]["source"]
         self.assertIn("20 trabajos", intro)
-        self.assertIn("Revisión 1.0", intro)
+        self.assertIn("Revisión 1.1", intro)
         self.assertIn("etapa 5", intro)
         self.assertEqual([intro.index(name) for name in builder.MODEL_NAMES],
             sorted(intro.index(name) for name in builder.MODEL_NAMES))

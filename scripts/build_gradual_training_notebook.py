@@ -40,7 +40,7 @@ def build(code_revision, *, allow_unpublished_placeholder=False):
     value = {**previous, "cells": previous["cells"][:8]}
     value["cells"][0] = _markdown(
         "# 42 · Ajuste gradual de los codificadores seleccionados\n\n"
-        "**Revisión 1.0 · Plan metodológico v1.2 · GPU.**\n\n"
+        "**Revisión 1.1 · Plan metodológico v1.2 · GPU.**\n\n"
         "La campaña autorizada comprende **20 trabajos**: **DenseNet121, ViT-B/16, Skelex y MambaOut-Tiny**, "
         "cada uno en los mismos cinco pliegues de desarrollo, con semilla 2026. La selección se vuelve a "
         "comprobar contra los resultados completos y privados de las libretas 40 y 41; esta libreta no "
@@ -89,7 +89,8 @@ def build(code_revision, *, allow_unpublished_placeholder=False):
     value["cells"][7] = _code(locate)
     value["cells"] += [_markdown("## 4. Verificar la selección y preparar los 20 trabajos\n\n"
         "Se localizan los resultados completos de las libretas 40 y 41, se comprueban las predicciones y "
-        "métricas de desarrollo y se reconstruye la selección conforme al plan. El conjunto resultante "
+        "métricas de desarrollo y se reconstruye la selección conforme al plan. Se reconoce el cierre "
+        "autorizado aunque existan carpetas de intentos incompletos anteriores. El conjunto resultante "
         "debe ser DenseNet121, ViT-B/16, Skelex y MambaOut-Tiny. Si la evidencia no coincide, la preparación "
         "se detiene. Esta etapa no descarga pesos ni entrena; guarda una preparación verificable en Drive."),
         _code("""if CAMPAIGN != 'gradual_four_models':

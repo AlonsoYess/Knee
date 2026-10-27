@@ -82,27 +82,71 @@ def _relative(root, relative):
     return path
 
 
+def _summary_paths(root, number):
+    """Enumerate only bounded final-record locations, never weight payloads."""
+    if number == "40":
+        candidate = checked_path(root / previous.SUMMARY_FILENAME)
+        return [candidate] if candidate.is_file() else []
+    candidates = []
+    for count, path in enumerate(root.iterdir(), 1):
+        require(count <= previous.MAX_ATTEMPTS + 128, "bounded_screening_campaign_inventory_required")
+        if path.name.startswith("recovery_completion_") and checked_path(path).is_dir():
+            candidate = checked_path(path / recovery.SUMMARY_FILENAME)
+            if candidate.is_file():
+                candidates.append(candidate)
+    return candidates
+
+
+def find_authorized_campaign(records, campaign, package_sha256, authority_path=None):
+    """Find the approved completed source, ignoring unfinished/unapproved runs.
+
+    A folder manifest is not evidence that a run completed. Discovery uses the
+    exact final-summary digest authorized privately, then authenticates its
+    manifest and package. It never chooses by date, directory order or score.
+    """
+    families = {"densenet_frozen": "40", "remaining_encoders_frozen": "41"}
+    require(campaign in families and valid_sha(package_sha256), "registered_screening_source_family_and_package_required")
+    root = checked_path(records)
+    require(root.is_dir(), "existing_private_screening_records_required")
+    authority, _ = _authority(checked_path(authority_path) if authority_path is not None else root / AUTHORITY_FILENAME)
+    number = families[campaign]
+    expected_digest = authority[f"source{number}_summary_digest"]
+    matches, scanned = [], 0
+    for count, path in enumerate(root.iterdir(), 1):
+        require(count <= previous.MAX_DIRECT_CHILDREN, "bounded_private_screening_records_inventory_required")
+        if not path.name.startswith(previous.CAMPAIGN_PREFIX):
+            continue
+        path = checked_path(path)
+        if not path.is_dir():
+            continue
+        scanned += 1
+        require(scanned <= previous.MAX_PREVIOUS_RECORDS, "bounded_previous_screening_campaigns_required")
+        for candidate in _summary_paths(path, number):
+            summary, _ = recovery._small_json(candidate)
+            if digest(summary) == expected_digest:
+                matches.append(path)
+                break
+    require(len(matches) == 1, "one_privately_authorized_completed_screening_campaign_required:" + number)
+    selected = matches[0]
+    summary, _ = _source(selected, number, authority)
+    require(summary.get("campaign") == campaign and summary.get("development_package_sha256") == package_sha256,
+        "authorized_screening_source_family_or_package_mismatch")
+    return selected
+
+
 def _source(root, number, authority):
     root = checked_path(root)
     require(root.is_dir(), "existing_screening_campaign_directory_required")
     expected_digest = authority[f"source{number}_summary_digest"]
-    if number == "40":
-        candidates = [root / previous.SUMMARY_FILENAME]
-    else:
-        candidates = []
-        for count, path in enumerate(root.iterdir(), 1):
-            require(count <= previous.MAX_ATTEMPTS + 128, "bounded_screening_campaign_inventory_required")
-            if path.name.startswith("recovery_completion_") and checked_path(path).is_dir():
-                candidate = path / recovery.SUMMARY_FILENAME
-                if candidate.is_file():
-                    candidates.append(candidate)
     matches = []
-    for path in candidates:
+    for path in _summary_paths(root, number):
         summary, checksum = recovery._small_json(path)
         if digest(summary) == expected_digest:
             matches.append((path, summary, checksum))
     require(len(matches) == 1, "one_exact_privately_authorized_screening_summary_required:" + number)
     path, summary, checksum = matches[0]
+    require(summary.get("persistent_campaign_folder") == root.name,
+        "authorized_screening_summary_must_name_its_campaign_folder")
     if number == "40":
         previous.validate_result(summary, "densenet_frozen")
         core_record, core_sha = recovery._small_json(root / core.FILENAME, summary["core_record_sha256"])
