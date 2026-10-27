@@ -1,9 +1,9 @@
 {
   "version": "gradual_campaign_notebook_publication_v1.0",
-  "code_revision": "ebfd8e7b45af9f73a1bbe95139d5d48b79471bb6",
-  "notebook_revision": "1.0",
+  "code_revision": "8f9832fac7e53862f0c16020c82898e5cb6a74e6",
+  "notebook_revision": "1.1",
   "notebook_path": "notebooks/42_entrenar_ajuste_gradual_cinco_pliegues.ipynb",
-  "notebook_sha256": "d0e198e5220c712662f5be5789a6af680c5db4af0c0964d62e203bde31e577dc",
+  "notebook_sha256": "28ceaac0105943a68dc22b9f8d179330c1b398a6bb0a13c6cfea7073d9379400",
   "campaign": "gradual_four_models",
   "model_order": [
     "image_densenet121",
@@ -35,7 +35,7 @@
   },
   "final_focused_regression": {
     "passed": true,
-    "tests_run": 118,
+    "tests_run": 123,
     "skipped": 0,
     "cuda_build_metadata_simulated": true,
     "actual_gpu_compute": false
@@ -46,5 +46,8 @@
     11
   ],
   "completed_jobs_fast_recovery_synthetic_verified": true,
-  "source_payload_verification_before_any_weight_reuse_required": true
+  "source_payload_verification_before_any_weight_reuse_required": true,
+  "source_discovery_uses_exact_private_approved_summary": true,
+  "incomplete_previous_campaigns_do_not_count_as_completed": true,
+  "actual_private_metadata_discovery_replay_verified": true
 }
