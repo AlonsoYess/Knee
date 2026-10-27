@@ -1,0 +1,50 @@
+{
+  "version": "gradual_campaign_notebook_publication_v1.0",
+  "code_revision": "ebfd8e7b45af9f73a1bbe95139d5d48b79471bb6",
+  "notebook_revision": "1.0",
+  "notebook_path": "notebooks/42_entrenar_ajuste_gradual_cinco_pliegues.ipynb",
+  "notebook_sha256": "d0e198e5220c712662f5be5789a6af680c5db4af0c0964d62e203bde31e577dc",
+  "campaign": "gradual_four_models",
+  "model_order": [
+    "image_densenet121",
+    "image_vit_b16",
+    "image_skelex",
+    "image_mambaout_tiny"
+  ],
+  "stage": "stage_2",
+  "screening_selection_reauthenticated": true,
+  "training_recipe_changed": false,
+  "five_participant_folds_preserved": true,
+  "maximum_epochs": 60,
+  "head_only_epochs": 5,
+  "last_block_epochs": 5,
+  "epoch_resume_full_model_and_optimizer": true,
+  "retained_epoch_generations": 2,
+  "typed_confirmation_required": false,
+  "private_path_defaults_in_drive_only": true,
+  "private_screening_authority_in_drive_only": true,
+  "reserved_test_access_authorized": false,
+  "fusion_authorized": false,
+  "calibration_authorized": false,
+  "participant_training_executed_by_assistant": false,
+  "real_gpu_executed_by_assistant": false,
+  "broad_cpu_regression": {
+    "passed": true,
+    "tests_run": 605,
+    "skipped": 0
+  },
+  "final_focused_regression": {
+    "passed": true,
+    "tests_run": 118,
+    "skipped": 0,
+    "cuda_build_metadata_simulated": true,
+    "actual_gpu_compute": false
+  },
+  "epoch_replay_synthetic_cpu_exact_after_epochs": [
+    3,
+    6,
+    11
+  ],
+  "completed_jobs_fast_recovery_synthetic_verified": true,
+  "source_payload_verification_before_any_weight_reuse_required": true
+}
