@@ -60,11 +60,15 @@ def setup_runtime(repository_root, destination, campaign="clinical"):
 
 
 def run_tests(repository_root):
+    import torch
     import unittest
     repository = checked_path(repository_root)
     require(checked_path(__file__).resolve() == repository.resolve() / "src/knee/methodology_campaign_colab.py",
         "campaign_tests_must_use_selected_checkout")
     require(os.environ.get("CUDA_VISIBLE_DEVICES", "") == "", "campaign_synthetic_tests_must_hide_gpu")
+    require(not torch.cuda.is_available(), "campaign_synthetic_tests_must_compute_on_cpu")
+    test_runtime = ("gpu_build_cpu_compute_no_training" if torch.version.cuda is not None
+        else "synthetic_cpu_no_participant_training")
     sys.path.insert(0, str(repository / "tests"))
     with redirect_stdout(sys.stderr):
         loader = unittest.TestLoader()
@@ -75,7 +79,7 @@ def run_tests(repository_root):
     require(result.wasSuccessful() and result.testsRun == count and not result.skipped
         and not result.expectedFailures and not result.unexpectedSuccesses, "methodology_campaign_tests_not_complete")
     return {"passed": True, "tests_run": count, "skipped": 0, "scope": list(TEST_MODULES),
-        "test_runtime": "synthetic_cpu_no_participant_training"}
+        "test_runtime": test_runtime}
 
 
 def find_preparation(persistent_root):
@@ -364,7 +368,8 @@ def train(repository_root, preparation_dir, package_dir, reference_path, output_
     require(cpu_tests.get("passed") is True and cpu_tests.get("skipped") == 0
         and type(cpu_tests.get("tests_run")) is int and cpu_tests["tests_run"] > 0
         and cpu_tests.get("scope") == list(TEST_MODULES)
-        and cpu_tests.get("test_runtime") == "synthetic_cpu_no_participant_training",
+        and cpu_tests.get("test_runtime") == ("synthetic_cpu_no_participant_training"
+            if campaign == "clinical" else "gpu_build_cpu_compute_no_training"),
         "complete_methodology_campaign_synthetic_test_receipt_required")
     require(runtime.get("training_executed") is False and runtime.get("host_python_modified") is False
         and runtime.get("pretrained_weights_downloaded") is False

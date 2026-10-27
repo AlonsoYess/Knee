@@ -1,5 +1,6 @@
 """Synthetic campaign contracts only; actual fit/optimizer/backward are blocked."""
 from copy import deepcopy
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -15,12 +16,26 @@ from test_training_runner import fake_conventional_fit
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def synthetic_cpu_environment(execution_environment):
+    """Describe the artificial CPU receipt; never attest to the host runtime."""
+    if execution_environment != "local_cpu":
+        raise AssertionError("Only the synthetic local-CPU fixture may use this stub")
+    return {"execution_environment": "local_cpu", "colab_runtime_executed": False,
+        "local_rehearsal": True, "cpu_only_guard_passed": True,
+        "environment": {"python": "3.12.14", "numpy": "1.26.4",
+            "torch": "2.6.0+cpu", "torchvision": "0.21.0+cpu"}}
+
+
 def synthetic_preflight(directory):
     """Artificial receipt fixture, never a claim of real Colab execution."""
     from test_methodology_inputs_colab import fixture, MethodologyColabTests
     value = fixture(directory)
     helper = MethodologyColabTests()
-    core = helper.verify(value)
+    # This test fixture is also constructed by the GPU notebook's CPU-compute
+    # tests. Only its invented runtime receipt is simulated; all data checks,
+    # artifact hashes, persistence and no-training guards remain exercised.
+    with patch.object(subject.inputs, "_cpu_environment", side_effect=synthetic_cpu_environment):
+        core = helper.verify(value)
     # Explicit test-only simulation permits exercise of the real-record gate.
     core.update(execution_environment="google_colab_cpu", colab_runtime_executed=True, local_rehearsal=False)
     target = value["output"] / subject.inputs.CORE_FILENAME
@@ -135,6 +150,31 @@ class MethodologyCampaignTests(unittest.TestCase):
     def tearDownClass(cls):
         import torch
         torch.set_num_threads(cls.threads)
+
+    def test_synthetic_preflight_supports_hidden_cuda_build_and_restores_real_guard(self):
+        import torch
+        original_guard = subject.inputs._cpu_environment
+        with tempfile.TemporaryDirectory() as directory, \
+             patch.dict(os.environ, {"CUDA_VISIBLE_DEVICES": "", "COLAB_GPU": "0"}), \
+             patch.object(torch.cuda, "is_available", return_value=False), \
+             patch.object(torch.version, "cuda", "12.4"):
+            value = synthetic_preflight(directory)
+            self.assertEqual(value["core"]["development_knees"], 30)
+            self.assertIs(subject.inputs._cpu_environment, original_guard)
+            with self.assertRaisesRegex(ValueError, "cpu_only_pytorch_build_required"):
+                original_guard("local_cpu")
+
+    def test_real_cpu_preflight_still_rejects_a_hidden_cuda_build(self):
+        import torch
+        with patch.dict(os.environ, {"CUDA_VISIBLE_DEVICES": "", "COLAB_GPU": "0"}), \
+             patch.object(torch.cuda, "is_available", return_value=False), \
+             patch.object(torch.version, "cuda", "12.4"):
+            with self.assertRaisesRegex(ValueError, "cpu_only_pytorch_build_required"):
+                subject.inputs._cpu_environment("local_cpu")
+
+    def test_synthetic_runtime_stub_cannot_claim_real_colab_execution(self):
+        with self.assertRaisesRegex(AssertionError, "synthetic local-CPU"):
+            synthetic_cpu_environment("google_colab_cpu")
 
     def test_clinical_campaign_contains_every_scenario_algorithm_fold_once(self):
         requests = subject.requests("clinical", "a" * 64, "b" * 64, self.plan, self.registry)

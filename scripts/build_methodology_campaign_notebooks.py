@@ -48,6 +48,7 @@ def build(code_revision, campaign, *, allow_unpublished_placeholder=False):
         raise ValueError("registered_methodology_campaign_required")
     clinical = campaign == "clinical"
     number, resource = (39, "CPU") if clinical else (40, "GPU")
+    notebook_revision = "1.0" if clinical else "1.1"
     old_builder = "build_training_preparation_notebook.py" if clinical else "build_training_smoke_notebook.py"
     old_module = "training_preparation_colab" if clinical else "training_smoke_colab"
     old_prefix = "knee_training_preparation34_" if clinical else "knee_training_smoke35_"
@@ -59,6 +60,12 @@ def build(code_revision, campaign, *, allow_unpublished_placeholder=False):
         raise ValueError("bounded_campaign_bootstrap_source_changed")
     bootstrap = bootstrap.replace(expected_import, "from knee import methodology_campaign_colab as orchestration")
     bootstrap = bootstrap.replace(old_prefix, f"knee_methodology{number}_")
+    if not clinical:
+        previous_error = "La prueba breve se detuvo. Conserva el error; no intentes entrenamiento completo."
+        if previous_error not in bootstrap:
+            raise ValueError("bounded_campaign_pretraining_error_source_changed")
+        bootstrap = bootstrap.replace(previous_error,
+            "La comprobación previa de la campaña se detuvo. Conserva el error; no inicies entrenamiento.")
     bootstrap += f"\nCAMPAIGN = {campaign!r}\n"
     title = ("39 · Modelos clínicos: tres escenarios y cinco pliegues" if clinical else
         "40 · DenseNet121 congelado con aumento de intensidad")
@@ -80,8 +87,11 @@ def build(code_revision, campaign, *, allow_unpublished_placeholder=False):
         "Un ensayo local o una comprobación sin guardar no satisfacen este requisito.")
     if not clinical:
         prerequisite += " También se autentica la prueba GPU 35 ya completada."
+    synthetic_runtime = ("" if clinical else
+        " Las pruebas calculan en CPU con la compilación de PyTorch que incluye soporte para GPU. "
+        "La GPU permanece oculta durante estas comprobaciones; no se entrena con datos de participantes.")
     stages = [
-        _markdown(f"# {title}\n\n**Revisión 1.0 · Plan metodológico v1.2. Selecciona {resource}.**\n\n"
+        _markdown(f"# {title}\n\n**Revisión {notebook_revision} · Plan metodológico v1.2. Selecciona {resource}.**\n\n"
             + scope + "\n\n" + prerequisite + "\n\n" + history + "\n\n"
             "Esta libreta queda preparada para una ejecución posterior por el investigador. "
             "Las primeras celdas preparan el entorno y comprueban sus entradas. **El entrenamiento solo comienza "
@@ -103,7 +113,8 @@ print('Intérprete preparado. Todavía no se entrenó ningún trabajo.')
 """),
         _markdown("## 2. Comprobar la implementación con datos sintéticos\n\n"
             "Se prueban los escenarios clínicos, el aumento, la autorización y la recuperación de trabajos. "
-            "Estas pruebas no ajustan modelos reales. Cualquier fallo u omisión detiene la libreta."),
+            "Estas pruebas no ajustan modelos reales. Cualquier fallo u omisión detiene la libreta."
+            + synthetic_runtime),
         _code("""TEST_ENV = dict(RUN_ENV)
 TEST_ENV.update(CUDA_VISIBLE_DEVICES='', COLAB_GPU='0')
 CPU_TESTS = json.loads(checked_run([str(NEURAL_PYTHON), '-B', str(REPO_DIR / 'scripts/train_methodology_campaign_colab.py'), '--operation', 'tests', '--campaign', CAMPAIGN, '--repository-root', str(REPO_DIR)], cwd=REPO_DIR, env=TEST_ENV))
