@@ -48,7 +48,7 @@ def build(code_revision, campaign, *, allow_unpublished_placeholder=False):
         raise ValueError("registered_methodology_campaign_required")
     clinical = campaign == "clinical"
     number, resource = (39, "CPU") if clinical else (40, "GPU")
-    notebook_revision = "1.0" if clinical else "1.1"
+    notebook_revision = "1.0" if clinical else "1.2"
     old_builder = "build_training_preparation_notebook.py" if clinical else "build_training_smoke_notebook.py"
     old_module = "training_preparation_colab" if clinical else "training_smoke_colab"
     old_prefix = "knee_training_preparation34_" if clinical else "knee_training_smoke35_"
@@ -162,6 +162,7 @@ orchestration._save(RUNTIME_RECEIPT, runtime)
 arguments = [str(NEURAL_PYTHON), '-u', '-B', str(REPO_DIR / 'scripts/train_methodology_campaign_colab.py'), '--operation', 'train', '--campaign', CAMPAIGN, '--repository-root', str(REPO_DIR), '--preparation-dir', str(PREPARATION_DIR), '--package-dir', str(LOCAL_PACKAGE_DIR), '--reference-path', str(LOCAL_REFERENCE), '--output-dir', str(LOCAL_OUTPUT), '--records-root', str(PERSISTENT_ROOT), '--code-revision', CODE_REVISION, '--test-receipt', str(TEST_RECEIPT), '--runtime-receipt', str(RUNTIME_RECEIPT), '--approval-statement', orchestration.APPROVAL_STATEMENTS[CAMPAIGN]]
 if CAMPAIGN == 'densenet_frozen':
     WEIGHTS_ROOT = SESSION_ROOT / 'verified_public_weights'
+    WEIGHTS_ROOT.mkdir(exist_ok=True)
     arguments.extend(['--weights-root', str(WEIGHTS_ROOT)])
 print('Iniciando únicamente la campaña confirmada del plan v1.2. Cada trabajo completo se guardará en Drive…', flush=True)
 training_log = training_run(arguments, cwd=REPO_DIR, env=RUN_ENV)

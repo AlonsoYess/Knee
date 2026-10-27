@@ -5,7 +5,10 @@ import importlib.util
 import io
 import json
 from pathlib import Path
+from tempfile import TemporaryDirectory
+from types import SimpleNamespace
 import unittest
+from unittest.mock import Mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -17,6 +20,107 @@ REVISION = "1234567890abcdef1234567890abcdef12345678"
 
 
 class MethodologyCampaignNotebooksTests(unittest.TestCase):
+    def _execute_generated_training_cell(self, campaign, *, authorized=True):
+        cells = builder.build(REVISION, campaign)["cells"]
+        source = next(cell["source"] for cell in cells
+            if cell["cell_type"] == "code" and "'--operation', 'train'" in cell["source"])
+        tree = ast.parse(source)
+        launchers = [node for node in tree.body
+            if isinstance(node, ast.FunctionDef) and node.name == "training_run"]
+        self.assertEqual(len(launchers), 1)
+        # Replace only the subprocess launcher; execute the real cell's consent,
+        # directory preparation, argument construction and result readback.
+        tree.body.remove(launchers[0])
+        with TemporaryDirectory(prefix="synthetic_campaign_cell_") as temporary:
+            root = Path(temporary)
+            session = root / "session"
+            package = session / "development"
+            reference = session / "reference" / "synthetic_reference.json"
+            repository = root / "repository"
+            preparation = root / "preparation"
+            records = root / "records"
+            for directory in (session, package, reference.parent, repository, preparation, records):
+                directory.mkdir(parents=True, exist_ok=True)
+            reference.write_text("{}", encoding="utf-8")
+            cache = session / "verified_public_weights"
+            environment = {"CUDA_VISIBLE_DEVICES": "0", "SYNTHETIC_FIXTURE": "1"}
+            summary = {"synthetic_cell_fixture": True, "campaign": campaign}
+            summary_name = "synthetic_campaign_summary.json"
+            approval = "SYNTHETIC APPROVAL " + campaign
+            confirmation = "SYNTHETIC CONFIRMATION " + campaign
+
+            def save(path, value):
+                Path(path).write_text(json.dumps(value), encoding="utf-8")
+
+            def training_run(arguments, **keywords):
+                self.assertEqual(keywords["cwd"], repository)
+                self.assertIs(keywords["env"], environment)
+                argument = lambda name: arguments[arguments.index(name) + 1]
+                self.assertEqual(argument("--operation"), "train")
+                self.assertEqual(argument("--campaign"), campaign)
+                self.assertEqual(argument("--approval-statement"), approval)
+                output = Path(argument("--output-dir"))
+                if campaign == "densenet_frozen":
+                    weights = Path(argument("--weights-root"))
+                    self.assertEqual(weights, cache)
+                    self.assertTrue(weights.is_dir(),
+                        "separate_existing_external_weights_cache_required")
+                    for other in (package, reference.parent, preparation, records, repository, output):
+                        self.assertFalse(weights.resolve().is_relative_to(other.resolve()))
+                        self.assertFalse(other.resolve().is_relative_to(weights.resolve()))
+                else:
+                    self.assertNotIn("--weights-root", arguments)
+                    self.assertFalse(cache.exists())
+                output.mkdir()
+                save(output / summary_name, summary)
+                return "synthetic launcher; no model execution"
+
+            orchestration = SimpleNamespace(CONFIRMATIONS={campaign: confirmation},
+                APPROVAL_STATEMENTS={campaign: approval}, SUMMARY_FILENAME=summary_name,
+                _save=Mock(side_effect=save), validate_result=Mock())
+            launcher = Mock(side_effect=training_run)
+            namespace = {"input": Mock(return_value=confirmation if authorized else "WRONG CONFIRMATION"),
+                "orchestration": orchestration, "CAMPAIGN": campaign, "SESSION_ROOT": session,
+                "CPU_TESTS": {"synthetic_test_receipt": True}, "runtime": {"synthetic_runtime_receipt": True},
+                "NEURAL_PYTHON": root / "synthetic_python", "REPO_DIR": repository,
+                "PREPARATION_DIR": preparation, "LOCAL_PACKAGE_DIR": package,
+                "LOCAL_REFERENCE": reference, "PERSISTENT_ROOT": records,
+                "CODE_REVISION": REVISION, "RUN_ENV": environment, "json": json,
+                "training_run": launcher}
+            before = sorted(str(path.relative_to(root)) for path in root.rglob("*"))
+            with redirect_stdout(io.StringIO()):
+                if authorized:
+                    exec(compile(tree, "generated_training_cell", "exec"), namespace)
+                else:
+                    with self.assertRaisesRegex(RuntimeError, "No se confirmó la campaña"):
+                        exec(compile(tree, "generated_training_cell", "exec"), namespace)
+            namespace["input"].assert_called_once()
+            if authorized:
+                launcher.assert_called_once()
+                self.assertEqual(orchestration._save.call_count, 2)
+                self.assertEqual(namespace["FINAL_CHECK"], summary)
+                orchestration.validate_result.assert_called_once_with(summary)
+                for name, value in (("synthetic_test_receipt.json", namespace["CPU_TESTS"]),
+                                    ("setup_receipt.json", namespace["runtime"])):
+                    self.assertEqual(json.loads((session / name).read_text(encoding="utf-8")), value)
+            else:
+                launcher.assert_not_called()
+                orchestration._save.assert_not_called()
+                orchestration.validate_result.assert_not_called()
+                self.assertFalse(cache.exists())
+                self.assertEqual(sorted(str(path.relative_to(root)) for path in root.rglob("*")), before)
+
+    def test_densenet_training_cell_prepares_separate_weights_cache_before_launch(self):
+        self._execute_generated_training_cell("densenet_frozen")
+
+    def test_clinical_training_cell_neither_creates_nor_passes_weights_cache(self):
+        self._execute_generated_training_cell("clinical")
+
+    def test_unconfirmed_training_cell_creates_nothing_and_does_not_launch(self):
+        for campaign in builder.NOTEBOOKS:
+            with self.subTest(campaign=campaign):
+                self._execute_generated_training_cell(campaign, authorized=False)
+
     def test_each_notebook_is_clean_and_has_exact_revision(self):
         for campaign in builder.NOTEBOOKS:
             with self.subTest(campaign=campaign):
@@ -77,7 +181,7 @@ class MethodologyCampaignNotebooksTests(unittest.TestCase):
         clinical = builder.build(REVISION, "clinical")
         image = builder.build(REVISION, "densenet_frozen")
         self.assertIn("Revisión 1.0", clinical["cells"][0]["source"])
-        self.assertIn("Revisión 1.1", image["cells"][0]["source"])
+        self.assertIn("Revisión 1.2", image["cells"][0]["source"])
         clinical_tests = next(cell["source"] for cell in clinical["cells"]
             if cell["cell_type"] == "markdown" and cell["source"].startswith("## 2."))
         image_tests = next(cell["source"] for cell in image["cells"]
