@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import hashlib
 import importlib.util
 import json
 from pathlib import Path
@@ -35,12 +36,16 @@ def _code(source):
     return {"cell_type": "code", "metadata": {}, "execution_count": None, "outputs": [], "source": source}
 
 
-def build(code_revision, *, allow_unpublished_placeholder=False):
+def build(code_revision, *, supervision_revision=None, allow_unpublished_placeholder=False):
+    supervision_revision = supervision_revision or code_revision
+    import re
+    if not re.fullmatch(r"[0-9a-f]{40}", supervision_revision) or supervision_revision == "0" * 40:
+        raise ValueError("published_supervision_revision_required")
     previous = _previous().build(code_revision, allow_unpublished_placeholder=allow_unpublished_placeholder)
     value = {**previous, "cells": previous["cells"][:8]}
     value["cells"][0] = _markdown(
         "# 42 · Ajuste gradual de los codificadores seleccionados\n\n"
-        "**Revisión 1.1 · Plan metodológico v1.2 · GPU.**\n\n"
+        "**Revisión 1.2 · Plan metodológico v1.2 · GPU.**\n\n"
         "La campaña autorizada comprende **20 trabajos**: **DenseNet121, ViT-B/16, Skelex y MambaOut-Tiny**, "
         "cada uno en los mismos cinco pliegues de desarrollo, con semilla 2026. La selección se vuelve a "
         "comprobar contra los resultados completos y privados de las libretas 40 y 41; esta libreta no "
@@ -57,6 +62,12 @@ def build(code_revision, *, allow_unpublished_placeholder=False):
         "las dos generaciones recientes verificadas de cada trabajo; una época interrumpida antes de "
         "guardarse se repite. Para retomar un pliegue, conserva esta revisión y el mismo tipo de GPU y entorno; "
         "si no son compatibles, la libreta se detiene y conserva el avance. Ejecuta una sola sesión de esta campaña.\n\n"
+        "La supervisión guarda en Drive el consumo de RAM y GPU, los mensajes y el cierre de cada intento. "
+        "Un fallo HTTP 502, 503 o 504 identificado admite un único reintento. Una interrupción desconocida, "
+        "un problema de memoria o una incompatibilidad detienen la ejecución con un registro; no se cambia "
+        "la receta para eludirlos. Si desaparece el entorno completo de Colab, vuelve a ejecutar las etapas "
+        "desde el inicio para consultar el último registro y recuperar el avance. El código no puede "
+        "reiniciar por sí mismo un entorno de Colab desconectado.\n\n"
         "Las primeras cuatro etapas preparan y comprueban las entradas. **El entrenamiento comienza al "
         "ejecutar la etapa 5**, de acuerdo con la autorización ya otorgada; no se solicita una nueva frase "
         "ni es necesario escribir rutas. Los originales y las particiones no se modifican. La prueba "
@@ -67,6 +78,32 @@ def build(code_revision, *, allow_unpublished_placeholder=False):
              "from knee import gradual_campaign_colab as orchestration"),
             ("CAMPAIGN = 'remaining_encoders_frozen'", "CAMPAIGN = 'gradual_four_models'")):
         bootstrap = _replace_once(bootstrap, old, new)
+    support_paths = ("scripts/colab_training_supervisor.py", "tests/test_colab_training_supervisor.py")
+    root = Path(__file__).resolve().parents[1]
+    support_hashes = {name: hashlib.sha256((root / name).read_bytes()).hexdigest() for name in support_paths}
+    bootstrap += """\n# Operational helper is independently pinned; the frozen training checkout stays unchanged.
+import hashlib, importlib.util
+SUPERVISION_REVISION = __SUPERVISION_REVISION__
+SUPPORT_HASHES = __SUPPORT_HASHES__
+SUPPORT_DIR = SESSION_ROOT / 'supervision'
+for relative, expected_hash in SUPPORT_HASHES.items():
+    support_url = 'https://raw.githubusercontent.com/AlonsoYess/Knee/' + SUPERVISION_REVISION + '/' + relative
+    with urllib.request.urlopen(support_url, timeout=60) as response:
+        if response.geturl() != support_url:
+            raise RuntimeError('La descarga de la supervisión cambió de ubicación.')
+        payload = response.read(1024**2 + 1)
+    if len(payload) > 1024**2 or hashlib.sha256(payload).hexdigest() != expected_hash:
+        raise RuntimeError('La supervisión descargada no coincide con la revisión publicada.')
+    destination = SUPPORT_DIR / relative
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with destination.open('xb') as stream:
+        stream.write(payload)
+support_spec = importlib.util.spec_from_file_location('knee_colab_supervision42', SUPPORT_DIR / 'scripts/colab_training_supervisor.py')
+supervision = importlib.util.module_from_spec(support_spec)
+sys.modules[support_spec.name] = supervision
+support_spec.loader.exec_module(supervision)
+print('Supervisión operativa verificada; el código de entrenamiento conserva su revisión original.')
+""".replace("__SUPERVISION_REVISION__", repr(supervision_revision)).replace("__SUPPORT_HASHES__", repr(support_hashes))
     value["cells"][1] = _code(bootstrap)
     for cell in value["cells"]:
         if cell["cell_type"] == "code":
@@ -74,7 +111,14 @@ def build(code_revision, *, allow_unpublished_placeholder=False):
                 "scripts/train_gradual_campaign_colab.py")
     value["cells"][4] = _markdown("## 2. Comprobar la implementación con datos sintéticos\n\n"
         "Se comprueban el alcance, la selección, la recuperación y la separación entre preparación y "
-        "entrenamiento. Las pruebas utilizan CPU con la GPU oculta y no abren datos de participantes.")
+        "entrenamiento. También se prueba la supervisión con procesos pequeños sintéticos. Las pruebas "
+        "utilizan CPU con la GPU oculta y no abren datos de participantes.")
+    value["cells"][5] = _code(value["cells"][5]["source"] + """
+SUPERVISION_TEST_ENV = dict(os.environ)
+SUPERVISION_TEST_ENV.update(CUDA_VISIBLE_DEVICES='', COLAB_GPU='0', PYTHONDONTWRITEBYTECODE='1', KNEE_FROZEN_REPOSITORY=str(REPO_DIR))
+supervision_tests = checked_run([sys.executable, '-B', '-m', 'unittest', 'discover', '-s', str(SUPPORT_DIR / 'tests'), '-p', 'test_colab_training_supervisor.py', '-v'], cwd=SUPPORT_DIR, env=SUPERVISION_TEST_ENV)
+print('Pruebas de supervisión aprobadas: procesos sintéticos en CPU, sin entrenamiento de participantes.')
+""")
     value["cells"][6] = _markdown("## 3. Reconstruir únicamente las entradas de desarrollo\n\n"
         "Las carpetas se leen de la misma configuración privada utilizada en la libreta 41. Se comprueban "
         "las partes del paquete y la referencia de entradas. Esta etapa no selecciona datos nuevos ni "
@@ -86,6 +130,8 @@ def build(code_revision, *, allow_unpublished_placeholder=False):
     locate = _replace_once(locate,
         "print('Comprobación 38 localizada. Paquete de desarrollo reconstruido y verificado.')",
         "print('Paquete de desarrollo reconstruido y verificado. No se inició entrenamiento.')")
+    locate = _replace_once(locate, "LOCAL_PACKAGE_DIR = SESSION_ROOT",
+        "supervision.show_previous(PERSISTENT_ROOT)\nLOCAL_PACKAGE_DIR = SESSION_ROOT")
     value["cells"][7] = _code(locate)
     value["cells"] += [_markdown("## 4. Verificar la selección y preparar los 20 trabajos\n\n"
         "Se localizan los resultados completos de las libretas 40 y 41, se comprueban las predicciones y "
@@ -110,15 +156,17 @@ PREPARATION_CHECK = json.loads(checked_run([str(NEURAL_PYTHON), '-B', str(REPO_D
 orchestration.validate_preparation_receipt(REPO_DIR, PREPARATION_DIR, code_revision=CODE_REVISION)
 print('Preparación verificada y guardada. Esta etapa no ejecutó entrenamiento.')
 """)]
-    progress = next(ast.get_source_segment(previous["cells"][9]["source"], node)
-        for node in ast.parse(previous["cells"][9]["source"]).body
-        if isinstance(node, ast.FunctionDef) and node.name == "training_run")
     run = """if CAMPAIGN != 'gradual_four_models':
     raise RuntimeError('Esta libreta no autoriza otra campaña.')
 orchestration.validate_preparation_receipt(REPO_DIR, PREPARATION_DIR, code_revision=CODE_REVISION)
-import queue, threading, time, uuid
+import uuid
 
-__PROGRESS__
+def training_run(arguments, *, cwd, env):
+    outcome = supervision.run(arguments, cwd=cwd, env=env, records_root=PERSISTENT_ROOT,
+        session_root=SESSION_ROOT, code_revision=CODE_REVISION, sample_interval=2,
+        heartbeat_interval=30, max_retries=1, retry_delay=30)
+    globals()['LOCAL_OUTPUT'] = outcome.output_dir
+    return outcome.stdout
 
 WEIGHTS_ROOT = SESSION_ROOT / 'verified_public_weights'
 WEIGHTS_ROOT.mkdir(exist_ok=True)
@@ -128,12 +176,14 @@ training_log = training_run([str(NEURAL_PYTHON), '-u', '-B', str(REPO_DIR / 'scr
 FINAL_CHECK = json.loads((LOCAL_OUTPUT / orchestration.SUMMARY_FILENAME).read_text(encoding='utf-8'))
 orchestration.validate_result(FINAL_CHECK)
 print('Campaña gradual terminada y guardada en Drive. La prueba reservada permanece cerrada.')
-""".replace("__PROGRESS__", progress)
+"""
     value["cells"] += [_markdown("## 5. Ejecutar el ajuste gradual autorizado\n\n"
         "Esta celda inicia la comprobación GPU y los trabajos pendientes. Se conserva la receta aprobada "
         "y cada pliegue mantiene sus participantes separados. El progreso muestra modelo, pliegue y época; "
         "los guardados permiten recuperar las épocas completas después de una interrupción. Los resultados "
-        "se guardan en la misma carpeta privada de registros."), _code(run),
+        "se guardan en la misma carpeta privada de registros. Si el entorno desaparece sin cierre, la "
+        "supervisión conserva el último consumo observado sin atribuir automáticamente la causa a memoria. "
+        "No inicies otra sesión de esta campaña en paralelo."), _code(run),
         _markdown("## 6. Mostrar el resultado\n\n"
         "Comparte únicamente el JSON final. Las predicciones individuales, los modelos y los estados "
         "de recuperación permanecen privados. Las métricas corresponden a desarrollo y no sustituyen "
@@ -153,10 +203,12 @@ print('Campaña gradual terminada y guardada en Drive. La prueba reservada perma
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--code-revision", required=True)
+    parser.add_argument("--supervision-revision", required=True)
     parser.add_argument("--allow-unpublished-placeholder", action="store_true")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
-    value = build(args.code_revision, allow_unpublished_placeholder=args.allow_unpublished_placeholder)
+    value = build(args.code_revision, supervision_revision=args.supervision_revision,
+                  allow_unpublished_placeholder=args.allow_unpublished_placeholder)
     target = args.output or Path(__file__).resolve().parents[1] / NOTEBOOK_PATH
     target.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
 

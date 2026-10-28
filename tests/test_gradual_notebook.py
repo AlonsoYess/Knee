@@ -6,6 +6,7 @@ import io
 import json
 from pathlib import Path, PurePosixPath
 import tempfile
+import sys
 from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock
@@ -24,7 +25,7 @@ class GradualNotebookTests(unittest.TestCase):
         self.assertEqual(notebook["metadata"]["accelerator"], "GPU")
         intro = notebook["cells"][0]["source"]
         self.assertIn("20 trabajos", intro)
-        self.assertIn("Revisión 1.1", intro)
+        self.assertIn("Revisión 1.2", intro)
         self.assertIn("etapa 5", intro)
         self.assertEqual([intro.index(name) for name in builder.MODEL_NAMES],
             sorted(intro.index(name) for name in builder.MODEL_NAMES))
@@ -161,6 +162,7 @@ class GradualNotebookTests(unittest.TestCase):
             stage = Mock(return_value={"synthetic": True})
             namespace = {"Path": Path, "PurePosixPath": PurePosixPath, "MY_DRIVE_ROOT": drive,
                 "SESSION_ROOT": session, "os": SimpleNamespace(environ={}),
+                "supervision": SimpleNamespace(show_previous=Mock()),
                 "orchestration": SimpleNamespace(checked_path=checked_path, stage_development=stage,
                     _json=lambda p: json.loads(Path(p).read_text()))}
             with redirect_stdout(io.StringIO()):
@@ -168,6 +170,70 @@ class GradualNotebookTests(unittest.TestCase):
             stage.assert_called_once_with(package, session / "development",
                 session / "reference/model_inputs_loading_reference_v1.json")
             self.assertEqual(namespace["PERSISTENT_ROOT"], records)
+
+    def test_supervision_is_independently_pinned_without_changing_training_revision(self):
+        support_revision = "f" * 40
+        notebook = builder.build(REVISION, supervision_revision=support_revision)
+        source = notebook["cells"][1]["source"]
+        self.assertIn("CODE_REVISION = " + repr(REVISION), source)
+        self.assertIn("SUPERVISION_REVISION = " + repr(support_revision), source)
+        self.assertIn("hashlib.sha256(payload).hexdigest() != expected_hash", source)
+        self.assertIn("SUPPORT_DIR = SESSION_ROOT / 'supervision'", source)
+        self.assertNotIn("REPO_DIR / 'scripts/colab_training_supervisor.py'", source)
+        self.assertIn("supervision.show_previous(PERSISTENT_ROOT)", notebook["cells"][7]["source"])
+        self.assertIn("sys.executable", notebook["cells"][5]["source"])
+        self.assertIn("KNEE_FROZEN_REPOSITORY=str(REPO_DIR)", notebook["cells"][5]["source"])
+
+    def test_supervised_training_reads_the_successful_retry_output_directory(self):
+        source = builder.build(REVISION)["cells"][11]["source"]
+        tree = ast.parse(source)
+        function = next(n for n in tree.body if isinstance(n, ast.FunctionDef))
+        outcome = SimpleNamespace(stdout="synthetic final result", output_dir=Path("successful_retry"))
+        module = SimpleNamespace(run=Mock(return_value=outcome))
+        namespace = {"supervision": module, "PERSISTENT_ROOT": Path("records"),
+                     "SESSION_ROOT": Path("session"), "CODE_REVISION": REVISION,
+                     "LOCAL_OUTPUT": Path("first_attempt")}
+        exec(compile(ast.Module(body=[function], type_ignores=[]), "supervised_cell", "exec"), namespace)
+        text = namespace["training_run"](["synthetic"], cwd=Path("repo"), env={"synthetic": "true"})
+        self.assertEqual(text, outcome.stdout)
+        self.assertEqual(namespace["LOCAL_OUTPUT"], outcome.output_dir)
+        self.assertEqual(module.run.call_args.kwargs["code_revision"], REVISION)
+        self.assertEqual(module.run.call_args.kwargs["max_retries"], 1)
+
+    def _support_bootstrap(self, *, corrupt=False):
+        notebook = builder.build(REVISION, supervision_revision="f" * 40)
+        source = notebook["cells"][1]["source"].split(
+            "# Operational helper is independently pinned; the frozen training checkout stays unchanged.", 1)[1]
+        class Response:
+            def __init__(self, url):
+                self.url = url
+            def __enter__(self):
+                return self
+            def __exit__(self, *args):
+                return False
+            def geturl(self):
+                return self.url
+            def read(self, maximum):
+                relative = self.url.split("/" + "f" * 40 + "/", 1)[1]
+                return b"changed" if corrupt else (ROOT / relative).read_bytes()[:maximum]
+        with tempfile.TemporaryDirectory(prefix="independent_support_") as directory:
+            namespace = {"SESSION_ROOT": Path(directory), "sys": sys,
+                         "urllib": SimpleNamespace(request=SimpleNamespace(urlopen=lambda url, **kw: Response(url)))}
+            with redirect_stdout(io.StringIO()):
+                if corrupt:
+                    with self.assertRaises(RuntimeError):
+                        exec(compile(source, "support_bootstrap", "exec"), namespace)
+                else:
+                    exec(compile(source, "support_bootstrap", "exec"), namespace)
+                    self.assertTrue(callable(namespace["supervision"].run))
+                    self.assertTrue((Path(directory) / "supervision/tests/test_colab_training_supervisor.py").is_file())
+            sys.modules.pop("knee_colab_supervision42", None)
+
+    def test_independent_helper_bootstrap_loads_verified_bytes_without_core_edits(self):
+        self._support_bootstrap()
+
+    def test_independent_helper_bootstrap_rejects_changed_bytes_before_execution(self):
+        self._support_bootstrap(corrupt=True)
 
     def test_cli_exposes_only_bounded_prepare_and_training(self):
         source = (ROOT / "scripts/train_gradual_campaign_colab.py").read_text(encoding="utf-8")
