@@ -1,9 +1,9 @@
 {
   "version": "gradual_campaign_notebook_publication_v1.0",
   "code_revision": "8f9832fac7e53862f0c16020c82898e5cb6a74e6",
-  "notebook_revision": "1.1",
+  "notebook_revision": "1.2",
   "notebook_path": "notebooks/42_entrenar_ajuste_gradual_cinco_pliegues.ipynb",
-  "notebook_sha256": "28ceaac0105943a68dc22b9f8d179330c1b398a6bb0a13c6cfea7073d9379400",
+  "notebook_sha256": "d46bcdfc0eebea27e6c82c544d1447142a0340038e42b5edbe3b475029c5fa15",
   "campaign": "gradual_four_models",
   "model_order": [
     "image_densenet121",
@@ -28,18 +28,6 @@
   "calibration_authorized": false,
   "participant_training_executed_by_assistant": false,
   "real_gpu_executed_by_assistant": false,
-  "broad_cpu_regression": {
-    "passed": true,
-    "tests_run": 605,
-    "skipped": 0
-  },
-  "final_focused_regression": {
-    "passed": true,
-    "tests_run": 123,
-    "skipped": 0,
-    "cuda_build_metadata_simulated": true,
-    "actual_gpu_compute": false
-  },
   "epoch_replay_synthetic_cpu_exact_after_epochs": [
     3,
     6,
@@ -49,5 +37,60 @@
   "source_payload_verification_before_any_weight_reuse_required": true,
   "source_discovery_uses_exact_private_approved_summary": true,
   "incomplete_previous_campaigns_do_not_count_as_completed": true,
-  "actual_private_metadata_discovery_replay_verified": true
+  "actual_private_metadata_discovery_replay_verified": true,
+  "historical_pre_supervision_regression": {
+    "broad_cpu_regression": {
+      "passed": true,
+      "tests_run": 605,
+      "skipped": 0
+    },
+    "final_focused_regression": {
+      "passed": true,
+      "tests_run": 123,
+      "skipped": 0,
+      "cuda_build_metadata_simulated": true,
+      "actual_gpu_compute": false
+    }
+  },
+  "supervision_revision": "5f51ef64a1cb975e095475334e8032ea9cf1057d",
+  "supervision_files_sha256": {
+    "scripts/colab_training_supervisor.py": "a013bfea31153b07f70f8f230dc07acd8c973edecaaca1c374f3c1ef9295dbc8",
+    "tests/test_colab_training_supervisor.py": "82b8e75c095eac4ebb253d7b6f9d27c1a4c208bdea9e19fcc64ff843c41cc4a3"
+  },
+  "broad_cpu_regression": {
+    "passed": true,
+    "tests_run": 151,
+    "skipped": 0,
+    "cuda_build_metadata_simulated": true,
+    "actual_gpu_compute": false,
+    "participant_training": false
+  },
+  "final_focused_regression": {
+    "passed": true,
+    "tests_run": 48,
+    "skipped": 0,
+    "scope": [
+      "test_colab_training_supervisor",
+      "test_gradual_notebook"
+    ],
+    "actual_gpu_compute": false,
+    "participant_training": false
+  },
+  "operational_supervision": {
+    "resource_samples_persisted_in_private_drive": true,
+    "sample_interval_seconds": 2,
+    "stdout_stderr_and_exit_code_persisted": true,
+    "unfinished_controller_cause_remains_unknown": true,
+    "whole_colab_runtime_auto_restart_possible": false,
+    "maximum_identified_transient_http_retries": 1,
+    "retry_http_statuses": [
+      502,
+      503,
+      504
+    ],
+    "unknown_sigkill_retried": false,
+    "memory_pressure_stops_without_recipe_changes": true,
+    "frozen_training_core_source_bytes_changed": false,
+    "monitor_cannot_guarantee_capturing_every_peak": true
+  }
 }
