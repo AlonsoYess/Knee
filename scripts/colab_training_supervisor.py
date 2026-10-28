@@ -13,6 +13,7 @@ import errno
 import json
 import os
 from pathlib import Path
+import platform
 import queue
 import re
 import shutil
@@ -23,7 +24,13 @@ import threading
 import time
 import uuid
 
-VERSION = "colab_training_supervisor_v1.0"
+VERSION = "colab_training_supervisor_v1.1"
+HOST_MEMORY_POLICY = "glibc_cpu_reclaim_v1.0"
+# GNU libc documents startup knobs for returning freed large CPU allocations:
+# https://sourceware.org/glibc/manual/latest/html_node/Malloc-Tunable-Parameters.html
+# These affect allocation/release, not layers, tensors, RNG, optimizer or batch size.
+HOST_MEMORY_ENV = {"MALLOC_MMAP_THRESHOLD_": "131072", "MALLOC_TRIM_THRESHOLD_": "131072",
+                   "MALLOC_ARENA_MAX": "2"}
 LOG_FOLDER = "gradual_runtime_logs"
 MEMORY_RESERVE = 768 * 1024 ** 2
 DISK_RESERVE = 2 * 1024 ** 3
@@ -43,6 +50,73 @@ def sanitize(text):
 
 def _now():
     return datetime.now(timezone.utc).isoformat()
+
+
+def host_memory_environment(environment, policy=None):
+    result = dict(environment)
+    record = {"enabled": False, "training_recipe_changed": False}
+    if policy is None:
+        return result, record
+    if policy != HOST_MEMORY_POLICY:
+        raise ValueError("registered_host_memory_policy_required")
+    if not sys.platform.startswith("linux") or platform.libc_ver()[0] != "glibc":
+        raise ValueError("host_memory_policy_requires_linux_glibc")
+    preload = str(result.get("LD_PRELOAD", "")).lower()
+    if any(name in preload for name in ("tcmalloc", "jemalloc", "mimalloc", "malloc_debug")):
+        raise ValueError("existing_preloaded_allocator_requires_explicit_review")
+    tunables = str(result.get("GLIBC_TUNABLES", ""))
+    if "glibc.malloc." in tunables:
+        raise ValueError("existing_glibc_allocator_tunables_require_explicit_review")
+    result.update(HOST_MEMORY_ENV)
+    record.update(enabled=True, version=HOST_MEMORY_POLICY, environment=dict(HOST_MEMORY_ENV),
+                  frozen_core_modified=False, checkpoint_format_changed=False)
+    return result, record
+
+
+_ALLOCATOR_MATH_PROBE = r'''
+import hashlib, json, torch
+torch.set_num_threads(1)
+torch.set_num_interop_threads(1)
+torch.use_deterministic_algorithms(True)
+torch.manual_seed(2026)
+model = torch.nn.Sequential(torch.nn.Linear(7, 11), torch.nn.GELU(), torch.nn.Linear(11, 1))
+optimizer = torch.optim.AdamW(model.parameters(), lr=0.001, foreach=False)
+x, y = torch.randn(9, 7), torch.randint(0, 2, (9, 1)).float()
+losses = []
+for _ in range(3):
+    optimizer.zero_grad(set_to_none=True)
+    loss = torch.nn.functional.binary_cross_entropy_with_logits(model(x), y)
+    loss.backward()
+    optimizer.step()
+    losses.append(loss.item())
+weights = hashlib.sha256()
+for name, value in sorted(model.state_dict().items()):
+    weights.update(name.encode())
+    weights.update(value.detach().numpy().tobytes())
+print(json.dumps({'weights_sha256':weights.hexdigest(),
+                  'rng_sha256':hashlib.sha256(bytes(torch.get_rng_state().tolist())).hexdigest(),
+                  'losses':losses,'synthetic_cpu_only':True,'participant_data_opened':False}))
+'''
+
+
+def verify_host_memory_math(python, original_env, proposed_env):
+    """Compare tiny synthetic CPU updates in fresh processes, with no pretrained data."""
+    proofs = []
+    for environment in (original_env, proposed_env):
+        child_env = dict(environment)
+        child_env.update(CUDA_VISIBLE_DEVICES="", COLAB_GPU="0", PYTHONDONTWRITEBYTECODE="1")
+        result = subprocess.run([str(python), "-B", "-c", _ALLOCATOR_MATH_PROBE],
+                                env=child_env, capture_output=True, text=True, timeout=90, check=False)
+        if result.returncode != 0 or len(result.stdout) > 16384:
+            raise ValueError("host_memory_synthetic_cpu_comparison_failed: " + sanitize(result.stderr[-1000:]))
+        proof = json.loads(result.stdout)
+        if not isinstance(proof, dict) or proof.get("synthetic_cpu_only") is not True or proof.get("participant_data_opened") is not False:
+            raise ValueError("bounded_host_memory_math_proof_required")
+        proofs.append(proof)
+    if proofs[0] != proofs[1]:
+        raise ValueError("host_memory_policy_changed_synthetic_updates_or_rng")
+    return {"synthetic_cpu_updates_and_rng_identical": True, "participant_data_opened": False,
+            "gpu_used": False, "capacity_sufficiency_proven": False, "proof": proofs[0]}
 
 
 def _read(path, limit=16384):
@@ -251,7 +325,8 @@ def show_previous(records_root):
     result = load_previous_status(records_root)
     if result is not None:
         fields = ("version", "state", "attempts", "returncode", "signal", "failure_kind",
-                  "last_progress", "last_sample", "resource_summary", "termination_cause_confirmed", "note")
+                  "last_progress", "last_sample", "resource_summary", "host_memory_policy",
+                  "supervisor_error", "termination_cause_confirmed", "note")
         print("Último registro operativo de la libreta 42 (no inicia entrenamiento):", flush=True)
         print(json.dumps({key: result[key] for key in fields if key in result}, ensure_ascii=False, indent=2), flush=True)
     return result
@@ -303,7 +378,7 @@ def _terminate(process):
 
 def run(arguments, *, cwd, env, records_root, session_root, code_revision,
         sample_interval=10, heartbeat_interval=30, max_retries=1, retry_delay=30,
-        sample_provider=None):
+        sample_provider=None, host_memory_policy=None):
     arguments = [str(x) for x in arguments]
     def argument(name):
         if arguments.count(name) != 1:
@@ -361,6 +436,14 @@ def run(arguments, *, cwd, env, records_root, session_root, code_revision,
         lease_owned = True
         _save(run_dir / "run.json", report)
         _save(logs / "latest.json", {"run_name": run_name})
+        child_env, policy_record = host_memory_environment(env, host_memory_policy)
+        report["host_memory_policy"] = policy_record
+        _save(run_dir / "run.json", report)
+        if policy_record["enabled"]:
+            print("Comprobando la gestión de RAM con dos procesos sintéticos en CPU; no se abren datos de participantes…", flush=True)
+            policy_record["verification"] = verify_host_memory_math(arguments[0], env, child_env)
+            _save(run_dir / "run.json", report)
+            print("Gestión de RAM preparada; pesos sintéticos, pérdidas y generador aleatorio coinciden. Se conserva el código congelado.", flush=True)
         for attempt in range(1, max_retries + 2):
             attempt_dir = run_dir / f"attempt_{attempt:03d}"
             attempt_dir.mkdir()
@@ -391,7 +474,7 @@ def run(arguments, *, cwd, env, records_root, session_root, code_revision,
                     _sync(telemetry)
                 persist_sample(initial)
                 if not pressure_reason:
-                    process = subprocess.Popen(command, cwd=cwd, env=env, text=True, bufsize=1,
+                    process = subprocess.Popen(command, cwd=cwd, env=child_env, text=True, bufsize=1,
                                                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                                start_new_session=os.name == "posix")
                     attempt_report["child"] = _identity(process.pid)
@@ -519,8 +602,11 @@ def run(arguments, *, cwd, env, records_root, session_root, code_revision,
         if isinstance(error, TrainingStopped):
             raise
         cancelled = isinstance(error, (KeyboardInterrupt, SystemExit))
+        policy_failure = isinstance(error, ValueError) and any(
+            marker in str(error) for marker in ("host_memory", "allocator", "linux_glibc"))
         report.update(state="cancelled" if cancelled else "failed", finished_at_utc=_now(),
-                      failure_kind="controller_cancelled" if cancelled else "supervisor_or_persistence_error",
+                      failure_kind="controller_cancelled" if cancelled else (
+                          "host_memory_policy_validation_error" if policy_failure else "supervisor_or_persistence_error"),
                       returncode=process.returncode if process is not None else None,
                       supervisor_error=sanitize(f"{type(error).__name__}: {error}")[:2000])
         # A Drive failure must never silently turn supervision off. Try local evidence too.

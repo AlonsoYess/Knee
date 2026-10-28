@@ -45,7 +45,7 @@ def build(code_revision, *, supervision_revision=None, allow_unpublished_placeho
     value = {**previous, "cells": previous["cells"][:8]}
     value["cells"][0] = _markdown(
         "# 42 · Ajuste gradual de los codificadores seleccionados\n\n"
-        "**Revisión 1.2 · Plan metodológico v1.2 · GPU.**\n\n"
+        "**Revisión 1.3 · Plan metodológico v1.2 · GPU.**\n\n"
         "La campaña autorizada comprende **20 trabajos**: **DenseNet121, ViT-B/16, Skelex y MambaOut-Tiny**, "
         "cada uno en los mismos cinco pliegues de desarrollo, con semilla 2026. La selección se vuelve a "
         "comprobar contra los resultados completos y privados de las libretas 40 y 41; esta libreta no "
@@ -68,6 +68,11 @@ def build(code_revision, *, supervision_revision=None, allow_unpublished_placeho
         "la receta para eludirlos. Si desaparece el entorno completo de Colab, vuelve a ejecutar las etapas "
         "desde el inicio para consultar el último registro y recuperar el avance. El código no puede "
         "reiniciar por sí mismo un entorno de Colab desconectado.\n\n"
+        "Esta revisión reduce la retención de asignaciones CPU liberadas mediante una política explícita "
+        "de GNU libc. Antes de iniciar datos reales, dos procesos sintéticos en CPU comprueban que las "
+        "pérdidas, pesos y estado aleatorio coinciden con y sin esa política. El código científico y el "
+        "formato de recuperación permanecen en la revisión original. La comprobación no demuestra que "
+        "cualquier modelo quepa en la RAM disponible; la protección de memoria sigue activa.\n\n"
         "Las primeras cuatro etapas preparan y comprueban las entradas. **El entrenamiento comienza al "
         "ejecutar la etapa 5**, de acuerdo con la autorización ya otorgada; no se solicita una nueva frase "
         "ni es necesario escribir rutas. Los originales y las particiones no se modifican. La prueba "
@@ -164,7 +169,8 @@ import uuid
 def training_run(arguments, *, cwd, env):
     outcome = supervision.run(arguments, cwd=cwd, env=env, records_root=PERSISTENT_ROOT,
         session_root=SESSION_ROOT, code_revision=CODE_REVISION, sample_interval=2,
-        heartbeat_interval=30, max_retries=1, retry_delay=30)
+        heartbeat_interval=30, max_retries=1, retry_delay=30,
+        host_memory_policy=supervision.HOST_MEMORY_POLICY)
     globals()['LOCAL_OUTPUT'] = outcome.output_dir
     return outcome.stdout
 

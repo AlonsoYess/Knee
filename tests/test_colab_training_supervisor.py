@@ -407,6 +407,85 @@ class SupervisorTests(unittest.TestCase):
         self.assertIn("parent done", outcome.stdout)
         self.assertEqual(outcome.attempts, 1)
 
+    def test_no_memory_policy_preserves_original_environment(self):
+        original = {"CUBLAS_WORKSPACE_CONFIG": ":4096:8", "OMP_NUM_THREADS": "2"}
+        result, record = supervisor.host_memory_environment(original)
+        self.assertEqual(result, original)
+        self.assertIsNot(result, original)
+        self.assertFalse(record["enabled"])
+
+    def test_host_memory_policy_only_adds_registered_cpu_allocator_controls(self):
+        original = {"CUBLAS_WORKSPACE_CONFIG": ":4096:8", "OMP_NUM_THREADS": "2", "CUDA_VISIBLE_DEVICES": "0"}
+        with patch.object(supervisor.sys, "platform", "linux"), \
+             patch.object(supervisor.platform, "libc_ver", return_value=("glibc", "2.35")):
+            result, record = supervisor.host_memory_environment(original, supervisor.HOST_MEMORY_POLICY)
+        self.assertEqual({k: result[k] for k in original}, original)
+        self.assertEqual({k: result[k] for k in result if k not in original}, supervisor.HOST_MEMORY_ENV)
+        self.assertTrue(record["enabled"])
+        self.assertFalse(record["frozen_core_modified"])
+        self.assertFalse(record["checkpoint_format_changed"])
+
+    def test_host_memory_policy_rejects_unknown_backends_or_policy(self):
+        with self.assertRaises(ValueError):
+            supervisor.host_memory_environment({}, "unregistered")
+        with patch.object(supervisor.sys, "platform", "win32"):
+            with self.assertRaisesRegex(ValueError, "linux_glibc"):
+                supervisor.host_memory_environment({}, supervisor.HOST_MEMORY_POLICY)
+        with patch.object(supervisor.sys, "platform", "linux"), \
+             patch.object(supervisor.platform, "libc_ver", return_value=("glibc", "2.35")):
+            for environment in ({"LD_PRELOAD": "/lib/libtcmalloc.so"},
+                                {"LD_PRELOAD": "/lib/libjemalloc.so"},
+                                {"GLIBC_TUNABLES": "glibc.malloc.arena_max=8"}):
+                with self.subTest(environment=environment), self.assertRaises(ValueError):
+                    supervisor.host_memory_environment(environment, supervisor.HOST_MEMORY_POLICY)
+
+    def test_memory_math_probe_hides_gpu_and_does_not_mutate_training_environment(self):
+        proof = {"synthetic_cpu_only": True, "participant_data_opened": False,
+                 "weights_sha256": "synthetic", "rng_sha256": "synthetic", "losses": [0.1]}
+        original = {"CUDA_VISIBLE_DEVICES": "0", "COLAB_GPU": "1"}
+        proposed = {**original, **supervisor.HOST_MEMORY_ENV}
+        response = type("Response", (), {"returncode": 0, "stdout": json.dumps(proof), "stderr": ""})()
+        with patch.object(supervisor.subprocess, "run", return_value=response) as process:
+            result = supervisor.verify_host_memory_math(sys.executable, original, proposed)
+        self.assertEqual(process.call_count, 2)
+        for call in process.call_args_list:
+            self.assertEqual(call.kwargs["env"]["CUDA_VISIBLE_DEVICES"], "")
+            self.assertEqual(call.kwargs["env"]["COLAB_GPU"], "0")
+        self.assertEqual(original, {"CUDA_VISIBLE_DEVICES": "0", "COLAB_GPU": "1"})
+        self.assertTrue(result["synthetic_cpu_updates_and_rng_identical"])
+        self.assertFalse(result["capacity_sufficiency_proven"])
+
+    def test_memory_math_probe_rejects_different_numerical_updates(self):
+        base = {"synthetic_cpu_only": True, "participant_data_opened": False, "weights_sha256": "first"}
+        responses = [type("R", (), {"returncode": 0, "stdout": json.dumps(base), "stderr": ""})(),
+                     type("R", (), {"returncode": 0, "stdout": json.dumps({**base, "weights_sha256": "other"}), "stderr": ""})()]
+        with patch.object(supervisor.subprocess, "run", side_effect=responses):
+            with self.assertRaisesRegex(ValueError, "changed_synthetic"):
+                supervisor.verify_host_memory_math(sys.executable, {}, {})
+
+    def test_training_child_receives_cpu_memory_policy_after_math_verification(self):
+        source = "import json,os;print(json.dumps({k:os.environ.get(k) for k in ('MALLOC_ARENA_MAX','MALLOC_MMAP_THRESHOLD_','MALLOC_TRIM_THRESHOLD_')}))"
+        proof = {"synthetic_cpu_updates_and_rng_identical": True, "participant_data_opened": False}
+        with patch.object(supervisor.sys, "platform", "linux"), \
+             patch.object(supervisor.platform, "libc_ver", return_value=("glibc", "2.35")), \
+             patch.object(supervisor, "verify_host_memory_math", return_value=proof) as verifier:
+            outcome = self.invoke(source, host_memory_policy=supervisor.HOST_MEMORY_POLICY,
+                                  env={k:v for k,v in os.environ.items() if k not in ("LD_PRELOAD","GLIBC_TUNABLES")})
+        verifier.assert_called_once()
+        self.assertEqual(json.loads(outcome.stdout), supervisor.HOST_MEMORY_ENV)
+        record = self.read(Path(outcome.run_dir) / "run.json")
+        self.assertEqual(record["host_memory_policy"]["verification"], proof)
+        self.assertEqual(record["code_revision"], REVISION)
+
+    def test_failed_memory_policy_verification_never_starts_training(self):
+        with patch.object(supervisor.sys, "platform", "linux"), \
+             patch.object(supervisor.platform, "libc_ver", return_value=("glibc", "2.35")), \
+             patch.object(supervisor, "verify_host_memory_math", side_effect=ValueError("synthetic_math_mismatch")), \
+             patch.object(supervisor.subprocess, "Popen", side_effect=AssertionError("must not launch")):
+            with self.assertRaises(supervisor.TrainingStopped):
+                self.invoke("raise AssertionError('must not launch')", host_memory_policy=supervisor.HOST_MEMORY_POLICY,
+                            env={k:v for k,v in os.environ.items() if k not in ("LD_PRELOAD","GLIBC_TUNABLES")})
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -25,7 +25,7 @@ class GradualNotebookTests(unittest.TestCase):
         self.assertEqual(notebook["metadata"]["accelerator"], "GPU")
         intro = notebook["cells"][0]["source"]
         self.assertIn("20 trabajos", intro)
-        self.assertIn("Revisión 1.2", intro)
+        self.assertIn("Revisión 1.3", intro)
         self.assertIn("etapa 5", intro)
         self.assertEqual([intro.index(name) for name in builder.MODEL_NAMES],
             sorted(intro.index(name) for name in builder.MODEL_NAMES))
@@ -189,7 +189,7 @@ class GradualNotebookTests(unittest.TestCase):
         tree = ast.parse(source)
         function = next(n for n in tree.body if isinstance(n, ast.FunctionDef))
         outcome = SimpleNamespace(stdout="synthetic final result", output_dir=Path("successful_retry"))
-        module = SimpleNamespace(run=Mock(return_value=outcome))
+        module = SimpleNamespace(run=Mock(return_value=outcome), HOST_MEMORY_POLICY="synthetic_memory_policy")
         namespace = {"supervision": module, "PERSISTENT_ROOT": Path("records"),
                      "SESSION_ROOT": Path("session"), "CODE_REVISION": REVISION,
                      "LOCAL_OUTPUT": Path("first_attempt")}
@@ -199,6 +199,7 @@ class GradualNotebookTests(unittest.TestCase):
         self.assertEqual(namespace["LOCAL_OUTPUT"], outcome.output_dir)
         self.assertEqual(module.run.call_args.kwargs["code_revision"], REVISION)
         self.assertEqual(module.run.call_args.kwargs["max_retries"], 1)
+        self.assertEqual(module.run.call_args.kwargs["host_memory_policy"], module.HOST_MEMORY_POLICY)
 
     def _support_bootstrap(self, *, corrupt=False):
         notebook = builder.build(REVISION, supervision_revision="f" * 40)
