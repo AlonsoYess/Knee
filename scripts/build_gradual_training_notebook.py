@@ -46,6 +46,9 @@ def build(code_revision, *, supervision_revision=None, allow_unpublished_placeho
     value["cells"][0] = _markdown(
         "# 42 · Ajuste gradual de los codificadores seleccionados\n\n"
         "**Revisión 1.3 · Plan metodológico v1.2 · GPU.**\n\n"
+        "**Si vienes de una ejecución anterior detenida, reinicia la sesión de Colab antes de la primera "
+        "celda y conserva GPU T4.** Esto limpia las variables del entorno; los trabajos y épocas guardados "
+        "en Drive se conservan.\n\n"
         "La campaña autorizada comprende **20 trabajos**: **DenseNet121, ViT-B/16, Skelex y MambaOut-Tiny**, "
         "cada uno en los mismos cinco pliegues de desarrollo, con semilla 2026. La selección se vuelve a "
         "comprobar contra los resultados completos y privados de las libretas 40 y 41; esta libreta no "

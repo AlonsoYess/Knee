@@ -1,9 +1,9 @@
 {
   "version": "gradual_campaign_notebook_publication_v1.0",
   "code_revision": "8f9832fac7e53862f0c16020c82898e5cb6a74e6",
-  "notebook_revision": "1.2",
+  "notebook_revision": "1.3",
   "notebook_path": "notebooks/42_entrenar_ajuste_gradual_cinco_pliegues.ipynb",
-  "notebook_sha256": "d46bcdfc0eebea27e6c82c544d1447142a0340038e42b5edbe3b475029c5fa15",
+  "notebook_sha256": "a33ba0bf99b1dabf05116c23a6f149710d88e70273e200c5699bc15f74d59857",
   "campaign": "gradual_four_models",
   "model_order": [
     "image_densenet121",
@@ -52,10 +52,10 @@
       "actual_gpu_compute": false
     }
   },
-  "supervision_revision": "5f51ef64a1cb975e095475334e8032ea9cf1057d",
+  "supervision_revision": "3a415df1dfc0ab8efb2d8221fa83f6969cd2cfbf",
   "supervision_files_sha256": {
-    "scripts/colab_training_supervisor.py": "a013bfea31153b07f70f8f230dc07acd8c973edecaaca1c374f3c1ef9295dbc8",
-    "tests/test_colab_training_supervisor.py": "82b8e75c095eac4ebb253d7b6f9d27c1a4c208bdea9e19fcc64ff843c41cc4a3"
+    "scripts/colab_training_supervisor.py": "10973d9f1ba310578a8ca5dd1ead024448ad16eb679f754585c0d88dab416838",
+    "tests/test_colab_training_supervisor.py": "a06f740ab6a78dedc9968570aa708b59a31e472e3a66b67b1d45b5d0e21c6ff5"
   },
   "broad_cpu_regression": {
     "passed": true,
@@ -67,7 +67,7 @@
   },
   "final_focused_regression": {
     "passed": true,
-    "tests_run": 48,
+    "tests_run": 55,
     "skipped": 0,
     "scope": [
       "test_colab_training_supervisor",
@@ -92,5 +92,36 @@
     "memory_pressure_stops_without_recipe_changes": true,
     "frozen_training_core_source_bytes_changed": false,
     "monitor_cannot_guarantee_capturing_every_peak": true
+  },
+  "previous_supervision_revision": "5f51ef64a1cb975e095475334e8032ea9cf1057d",
+  "previous_supervision_focused_regression": {
+    "passed": true,
+    "tests_run": 48,
+    "skipped": 0,
+    "scope": [
+      "test_colab_training_supervisor",
+      "test_gradual_notebook"
+    ],
+    "actual_gpu_compute": false,
+    "participant_training": false
+  },
+  "host_cpu_memory_policy": {
+    "version": "glibc_cpu_reclaim_v1.0",
+    "environment": {
+      "MALLOC_MMAP_THRESHOLD_": "131072",
+      "MALLOC_TRIM_THRESHOLD_": "131072",
+      "MALLOC_ARENA_MAX": "2"
+    },
+    "applied_only_to_new_training_process": true,
+    "original_training_environment_not_mutated": true,
+    "frozen_training_core_unchanged": true,
+    "checkpoint_format_unchanged": true,
+    "unknown_allocator_overrides_rejected": true,
+    "real_colab_synthetic_numerical_comparison_required_before_training": true,
+    "local_synthetic_cpu_weights_losses_rng_identical": true,
+    "local_platform": "win32",
+    "actual_glibc_ram_reduction_measured": false,
+    "actual_colab_capacity_sufficiency_proven": false,
+    "resource_guard_remains_enabled": true
   }
 }
