@@ -25,7 +25,7 @@ class GradualNotebookTests(unittest.TestCase):
         self.assertEqual(notebook["metadata"]["accelerator"], "GPU")
         intro = notebook["cells"][0]["source"]
         self.assertIn("20 trabajos", intro)
-        self.assertIn("Revisión 1.3", intro)
+        self.assertIn("Revisión 1.4", intro)
         self.assertIn("etapa 5", intro)
         self.assertEqual([intro.index(name) for name in builder.MODEL_NAMES],
             sorted(intro.index(name) for name in builder.MODEL_NAMES))
@@ -83,6 +83,9 @@ class GradualNotebookTests(unittest.TestCase):
                 self.assertEqual(arg("--campaign"), builder.CAMPAIGN)
                 self.assertEqual(arg("--code-revision"), REVISION)
                 self.assertEqual(arg("--operation"), "train" if train else "prepare")
+                expected_script = ((paths["session"] / "supervision/scripts/launch_gradual_with_saved_runtime.py")
+                    if train else paths["repository"] / "scripts/train_gradual_campaign_colab.py")
+                self.assertIn(str(expected_script), arguments)
                 self.assertEqual(Path(arg("--records-root")), paths["records"])
                 self.assertEqual(Path(arg("--package-dir")), paths["development"])
                 output = Path(arg("--output-dir"))
@@ -105,6 +108,7 @@ class GradualNotebookTests(unittest.TestCase):
                 "SESSION_ROOT": paths["session"], "CPU_TESTS": {"synthetic": "tests"},
                 "runtime": {"synthetic": "runtime"}, "orchestration": orchestration,
                 "NEURAL_PYTHON": Path("synthetic_python"), "REPO_DIR": paths["repository"],
+                "SUPPORT_DIR": paths["session"] / "supervision",
                 "LOCAL_PACKAGE_DIR": paths["development"], "LOCAL_REFERENCE": reference,
                 "PERSISTENT_ROOT": paths["records"], "PREPARATION_DIR": paths["preparation"],
                 "CODE_REVISION": REVISION, "RUN_ENV": {"fixture": "gpu_visible_only_to_future_process"},

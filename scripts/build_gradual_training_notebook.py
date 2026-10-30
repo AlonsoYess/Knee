@@ -45,10 +45,15 @@ def build(code_revision, *, supervision_revision=None, allow_unpublished_placeho
     value = {**previous, "cells": previous["cells"][:8]}
     value["cells"][0] = _markdown(
         "# 42 · Ajuste gradual de los codificadores seleccionados\n\n"
-        "**Revisión 1.3 · Plan metodológico v1.2 · GPU.**\n\n"
+        "**Revisión 1.4 · Plan metodológico v1.2 · GPU.**\n\n"
         "**Si vienes de una ejecución anterior detenida, reinicia la sesión de Colab antes de la primera "
         "celda y conserva GPU T4.** Esto limpia las variables del entorno; los trabajos y épocas guardados "
         "en Drive se conservan.\n\n"
+        "Puedes conservar la RAM alta con la misma GPU T4. Antes de cargar los modelos, un proceso "
+        "independiente lee y autentica el estado de desarrollo guardado; el proceso de entrenamiento "
+        "recupera sus cantidades de hilos CPU y comprueba el resto del entorno campo por campo. "
+        "Las diferencias y el resultado quedan registrados en Drive. Una incompatibilidad adicional "
+        "detiene la ejecución con su detalle, sin reiniciar los pliegues ni omitir comprobaciones.\n\n"
         "La campaña autorizada comprende **20 trabajos**: **DenseNet121, ViT-B/16, Skelex y MambaOut-Tiny**, "
         "cada uno en los mismos cinco pliegues de desarrollo, con semilla 2026. La selección se vuelve a "
         "comprobar contra los resultados completos y privados de las libretas 40 y 41; esta libreta no "
@@ -86,7 +91,8 @@ def build(code_revision, *, supervision_revision=None, allow_unpublished_placeho
              "from knee import gradual_campaign_colab as orchestration"),
             ("CAMPAIGN = 'remaining_encoders_frozen'", "CAMPAIGN = 'gradual_four_models'")):
         bootstrap = _replace_once(bootstrap, old, new)
-    support_paths = ("scripts/colab_training_supervisor.py", "tests/test_colab_training_supervisor.py")
+    support_paths = ("scripts/colab_training_supervisor.py", "tests/test_colab_training_supervisor.py",
+        "scripts/launch_gradual_with_saved_runtime.py", "tests/test_gradual_runtime_launcher.py")
     root = Path(__file__).resolve().parents[1]
     support_hashes = {name: hashlib.sha256((root / name).read_bytes()).hexdigest() for name in support_paths}
     bootstrap += """\n# Operational helper is independently pinned; the frozen training checkout stays unchanged.
@@ -125,7 +131,10 @@ print('Supervisión operativa verificada; el código de entrenamiento conserva s
 SUPERVISION_TEST_ENV = dict(os.environ)
 SUPERVISION_TEST_ENV.update(CUDA_VISIBLE_DEVICES='', COLAB_GPU='0', PYTHONDONTWRITEBYTECODE='1', KNEE_FROZEN_REPOSITORY=str(REPO_DIR))
 supervision_tests = checked_run([sys.executable, '-B', '-m', 'unittest', 'discover', '-s', str(SUPPORT_DIR / 'tests'), '-p', 'test_colab_training_supervisor.py', '-v'], cwd=SUPPORT_DIR, env=SUPERVISION_TEST_ENV)
-print('Pruebas de supervisión aprobadas: procesos sintéticos en CPU, sin entrenamiento de participantes.')
+RUNTIME_TEST_ENV = dict(TEST_ENV)
+RUNTIME_TEST_ENV['KNEE_FROZEN_REPOSITORY'] = str(REPO_DIR)
+runtime_launcher_tests = checked_run([str(NEURAL_PYTHON), '-B', '-m', 'unittest', 'discover', '-s', str(SUPPORT_DIR / 'tests'), '-p', 'test_gradual_runtime_launcher.py', '-v'], cwd=SUPPORT_DIR, env=RUNTIME_TEST_ENV)
+print('Pruebas de supervisión y recuperación del entorno aprobadas: procesos sintéticos en CPU, sin entrenamiento de participantes.')
 """)
     value["cells"][6] = _markdown("## 3. Reconstruir únicamente las entradas de desarrollo\n\n"
         "Las carpetas se leen de la misma configuración privada utilizada en la libreta 41. Se comprueban "
@@ -181,7 +190,7 @@ WEIGHTS_ROOT = SESSION_ROOT / 'verified_public_weights'
 WEIGHTS_ROOT.mkdir(exist_ok=True)
 LOCAL_OUTPUT = SESSION_ROOT / ('gradual_campaign_' + uuid.uuid4().hex)
 print('Iniciando solo los trabajos pendientes del ajuste gradual autorizado…', flush=True)
-training_log = training_run([str(NEURAL_PYTHON), '-u', '-B', str(REPO_DIR / 'scripts/train_gradual_campaign_colab.py'), '--operation', 'train', '--campaign', CAMPAIGN, '--repository-root', str(REPO_DIR), '--preparation-dir', str(PREPARATION_DIR), '--package-dir', str(LOCAL_PACKAGE_DIR), '--reference-path', str(LOCAL_REFERENCE), '--output-dir', str(LOCAL_OUTPUT), '--records-root', str(PERSISTENT_ROOT), '--weights-root', str(WEIGHTS_ROOT), '--code-revision', CODE_REVISION], cwd=REPO_DIR, env=RUN_ENV)
+training_log = training_run([str(NEURAL_PYTHON), '-u', '-B', str(SUPPORT_DIR / 'scripts/launch_gradual_with_saved_runtime.py'), '--operation', 'train', '--campaign', CAMPAIGN, '--repository-root', str(REPO_DIR), '--preparation-dir', str(PREPARATION_DIR), '--package-dir', str(LOCAL_PACKAGE_DIR), '--reference-path', str(LOCAL_REFERENCE), '--output-dir', str(LOCAL_OUTPUT), '--records-root', str(PERSISTENT_ROOT), '--weights-root', str(WEIGHTS_ROOT), '--code-revision', CODE_REVISION], cwd=REPO_DIR, env=RUN_ENV)
 FINAL_CHECK = json.loads((LOCAL_OUTPUT / orchestration.SUMMARY_FILENAME).read_text(encoding='utf-8'))
 orchestration.validate_result(FINAL_CHECK)
 print('Campaña gradual terminada y guardada en Drive. La prueba reservada permanece cerrada.')
