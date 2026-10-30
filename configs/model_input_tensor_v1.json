@@ -1,0 +1,30 @@
+{
+  "version": "physical_letterbox_224_p01_p99_v1.0",
+  "output_shape": [1, 224, 224],
+  "dtype": "float32",
+  "native_input": "two_dimensional_integer_native_roi",
+  "intensity": {
+    "percentiles": [1.0, 99.0],
+    "percentile_method": "linear",
+    "calculation_dtype": "float64",
+    "clip": [0.0, 1.0],
+    "photometric": "invert_MONOCHROME1_after_clipping_before_padding",
+    "dicom_voi_window_applied": false,
+    "dicom_padding_mask_applied": false,
+    "modality_rescale_policy": "positive_affine_only_cancels_under_per_image_percentile_normalization"
+  },
+  "geometry": {
+    "extent": "height_times_row_spacing_width_times_column_spacing",
+    "target": 224,
+    "rounding": "floor_scaled_size_plus_half_minimum_one",
+    "resampling": "Pillow_F_BILINEAR",
+    "reducing_gap": null,
+    "padding": "centered_zero_extra_pixel_bottom_and_right",
+    "orientation": "original_acquisition_no_mirroring",
+    "crop": false
+  },
+  "runtime": {"numpy": "1.26.4", "Pillow": "11.3.0"},
+  "rgb_replication_applied": false,
+  "checkpoint_normalization_applied": false,
+  "augmentation_applied": false
+}

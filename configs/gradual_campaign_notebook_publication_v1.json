@@ -1,0 +1,153 @@
+{
+  "version": "gradual_campaign_notebook_publication_v1.0",
+  "code_revision": "8f9832fac7e53862f0c16020c82898e5cb6a74e6",
+  "notebook_revision": "1.4",
+  "notebook_path": "notebooks/42_entrenar_ajuste_gradual_cinco_pliegues.ipynb",
+  "notebook_sha256": "aae633d13c8d6551b0c852becaabcb1908d580e7f0be93f5a17846f853635b67",
+  "campaign": "gradual_four_models",
+  "model_order": [
+    "image_densenet121",
+    "image_vit_b16",
+    "image_skelex",
+    "image_mambaout_tiny"
+  ],
+  "stage": "stage_2",
+  "screening_selection_reauthenticated": true,
+  "training_recipe_changed": false,
+  "five_participant_folds_preserved": true,
+  "maximum_epochs": 60,
+  "head_only_epochs": 5,
+  "last_block_epochs": 5,
+  "epoch_resume_full_model_and_optimizer": true,
+  "retained_epoch_generations": 2,
+  "typed_confirmation_required": false,
+  "private_path_defaults_in_drive_only": true,
+  "private_screening_authority_in_drive_only": true,
+  "reserved_test_access_authorized": false,
+  "fusion_authorized": false,
+  "calibration_authorized": false,
+  "participant_training_executed_by_assistant": false,
+  "real_gpu_executed_by_assistant": false,
+  "epoch_replay_synthetic_cpu_exact_after_epochs": [
+    3,
+    6,
+    11
+  ],
+  "completed_jobs_fast_recovery_synthetic_verified": true,
+  "source_payload_verification_before_any_weight_reuse_required": true,
+  "source_discovery_uses_exact_private_approved_summary": true,
+  "incomplete_previous_campaigns_do_not_count_as_completed": true,
+  "actual_private_metadata_discovery_replay_verified": true,
+  "historical_pre_supervision_regression": {
+    "broad_cpu_regression": {
+      "passed": true,
+      "tests_run": 605,
+      "skipped": 0
+    },
+    "final_focused_regression": {
+      "passed": true,
+      "tests_run": 123,
+      "skipped": 0,
+      "cuda_build_metadata_simulated": true,
+      "actual_gpu_compute": false
+    }
+  },
+  "supervision_revision": "9350995c52b5fb3d611c55669541f0b4c612aea6",
+  "supervision_files_sha256": {
+    "scripts/colab_training_supervisor.py": "10973d9f1ba310578a8ca5dd1ead024448ad16eb679f754585c0d88dab416838",
+    "tests/test_colab_training_supervisor.py": "a06f740ab6a78dedc9968570aa708b59a31e472e3a66b67b1d45b5d0e21c6ff5",
+    "scripts/launch_gradual_with_saved_runtime.py": "d5c6c107cf7dcd1368bed2724e2c4f972658abf24c2ed0e7456737e0b11da12e",
+    "tests/test_gradual_runtime_launcher.py": "ceab46d6199ef94b41e1d7cedc74e8b2846a6d7646bd63c6bac7b2cd0db702e3"
+  },
+  "broad_cpu_regression": {
+    "passed": true,
+    "tests_run": 36,
+    "skipped": 0,
+    "scope": [
+      "test_gradual_epoch_resume",
+      "test_gradual_campaign",
+      "test_gradual_campaign_colab",
+      "test_gradual_selection"
+    ],
+    "cuda_build_metadata_simulated": true,
+    "actual_gpu_compute": false,
+    "participant_training": false
+  },
+  "final_focused_regression": {
+    "passed": true,
+    "tests_run": 78,
+    "skipped": 0,
+    "scope": [
+      "test_colab_training_supervisor",
+      "test_gradual_notebook",
+      "test_gradual_runtime_launcher"
+    ],
+    "actual_gpu_compute": false,
+    "participant_training": false
+  },
+  "operational_supervision": {
+    "resource_samples_persisted_in_private_drive": true,
+    "sample_interval_seconds": 2,
+    "stdout_stderr_and_exit_code_persisted": true,
+    "unfinished_controller_cause_remains_unknown": true,
+    "whole_colab_runtime_auto_restart_possible": false,
+    "maximum_identified_transient_http_retries": 1,
+    "retry_http_statuses": [
+      502,
+      503,
+      504
+    ],
+    "unknown_sigkill_retried": false,
+    "memory_pressure_stops_without_recipe_changes": true,
+    "frozen_training_core_source_bytes_changed": false,
+    "monitor_cannot_guarantee_capturing_every_peak": true
+  },
+  "previous_supervision_revision": "3a415df1dfc0ab8efb2d8221fa83f6969cd2cfbf",
+  "previous_supervision_focused_regression": {
+    "passed": true,
+    "tests_run": 55,
+    "skipped": 0,
+    "scope": [
+      "test_colab_training_supervisor",
+      "test_gradual_notebook"
+    ],
+    "actual_gpu_compute": false,
+    "participant_training": false
+  },
+  "host_cpu_memory_policy": {
+    "version": "glibc_cpu_reclaim_v1.0",
+    "environment": {
+      "MALLOC_MMAP_THRESHOLD_": "131072",
+      "MALLOC_TRIM_THRESHOLD_": "131072",
+      "MALLOC_ARENA_MAX": "2"
+    },
+    "applied_only_to_new_training_process": true,
+    "original_training_environment_not_mutated": true,
+    "frozen_training_core_unchanged": true,
+    "checkpoint_format_unchanged": true,
+    "unknown_allocator_overrides_rejected": true,
+    "real_colab_synthetic_numerical_comparison_required_before_training": true,
+    "local_synthetic_cpu_weights_losses_rng_identical": true,
+    "local_platform": "win32",
+    "actual_glibc_ram_reduction_measured": false,
+    "actual_colab_capacity_sufficiency_proven": false,
+    "resource_guard_remains_enabled": true
+  },
+  "saved_runtime_recovery": {
+    "version": "gradual_saved_runtime_launcher_v1.0",
+    "gpu_hidden_metadata_subprocess": true,
+    "existing_state_full_sha_verified_before_metadata": true,
+    "weights_only_mmap_cpu_metadata_read": true,
+    "frozen_training_cli_invoked_unchanged": true,
+    "saved_cpu_threads_restored_before_scientific_imports": true,
+    "remaining_runtime_fields_compared_before_model_probes": true,
+    "additional_runtime_differences_rejected": true,
+    "original_epoch_restore_guard_preserved": true,
+    "individual_restore_guard_diagnostics": true,
+    "completed_job_weights_not_used_to_initialize_other_jobs": true,
+    "synthetic_changed_cpu_profile_exact_recovery_verified": true,
+    "independent_support_folder_against_previous_frozen_checkout_tested": true,
+    "existing_private_checkpoint_modified_by_assistant": false,
+    "actual_colab_training_resumption_verified": false
+  }
+}

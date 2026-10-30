@@ -1,0 +1,44 @@
+{
+  "version": "frozen_image_screening_notebook41_publication_v1.0",
+  "code_revision": "c0e2d03937615c3d7dac28351371a82819b2e46c",
+  "notebook_revision": "1.0",
+  "notebook_path": "notebooks/41_entrenar_codificadores_congelados_cinco_pliegues.ipynb",
+  "notebook_sha256": "03e579afaa9367fbd87bedcc92837bbc60b0c830612bd1ebc27b4a411b6e3d8d",
+  "campaign": "remaining_encoders_frozen",
+  "model_order": [
+    "image_vit_b16",
+    "image_convnextv2_tiny",
+    "image_skelex",
+    "image_biomedclip",
+    "image_mambaout_tiny"
+  ],
+  "development_folds": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "complete_jobs": 25,
+  "prior_two_update_smokes": 5,
+  "backbones_frozen": true,
+  "training_plan_version": "registered_training_plan_v1.2",
+  "augmentation_policy": "training_intensity_gamma_v1.0",
+  "reserved_test_access_authorized": false,
+  "assistant_executed_participant_training": false,
+  "assistant_executed_real_gpu": false,
+  "cpu_regression": {
+    "passed": true,
+    "tests_run": 521,
+    "skipped": 0
+  },
+  "hidden_cuda_build_regression": {
+    "passed": true,
+    "tests_run": 138,
+    "actual_cuda_build_metadata_simulated": true,
+    "gpu_compute_executed": false
+  },
+  "real_checkpoint_cpu_inference_verified": 5,
+  "training_execution": "subsequent_investigator_confirmed_colab_gpu_only",
+  "prior_recipes_registry_catalog_and_notebooks_unchanged": true
+}

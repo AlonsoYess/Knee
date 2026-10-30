@@ -37,6 +37,7 @@ auditoria_dicoms.csv
 __pycache__/
 *.py[cod]
 .venv/
+.venv-knee-crop/
 venv/
 .pytest_cache/
 .mypy_cache/

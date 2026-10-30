@@ -1,0 +1,157 @@
+{
+  "schema_version": "1.0",
+  "registry_version": "1.0",
+  "status": "approved_for_development_screening",
+  "governing_change": "MCR-2026-002",
+  "test_block_must_remain_closed": true,
+  "common_contract": {
+    "clinical_predictors": ["AGEYEARS_V00", "SEX", "BMI_V00"],
+    "radiographic_visit": "V00",
+    "outcome_visit": "V06",
+    "outcome": "PROGRESION_48M",
+    "group_unit": "participant",
+    "selection_metric": "average_precision_score",
+    "same_cohort_and_partitions": true
+  },
+  "clinical": {
+    "role": "unimodal_main",
+    "candidates": [
+      {
+        "id": "clinical_logistic",
+        "family": "regularized_logistic_regression",
+        "tier": "mandatory_baseline",
+        "rationale": "Interpretable and appropriate for a low-dimensional clinical branch."
+      },
+      {
+        "id": "clinical_xgboost",
+        "family": "xgboost",
+        "tier": "mandatory_candidate",
+        "rationale": "Captures nonlinearities and interactions without requiring a large neural network."
+      },
+      {
+        "id": "clinical_mlp",
+        "family": "mlp",
+        "tier": "mandatory_candidate",
+        "rationale": "Provides the neural clinical representation required by intermediate fusion."
+      }
+    ]
+  },
+  "radiographic": {
+    "role": "unimodal_main",
+    "mandatory_baselines": [
+      {
+        "id": "image_densenet121",
+        "family": "densenet121",
+        "pretraining": "imagenet",
+        "input_resolutions": [224]
+      },
+      {
+        "id": "image_vit_b16",
+        "family": "vit_b_16",
+        "pretraining": "imagenet",
+        "input_resolutions": [224]
+      }
+    ],
+    "modern_challengers": [
+      {
+        "id": "image_convnextv2_tiny",
+        "family": "convnext_v2_tiny",
+        "pretraining": "imagenet_fcmae",
+        "input_resolutions": [224, 384],
+        "weights_reference": "official_convnext_v2",
+        "license_review": "required_cc_by_nc_for_pretrained_weights"
+      },
+      {
+        "id": "image_dinov3_vits16",
+        "family": "dinov3_vits16",
+        "pretraining": "lvd_1689m_self_supervised",
+        "input_resolutions": [224, 384],
+        "weights_reference": "official_dinov3",
+        "license_review": "required_dinov3_license_and_access"
+      },
+      {
+        "id": "image_skelex",
+        "family": "skelex_vit_mae",
+        "pretraining": "musculoskeletal_xray_mae",
+        "input_resolutions": [224, 384],
+        "weights_reference": "skhoha/SKELEX",
+        "license_review": "required_cc_by_nc_nd_4_0_before_fine_tuning"
+      }
+    ],
+    "complementary": [
+      {
+        "id": "image_bilateral_cross_attention",
+        "family": "bilateral_cross_attention",
+        "encoder_source": "selected_eligible_radiographic_encoder",
+        "eligibility": "only_after_phase_1_confirms_target_and_contralateral_pairs",
+        "confirmatory_role": false
+      }
+    ]
+  },
+  "multimodal": {
+    "role": "multimodal_main",
+    "primary_candidates": [
+      {
+        "id": "fusion_intermediate_concat",
+        "family": "intermediate_concatenation",
+        "image_encoder": "selected_eligible_radiographic_encoder",
+        "clinical_encoder": "fold_fitted_mlp"
+      },
+      {
+        "id": "fusion_intermediate_gated_film",
+        "family": "intermediate_gated_film",
+        "image_encoder": "selected_eligible_radiographic_encoder",
+        "clinical_encoder": "fold_fitted_mlp"
+      }
+    ],
+    "complementary": [
+      {
+        "id": "fusion_late_fixed_mean",
+        "family": "late_fusion",
+        "weights": [0.5, 0.5],
+        "confirmatory_role": false
+      }
+    ]
+  },
+  "eligibility_gates": [
+    "public_or_authorized_weights_available",
+    "license_compatible_with_academic_research_and_required_artifacts",
+    "pretraining_overlap_risk_reviewed",
+    "deterministic_loader_and_preprocessing_verified",
+    "single_fold_smoke_test_passed_without_test_data",
+    "resource_profile_recorded"
+  ],
+  "screening": {
+    "stage_0": "technical_and_license_eligibility",
+    "stage_1": "frozen_encoder_or_linear_probe_on_development_only",
+    "stage_2": "controlled_partial_and_full_fine_tuning_for_mandatory_baselines_and_promoted_challengers",
+    "promotion_rule": "promote_at_most_two_modern_challengers_by_grouped_oof_average_precision_with_roc_auc_then_brier_ties",
+    "mandatory_baselines_are_never_eliminated_by_stage_1": true,
+    "neural_finalists_use_seeds": [2026, 2027, 2028],
+    "test_in_screening": false
+  },
+  "training_techniques": {
+    "optimizer": "adamw",
+    "mixed_precision": true,
+    "gradient_accumulation": "allowed_when_required_by_vram",
+    "schedule": "cosine_decay_with_warmup",
+    "early_stopping_metric": "development_average_precision",
+    "class_imbalance": "weighted_binary_cross_entropy_from_training_fold_only",
+    "fine_tuning": [
+      "frozen_probe",
+      "gradual_unfreezing",
+      "layerwise_learning_rate_decay",
+      "full_fine_tuning_when_supported_by_development_evidence"
+    ],
+    "augmentation_policy": "radiograph_safe_policy_to_be_frozen_after_phase_1_visual_qc",
+    "test_time_augmentation": "not_enabled_unless_preapproved_before_test_opening"
+  },
+  "forbidden": [
+    "test_driven_model_selection",
+    "future_visit_inputs",
+    "automatic_kl_grade_output",
+    "mri_input",
+    "unregistered_architecture_additions",
+    "participant_overlap_across_folds"
+  ]
+}
