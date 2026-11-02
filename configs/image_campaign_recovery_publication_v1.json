@@ -1,0 +1,36 @@
+{
+  "version": "image_campaign_recovery_publication_v1.0",
+  "code_revision": "7aefc0a92495ecce287e522820932ca2b5a3182f",
+  "notebook_revision": "2.0",
+  "notebook_path": "notebooks/41_entrenar_codificadores_congelados_cinco_pliegues.ipynb",
+  "notebook_sha256": "a7a76e9d172afbf3b169009ca8b641367b8bcca1c6fe67affdf84580169bf091",
+  "campaign": "remaining_encoders_frozen",
+  "legacy_compatible_revision": "c0e2d03937615c3d7dac28351371a82819b2e46c",
+  "training_recipe_changed": false,
+  "reserved_test_access_authorized": false,
+  "participant_training_executed_by_assistant": false,
+  "real_gpu_executed_by_assistant": false,
+  "cpu_regression": {
+    "passed": true,
+    "tests_run": 538,
+    "skipped": 0
+  },
+  "cuda_build_metadata_simulation": {
+    "passed": true,
+    "tests_run": 155,
+    "actual_gpu_compute": false
+  },
+  "final_recovery_and_frontend_tests": {
+    "passed": true,
+    "tests_run": 25,
+    "skipped": 0
+  },
+  "epoch_replay_synthetic_cpu_exact": true,
+  "completed_payloads_read_on_recovery": false,
+  "metadata_and_predictions_reauthenticated": true,
+  "full_payload_verification_required_before_later_weight_use": true,
+  "new_job_publication_readback_verified": true,
+  "private_path_defaults_in_drive_only": true,
+  "typed_confirmation_required": false,
+  "campaign_authorization_scope_preserved": true
+}

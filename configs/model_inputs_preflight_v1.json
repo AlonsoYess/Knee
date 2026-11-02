@@ -1,0 +1,25 @@
+{
+  "version": "model_inputs_loading_preflight_v1.0",
+  "registry_version": "1.0",
+  "image_encoders": ["image_densenet121", "image_vit_b16"],
+  "clinical_features": ["AGEYEARS", "SEX", "BMI"],
+  "clinical_policy": {
+    "feature_order": ["AGEYEARS", "SEX", "BMI"],
+    "sex_encoding": {"F": 0, "M": 1},
+    "bmi_imputation": "median_training_knee_rows_only",
+    "continuous_scaling": "population_standardization_ddof_0_after_training_BMI_imputation",
+    "constant_scale": 1.0,
+    "statistics_unit": "training_knee_rows",
+    "missingness_indicator": false
+  },
+  "image_geometry": "preserve_sealed_physical_letterbox_224_without_resize_crop_or_flip",
+  "checkpoint_input_metadata": "explicit_torchvision_IMAGENET1K_V1_not_full_transform",
+  "loader": {"batch_size": 8, "num_workers": 0, "shuffle": false, "drop_last": false},
+  "architecture_probe": {"weights": null, "training": false, "samples_per_fold": 2, "feature_extraction_only": true},
+  "folds": [0, 1, 2, 3, 4],
+  "seed": 2026,
+  "maximum_cpu_threads": 2,
+  "pretrained_downloads_authorized": false,
+  "predictive_training_authorized": false,
+  "reserved_test_access_authorized": false
+}

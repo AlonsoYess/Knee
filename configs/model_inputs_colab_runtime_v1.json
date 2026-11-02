@@ -1,0 +1,39 @@
+{
+  "version": "isolated_model_inputs_cpu_runtime_v1.0",
+  "platform": "linux_x86_64",
+  "python": "3.12.14",
+  "python_archive": {
+    "file": "python-3.12.14-linux-x86_64.tar.gz",
+    "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20260929/cpython-3.12.14%2B20260929-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz",
+    "sha256": "ef605200f8174e87ecfc308e52a88127543f85dd5c940dc5e92cab244b98a003",
+    "bytes": 34277962,
+    "max_bytes": 34277962
+  },
+  "cpu_wheels": [
+    {
+      "file": "torch-2.6.0+cpu-cp312-cp312-linux_x86_64.whl",
+      "url": "https://download-r2.pytorch.org/whl/cpu/torch-2.6.0%2Bcpu-cp312-cp312-linux_x86_64.whl",
+      "sha256": "59e78aa0c690f70734e42670036d6b541930b8eabbaa18d94e090abf14cc4d91",
+      "max_bytes": 300000000
+    },
+    {
+      "file": "torchvision-0.21.0+cpu-cp312-cp312-linux_x86_64.whl",
+      "url": "https://download-r2.pytorch.org/whl/cpu/torchvision-0.21.0%2Bcpu-cp312-cp312-linux_x86_64.whl",
+      "sha256": "d6874431e678ba107b60a83f255c33f3755f06bad587b1b919aa514ec325dcd8",
+      "max_bytes": 20000000
+    }
+  ],
+  "packages": {
+    "numpy": "1.26.4", "Pillow": "11.3.0", "filelock": "4.0.9",
+    "typing_extensions": "4.16.0", "networkx": "3.7", "Jinja2": "3.1.6",
+    "fsspec": "2026.9.0", "setuptools": "84.0.0", "sympy": "1.13.1",
+    "mpmath": "1.3.0", "MarkupSafe": "3.0.3", "torch": "2.6.0+cpu",
+    "torchvision": "0.21.0+cpu"
+  },
+  "pypi_index": "https://pypi.org/simple",
+  "maximum_tar_members": 10000,
+  "maximum_tar_expanded_bytes": 500000000,
+  "pretrained_weights_downloaded": false,
+  "data_opened": false,
+  "training_executed": false
+}

@@ -1,0 +1,6 @@
+# Add only inside the isolated notebook 34 CPU interpreter; never train here.
+scikit-learn==1.6.1
+scipy==1.14.1
+joblib==1.4.2
+threadpoolctl==3.5.0
+xgboost-cpu==3.0.5

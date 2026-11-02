@@ -1,0 +1,175 @@
+{
+  "version": "registered_pretrained_weights_v1.0",
+  "registry_version": "1.0",
+  "governing_change": "MCR-2026-002",
+  "reviewed_on": "2026-10-21",
+  "purpose": "technical_checkpoint_verification_without_training",
+  "training_authorized": false,
+  "input": {
+    "source": "sealed_physical_letterbox_224_float32",
+    "geometry_operations": [],
+    "channels": "replicate_gray_to_rgb",
+    "mean": [0.485, 0.456, 0.406],
+    "std": [0.229, 0.224, 0.225],
+    "official_resize_and_crop_pipeline_executed": false,
+    "note": "Checkpoint channel normalization is reused; thesis ROI geometry deliberately remains the previously verified physical letterbox, not an ImageNet evaluation crop."
+  },
+  "shared_limits": {
+    "verification_device": "cpu",
+    "verification_input": "two_synthetic_gray_patterns_no_participants",
+    "pretrained_checkpoint_is_not_a_progression_predictor": true,
+    "training_smoke_test_completed": false,
+    "colab_gpu_resource_profile_completed": false,
+    "pretraining_subject_disjointness_proven": false,
+    "preprocessing_localizer_oai_overlap_limitation_remains": true,
+    "checkpoint_binaries_in_public_repository": false,
+    "reserved_test_access": false
+  },
+  "models": {
+    "image_densenet121": {
+      "family": "densenet121",
+      "checkpoint_id": "DenseNet121_Weights.IMAGENET1K_V1",
+      "verification_enabled": true,
+      "feature_dimension": 1024,
+      "feature_readout": "relu_then_global_average_pool",
+      "files": [{
+        "name": "densenet121-a639ec97.pth",
+        "url": "https://download.pytorch.org/models/densenet121-a639ec97.pth",
+        "sha256": "a639ec97d7c33b07ae66f0b5fb7d0192f95a3b11b7576c66c0126c2a727c4395",
+        "bytes": 32342954,
+        "digest_origin": "measured_official_download_and_verified_publisher_prefix_a639ec97"
+      }],
+      "license_review": {
+        "code": "BSD-3-Clause",
+        "weights": "TorchVision warns dataset-derived terms can apply; ImageNet is noncommercial research/education. No separate permissive checkpoint license is inferred from the code license.",
+        "use_scope": "private_noncommercial_academic_research",
+        "unrestricted_redistribution_claimed": false
+      },
+      "overlap_review": "Declared ImageNet-1K pretraining, no declared OAI training; subject-level disjointness is not independently established.",
+      "sources": [
+        "https://docs.pytorch.org/vision/0.21/models/generated/torchvision.models.densenet121.html",
+        "https://docs.pytorch.org/vision/0.21/models.html",
+        "https://github.com/pytorch/vision/blob/v0.21.0/LICENSE",
+        "https://image-net.org/download.php"
+      ]
+    },
+    "image_vit_b16": {
+      "family": "vit_b_16",
+      "checkpoint_id": "ViT_B_16_Weights.IMAGENET1K_V1",
+      "verification_enabled": true,
+      "feature_dimension": 768,
+      "feature_readout": "final_normalized_cls_token",
+      "files": [{
+        "name": "vit_b_16-c867db91.pth",
+        "url": "https://download.pytorch.org/models/vit_b_16-c867db91.pth",
+        "sha256": "c867db91d3e12c6cbadabb610d73c24a546bf82d8c03a9fea34f43a712ddb0e9",
+        "bytes": 346328529,
+        "digest_origin": "measured_official_download_and_verified_publisher_prefix_c867db91"
+      }],
+      "license_review": {
+        "code": "BSD-3-Clause",
+        "weights": "TorchVision dataset-derived terms apply; selected V1 weights are not SWAG weights. Code licensing is not a blanket license of training images or model use.",
+        "use_scope": "private_noncommercial_academic_research",
+        "unrestricted_redistribution_claimed": false
+      },
+      "overlap_review": "Declared ImageNet-1K pretraining, no declared OAI training; subject-level disjointness is not independently established.",
+      "sources": [
+        "https://docs.pytorch.org/vision/0.21/models/generated/torchvision.models.vit_b_16.html",
+        "https://docs.pytorch.org/vision/0.21/models.html",
+        "https://image-net.org/download.php"
+      ]
+    },
+    "image_convnextv2_tiny": {
+      "family": "convnext_v2_tiny",
+      "checkpoint_id": "official_convnextv2_tiny_1k_224_fcmae_pt_only",
+      "upstream_code_revision": "2553895753323c6fe0b2bf390683f5ea358a42b9",
+      "verification_enabled": true,
+      "feature_dimension": 768,
+      "feature_readout": "global_average_pool_then_transfer_layernorm",
+      "nonpretrained_transfer_parameters": ["norm.weight=1", "norm.bias=0"],
+      "files": [{
+        "name": "convnextv2_tiny_1k_224_fcmae.pt",
+        "url": "https://dl.fbaipublicfiles.com/convnext/convnextv2/pt_only/convnextv2_tiny_1k_224_fcmae.pt",
+        "sha256": "b25eadb89ad634b5c925ea04cdacebafe3e462486baf9482dc2d832bb9af57ef",
+        "bytes": 111520513,
+        "digest_origin": "measured_official_https_download_no_upstream_full_digest_found"
+      }],
+      "license_review": {
+        "code": "MIT",
+        "weights": "CC-BY-NC-4.0",
+        "use_scope": "private_noncommercial_academic_research_with_attribution",
+        "unrestricted_redistribution_claimed": false
+      },
+      "overlap_review": "Official FCMAE pretraining on ImageNet-1K; no declared OAI training. This is not the 1K fine-tuned/EMA or 22K checkpoint.",
+      "sources": [
+        "https://github.com/facebookresearch/ConvNeXt-V2/tree/2553895753323c6fe0b2bf390683f5ea358a42b9",
+        "https://github.com/facebookresearch/ConvNeXt-V2/blob/2553895753323c6fe0b2bf390683f5ea358a42b9/LICENSE"
+      ]
+    },
+    "image_dinov3_vits16": {
+      "family": "dinov3_vits16",
+      "checkpoint_id": "facebook/dinov3-vits16-pretrain-lvd1689m",
+      "upstream_revision": "114c1379950215c8b35dfcd4e90a5c251dde0d32",
+      "verification_enabled": false,
+      "blocking_reason": "official_manual_access_and_terms_acceptance_pending_no_authorized_checkpoint",
+      "metadata_only_not_downloaded_or_loaded": true,
+      "feature_dimension": 384,
+      "feature_readout": "normalized_cls_token_after_excluding_four_register_tokens_from_patch_readout",
+      "files": [{
+        "name": "dinov3_vits16_model.safetensors",
+        "url": "https://huggingface.co/facebook/dinov3-vits16-pretrain-lvd1689m/resolve/114c1379950215c8b35dfcd4e90a5c251dde0d32/model.safetensors",
+        "sha256": "4610ad75edef83e75afdebf162d148dc628045ea6cbb83d67d4708c709c4f91d",
+        "bytes": 86406384,
+        "digest_origin": "official_huggingface_lfs_metadata_not_locally_verified"
+      }],
+      "license_review": {
+        "code_and_weights": "DINOv3 custom license with required access conditions",
+        "use_scope": "pending_authorized_access_and_terms_review",
+        "terms_accepted_on_behalf_of_user": false,
+        "unrestricted_redistribution_claimed": false
+      },
+      "overlap_review": "LVD-1689M web-image training is not publicly auditable at participant level. OAI disjointness cannot be certified.",
+      "sources": [
+        "https://huggingface.co/facebook/dinov3-vits16-pretrain-lvd1689m",
+        "https://github.com/facebookresearch/dinov3"
+      ]
+    },
+    "image_skelex": {
+      "family": "skelex_vit_mae",
+      "checkpoint_id": "skhoha/SKELEX",
+      "upstream_revision": "368cae7b05cf649e6dbcddae9a7f00ea4b14bb8e",
+      "verification_enabled": true,
+      "feature_dimension": 1024,
+      "feature_readout": "final_normalized_cls_token_mask_ratio_zero_identity_noise_all_patches",
+      "files": [
+        {"name": "skelex_model.safetensors", "url": "https://huggingface.co/skhoha/SKELEX/resolve/368cae7b05cf649e6dbcddae9a7f00ea4b14bb8e/model.safetensors", "sha256": "81cd6e9cf8da0c56d149a2e1a3668fdc6def2742b055f2696f97507332d69ef8", "bytes": 1318230232, "digest_origin": "official_huggingface_lfs_metadata_and_local_download"},
+        {"name": "skelex_config.json", "url": "https://huggingface.co/skhoha/SKELEX/resolve/368cae7b05cf649e6dbcddae9a7f00ea4b14bb8e/config.json", "sha256": "b48411f4313c2ee6357586b57d185befac8c7c77cc475bc2188ec4487b1bc6f7", "bytes": 699, "digest_origin": "measured_revision_pinned_official_metadata_bytes"},
+        {"name": "skelex_preprocessor_config.json", "url": "https://huggingface.co/skhoha/SKELEX/resolve/368cae7b05cf649e6dbcddae9a7f00ea4b14bb8e/preprocessor_config.json", "sha256": "a250969c94afba52d785a0e08dd36e13aeda97c4dd2b7fd0d24b457288536cea", "bytes": 217, "digest_origin": "measured_revision_pinned_official_metadata_bytes"}
+      ],
+      "license_review": {
+        "weights": "CC-BY-NC-ND-4.0",
+        "use_scope": "private_noncommercial_academic_verification",
+        "fine_tuned_weight_redistribution": "not_authorized_by_this_review",
+        "public_prototype_with_adapted_weights": "requires_resolution_before_distribution",
+        "note": "Do not equate ND with a blanket ban on private experimentation. The authors provide fine-tuning code; sharing adapted weights or derivative artifacts requires separate consideration.",
+        "unrestricted_redistribution_claimed": false
+      },
+      "overlap_review": "Paper describes ImageNet initialization and SNUH1M pretraining; OAI is used downstream. The generic MAE checkpoint is selected, not an OAI task-fine-tuned checkpoint. No independent participant-level disjointness proof.",
+      "sources": [
+        "https://huggingface.co/skhoha/SKELEX",
+        "https://github.com/skhoha/SKELEX",
+        "https://www.nature.com/articles/s41746-026-02826-9",
+        "https://creativecommons.org/licenses/by-nc-nd/4.0/legalcode.en"
+      ]
+    }
+  },
+  "models_without_external_pretrained_checkpoint": {
+    "clinical_logistic": "fit_from_scratch_inside_training_fold_only",
+    "clinical_xgboost": "fit_from_scratch_inside_training_fold_only",
+    "clinical_mlp": "random_initialization_inside_training_fold_only",
+    "fusion_intermediate_concat": "use_selected_image_encoder_and_fold_local_clinical_branch",
+    "fusion_intermediate_gated_film": "use_selected_image_encoder_and_fold_local_clinical_branch",
+    "fusion_late_fixed_mean": "combine_fold_aligned_probabilities_fixed_half_each_deferred",
+    "image_bilateral_cross_attention": "deferred_pair_contract_not_enabled"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "source_dir": "dicom/originales/piloto_v1",
+  "pilot_audit_json": "outputs/auditorias/fase_1/paso_1_piloto/auditoria_piloto_privada.json",
+  "output_dir": "outputs/auditorias/fase_1/paso_3_separacion_bilateral",
+  "expected_unique_studies": 10,
+  "algorithm_version": "bilateral_split_v0.2_pilot",
+  "search_band": [0.40, 0.60],
+  "boundary_guard_fraction": 0.01,
+  "vertical_analysis_band": [0.15, 0.85],
+  "smoothing_fraction": 0.015,
+  "intensity_weight": 0.70,
+  "gradient_weight": 0.30,
+  "center_penalty": 0.12,
+  "minimum_half_width_ratio": 0.66,
+  "minimum_valley_prominence": 0.05,
+  "high_confidence_threshold": 0.75,
+  "proposed_mapping": {
+    "image_left": "RIGHT",
+    "image_right": "LEFT"
+  },
+  "max_preview_width": 1600
+}

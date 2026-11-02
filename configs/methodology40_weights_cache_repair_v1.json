@@ -1,0 +1,29 @@
+{
+  "version": "methodology40_external_weights_cache_repair_v1.0",
+  "implementation_revision": "a2d21001d48d4b8710ebb3a7b51bc6c3092ff3ef",
+  "notebook_revision": "1.2",
+  "notebook_path": "notebooks/40_entrenar_densenet121_aumento_v1_2.ipynb",
+  "notebook_sha256": "19e596fe1ae141e14b3f4eb861249a850480af5aa6c0c322e22845ac9eab7551",
+  "cause": "generated_training_cell_did_not_create_external_checkpoint_cache",
+  "repair": "create_separate_session_cache_before_launching_registered_campaign",
+  "regression_tests": {
+    "passed": true,
+    "tests_run": 12,
+    "new_generated_cell_regressions": 3,
+    "original_failure_reproduced_without_repair": true
+  },
+  "broader_tests": {
+    "mode": "broader",
+    "passed": true,
+    "tests_run": 488,
+    "skipped": 0
+  },
+  "existing_public_checkpoint_synthetic_forward_verified": true,
+  "synthetic_real_runner_and_local_persistence_verified": true,
+  "five_synthetic_jobs_recovered": true,
+  "approved_scientific_recipe_changed": false,
+  "clinical_notebook_modified": false,
+  "participant_training_executed": false,
+  "colab_gpu_validation_performed_by_assistant": false,
+  "reserved_test_opened": false
+}

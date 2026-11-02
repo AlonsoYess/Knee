@@ -1,0 +1,39 @@
+{
+  "version": "final_model_amendment_v1.0",
+  "id": "MCR-2026-014",
+  "base_change": "MCR-2026-002",
+  "date": "2026-10-22",
+  "status": "approved_for_implementation_and_cpu_verification_only",
+  "approval": {
+    "source": "direct_user_message",
+    "statement": "ok, apruebo agregar BiomedCLIP y MambaOut-Tiny y cerrar la búsqueda. Prepara el código en el repositorio y la libreta para que yo ejecute en Colab, sin entrenar todavía ni abrir la prueba reservada."
+  },
+  "added_models": [
+    "image_biomedclip",
+    "image_mambaout_tiny"
+  ],
+  "architecture_search_closed": true,
+  "supersedes_only": [
+    "model_families.radiographic",
+    "model_families.radiographic_modern_challengers",
+    "selection.candidate_registry"
+  ],
+  "unchanged": [
+    "outcome",
+    "predictors",
+    "source_images",
+    "tensor_geometry_224",
+    "participant_partitions",
+    "clinical_fold_processing",
+    "five_fold_mean_AP_and_ties",
+    "maximum_two_promoted_challengers",
+    "mandatory_baselines",
+    "fusion_strategies",
+    "reserved_test_protection"
+  ],
+  "historical_configs_preserved": true,
+  "training_authorized": false,
+  "reserved_test_access_authorized": false,
+  "external_service_patient_upload_authorized": false,
+  "scope_note": "New release entrypoints must resolve modeling_release_v1_1.json; no fallback to historical model_registry.json. CPU forward verification is not training readiness or predictive validation."
+}

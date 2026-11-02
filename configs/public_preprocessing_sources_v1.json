@@ -1,0 +1,207 @@
+{
+  "version": "public_preprocessing_source_inventory_v1.0",
+  "purpose": "Publish missing scientific preparation code without replaying private historical operations",
+  "code_change": "source_publication_only_identical_scientific_files",
+  "files": [
+    {
+      "path": "configs/model_input_tensor_v1.json",
+      "canonical_lf_sha256": "2812ca0f3668457bdd37f3b1400d5dac0092e0fe808a742bfa32397a642cac15"
+    },
+    {
+      "path": "configs/participant_split_v1.json",
+      "canonical_lf_sha256": "451d8d399233b9b99bff31d03f8b102d0a923ec28e148c79ea12c12ae527b192"
+    },
+    {
+      "path": "notebooks/31_verificar_paquete_desarrollo_sin_entrenar.ipynb",
+      "canonical_lf_sha256": "231ca2151400028c19cf57c46419c7a3ef57ff9f0fb2c399ac2e04c3c13e8018"
+    },
+    {
+      "path": "notebooks/31_verificar_paquete_desarrollo_sin_entrenar_v1_1.ipynb",
+      "canonical_lf_sha256": "0621994bb38da0025d9385243f9456a7403a64e61158221d93503a6cb156e808"
+    },
+    {
+      "path": "requirements-colab-data.txt",
+      "canonical_lf_sha256": "e77e7045d01a9431264f9262c6b199d8e7988c139276a5266a3cf689588ad66e"
+    },
+    {
+      "path": "requirements-model-inputs.txt",
+      "canonical_lf_sha256": "bc7ffa73f13a54b6beb212cdf04311d8ba93f723daefef880a433145d6b0eaf1"
+    },
+    {
+      "path": "scripts/freeze_common_cohort.py",
+      "canonical_lf_sha256": "09cc271fe690fb2d7ff55fd0672f61e9e8fdeef04d50c5afe1dd22c793696254"
+    },
+    {
+      "path": "scripts/prepare_colab_data.py",
+      "canonical_lf_sha256": "6fff2ffa3ef4416b9d9ed0ce72eddaf7b912422b70b465af61e821a1fd64c797"
+    },
+    {
+      "path": "scripts/prepare_colab_package_transport.py",
+      "canonical_lf_sha256": "6381cfda8cfc33fe197b576b17aa8cafab63f1a56d166cac1aba1dd2c3a39a78"
+    },
+    {
+      "path": "scripts/prepare_development_inputs.py",
+      "canonical_lf_sha256": "9ccebe4c81eb5358d737cc869c97527a6e27cfdb8b3edc751a64d58bc0ae1341"
+    },
+    {
+      "path": "scripts/prepare_routine_inputs.py",
+      "canonical_lf_sha256": "9384b2cd3508f73df9df1fedb5e074e2242a4a88904312d0c4310698b9f6ce3b"
+    },
+    {
+      "path": "scripts/rehearse_colab_data_preflight.py",
+      "canonical_lf_sha256": "e784c0d6323e89552003128f3a43e869fa59ae9fafb1c3411a944174bccf7f61"
+    },
+    {
+      "path": "scripts/rehearse_colab_transport_preflight.py",
+      "canonical_lf_sha256": "16ceab54bee848c46a92cce9ef229cc3eaf1608ae836cc71778460f7e003afc2"
+    },
+    {
+      "path": "scripts/verify_colab_data.py",
+      "canonical_lf_sha256": "d5f9924ff1d6bedecd8e3f80d1ae3bb2cdec5393f1573be5db3fc06f8c64e41a"
+    },
+    {
+      "path": "scripts/verify_common_cohort.py",
+      "canonical_lf_sha256": "2ca525d3e9f8a1e4b938eb3dfde0cf850934ac99f766dca7deec9127c1175e63"
+    },
+    {
+      "path": "scripts/verify_development_inputs.py",
+      "canonical_lf_sha256": "7e555a8645565960b9208cfe025b161169ab9935b07be7f2da7f0c66924c8ac5"
+    },
+    {
+      "path": "scripts/verify_participant_colab_preparation.py",
+      "canonical_lf_sha256": "0342d0a05ed19c1e18677ebd1ccf1e94b7fd6ab940ffb4ea95b1c9ac993798ae"
+    },
+    {
+      "path": "scripts/verify_routine_inputs.py",
+      "canonical_lf_sha256": "c038b26711591ce8d0c5189baa0d31f6751c3dc931ad96fe8b239b5bcae01933"
+    },
+    {
+      "path": "src/knee/colab_data_package.py",
+      "canonical_lf_sha256": "a2778f837fa28c035374cb5e12115f87cc461ef16a97942d4663a6d3a55214f3"
+    },
+    {
+      "path": "src/knee/colab_preparation.py",
+      "canonical_lf_sha256": "8b42421c03b50ba479d785f47d770a7cb4f0cf17fbcfede341c8bc10a45565a4"
+    },
+    {
+      "path": "src/knee/common_cohort.py",
+      "canonical_lf_sha256": "d3d42ac3252bcfa9afc6ef2c18361624d6d6762fd026c34f2df7a253eb857220"
+    },
+    {
+      "path": "src/knee/common_cohort_assets.py",
+      "canonical_lf_sha256": "93cfb0801c78e1adcc5d1481c6e88fd64cf5e6dca74cccf70aa74ec69e6c5587"
+    },
+    {
+      "path": "src/knee/development_dicom_headers.py",
+      "canonical_lf_sha256": "598494c07e0544fe2500bd1fa36dfe5e41b5f96309a8c1ed3efa750c4666e9f5"
+    },
+    {
+      "path": "src/knee/development_model_inputs.py",
+      "canonical_lf_sha256": "fac39e4279d522a2b34c6f134434c3df784cbfd8247ff78d002c116c3d43558a"
+    },
+    {
+      "path": "src/knee/model_input_tensor.py",
+      "canonical_lf_sha256": "7888fe1efdc31c756c7088c5d435e45d4be4e57cea29ed845801d522db03f11d"
+    },
+    {
+      "path": "src/knee/participant_partitions.py",
+      "canonical_lf_sha256": "6bef5fa39fb3243d0ff04ebb67b904dcf1ca12c1dc24d9f3156e552cd1d7d5ce"
+    },
+    {
+      "path": "src/knee/roi_contact_geometry.py",
+      "canonical_lf_sha256": "bbf42ba23acc38fa4b7157d1898bcc75bd392a6650bcea19fdb839deeae897ed"
+    },
+    {
+      "path": "src/knee/roi_contour_geometry.py",
+      "canonical_lf_sha256": "39e488d79ae25253925c4b9f1a3e7998a15fa39b2af8739c49b5e5059b752607"
+    },
+    {
+      "path": "src/knee/roi_external_candidate.py",
+      "canonical_lf_sha256": "4bfba76edc267483f2e570edc858772942f6546ae6d63bafb248e3ade226d42f"
+    },
+    {
+      "path": "src/knee/roi_global_retention_monitor.py",
+      "canonical_lf_sha256": "c32ad5e3f91fa16110fadb904dfb8fdc7d9bd5e4bd02a6c588b603323618efab"
+    },
+    {
+      "path": "src/knee/roi_global_retention_sources.py",
+      "canonical_lf_sha256": "c698091786724cc6df5d7aa78b9bb191214e258b0911622291c0004f32d127f7"
+    },
+    {
+      "path": "src/knee/roi_landmark_geometry.py",
+      "canonical_lf_sha256": "d613f8816d6d110d32d1c5923ffe1048a43e2115ddd2737906c4eb12352bdf16"
+    },
+    {
+      "path": "src/knee/routine_dicom_headers.py",
+      "canonical_lf_sha256": "94112005d553b42e89e0afe2799d3a458e10e9f5ffb8f727c73cd5629c2bcb84"
+    },
+    {
+      "path": "src/knee/routine_model_inputs.py",
+      "canonical_lf_sha256": "3a722e74cb1010a63fe77c531e86a2f9285e2a33c3e40c96bd3c73f7598a5798"
+    },
+    {
+      "path": "tests/test_colab_data_package.py",
+      "canonical_lf_sha256": "3c156137b6a31b31a5996892ed1c4ef17a206a80e0051d7c9cf59b55a355c8fe"
+    },
+    {
+      "path": "tests/test_colab_preparation.py",
+      "canonical_lf_sha256": "4e8a693309cf959f706ff0b5489a95303b39a017043e9edb32724e4badf00b96"
+    },
+    {
+      "path": "tests/test_colab_transport_notebook.py",
+      "canonical_lf_sha256": "8ff890d2ee4d2a3992f62f6a2e988c7e05009aaddb203d0379165d431dd4f0dd"
+    },
+    {
+      "path": "tests/test_common_cohort.py",
+      "canonical_lf_sha256": "d51de9d0428b6af7e89aea0c725921ad6b531bf567cb1fba785e00b6269b9e8c"
+    },
+    {
+      "path": "tests/test_common_cohort_assets.py",
+      "canonical_lf_sha256": "d11c73181d74def97093e36918fef7ed9bf7c7dee04da3564e8a4a5baaed54c1"
+    },
+    {
+      "path": "tests/test_development_dicom_headers.py",
+      "canonical_lf_sha256": "73ee1aeff43bc817ea2c4bef462669733628b9e01c2d747fc120064bbd921119"
+    },
+    {
+      "path": "tests/test_development_model_inputs.py",
+      "canonical_lf_sha256": "0f0c246ec25e2cc58003ef77e5dc38b8808bd1b548de36391a14323f619b2c2e"
+    },
+    {
+      "path": "tests/test_model_input_tensor.py",
+      "canonical_lf_sha256": "48faade141ab75a810655b5f31df0a0963e5db8ba3773452dad135e8259a7e1c"
+    },
+    {
+      "path": "tests/test_participant_partitions.py",
+      "canonical_lf_sha256": "e94c010e58d9af5a8bdb48ffe8dbb1bb7338ce9f2b7be8702164c7d8eb6ca463"
+    },
+    {
+      "path": "tests/test_roi_contact_geometry.py",
+      "canonical_lf_sha256": "5cba2fba31d8001a42739d0842b2755a970b8eafec12ef8750226bcbf292b163"
+    },
+    {
+      "path": "tests/test_roi_contour_geometry.py",
+      "canonical_lf_sha256": "ca205042336f43c6c69aeec82ddbcc5175ad7a92f9f204ba15cc09b45ce4377a"
+    },
+    {
+      "path": "tests/test_roi_external_candidate.py",
+      "canonical_lf_sha256": "041f4c8dc1df4522c8fdb750f3979b6c64b93fd8ff08c19e1fcb15a7a456f69f"
+    },
+    {
+      "path": "tests/test_roi_landmark_geometry.py",
+      "canonical_lf_sha256": "7f6316e7f0dc01a5f22d50739c4e1b11898544c5aca2964aeb9f429021e3292d"
+    },
+    {
+      "path": "tests/test_routine_dicom_headers.py",
+      "canonical_lf_sha256": "8e28deb1b2b3a76324b09e3c5bcc6b1d8345770f12004baaa25c7a495984bed0"
+    },
+    {
+      "path": "tests/test_routine_model_inputs.py",
+      "canonical_lf_sha256": "1936a5c42f7aa8ed87decb1af52a6edf0c19389dd3ffe4650f66da3a2456fa24"
+    }
+  ],
+  "private_operational_inputs": "Historical execution capsules, exact source inventories, source data, observations, per-knee decisions and execution-specific configurations remain private. Their integrity guards are preserved in the original private copies.",
+  "historical_notebooks": "Operational notebooks 16 through 30 remain in private Drive with their original capsules; notebooks 31 are published without outputs.",
+  "training_executed": false,
+  "reserved_test_opened": false
+}

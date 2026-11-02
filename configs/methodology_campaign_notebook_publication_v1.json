@@ -1,0 +1,26 @@
+{
+  "version": "methodology_campaign_notebook_publication_v1.0",
+  "status": "prepared_for_investigator_execution_not_trained",
+  "implementation_revision": "6620536015c6fca88d01dbe68518b74bb6f17df3",
+  "training_plan": "configs/training_plan_v1_2.json",
+  "statistics_alignment": "configs/governance/statistics_alignment_v1.json",
+  "historical_preprocessing_sources": "configs/public_preprocessing_sources_v1.json",
+  "notebooks": [
+    {
+      "path": "notebooks/39_entrenar_clinicos_tres_escenarios_v1_2.ipynb",
+      "sha256": "b70fe7943686b796b6b1673fc4899bfdef08d9e53453bb67dff1e589e4986008",
+      "bytes": 15221,
+      "campaign": "clinical"
+    },
+    {
+      "path": "notebooks/40_entrenar_densenet121_aumento_v1_2.ipynb",
+      "sha256": "eefcd5bb9fe9bb79bd32dab4d7b559be480fcf43fca5696073a5cfb55ee14e16",
+      "bytes": 15446,
+      "campaign": "densenet_frozen"
+    }
+  ],
+  "required_preflight": "completed_saved_real_colab_notebook_38",
+  "training_executed_by_publication": false,
+  "reserved_test_opened_by_publication": false,
+  "word_modified": false
+}

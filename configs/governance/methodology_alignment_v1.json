@@ -1,0 +1,34 @@
+{
+  "version": "methodology_alignment_v1.0",
+  "id": "MCR-2026-015",
+  "date": "2026-10-25",
+  "status": "approved_implementation_only_no_training",
+  "approval": {
+    "source": "direct_user_message",
+    "statement": "Ok, haz lo que propones: corrige el plan e implementa lo que falta de KL inicial, cirugía y WOMAC, fusión tardía y aumento de datos. Que todo concuerde con el Word, sin entrenar todavía ni abrir la prueba reservada."
+  },
+  "purpose": "Restore executable coverage of existing thesis commitments, not expand architecture search.",
+  "historical_inputs_and_jobs_preserved": true,
+  "changes": [
+    "two_complementary_baseline_clinical_scenarios",
+    "fixed_equal_probability_late_fusion",
+    "training_only_mild_gamma_augmentation"
+  ],
+  "unchanged": [
+    "outcome",
+    "cohort",
+    "participant_partitions",
+    "originals",
+    "native_crops",
+    "224_tensor_geometry",
+    "main_clinical_predictors",
+    "model_architecture_roster",
+    "AP_selection_rule",
+    "reserved_test_protection"
+  ],
+  "augmentation_rationale": "Mild intensity variation only; preserve all pixel positions, laterality and zero padding. Gamma bounds 0.9 to 1.1 with probability 0.5 are a starting engineering choice, not an empirically optimal claim.",
+  "historical_dense_net_result": "identity_policy_frozen_encoder_initial_result_remains_historical; new comparison campaigns require consistent v1.2 recipe",
+  "training_authorized": false,
+  "reserved_test_access_authorized": false,
+  "new_data_selected": false
+}

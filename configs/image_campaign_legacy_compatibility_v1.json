@@ -1,0 +1,60 @@
+{
+  "version": "image_campaign_legacy_compatibility_v1.0",
+  "legacy_code_revision": "c0e2d03937615c3d7dac28351371a82819b2e46c",
+  "legacy_source_files_sha256": {
+    "src/knee/methodology_campaign.py": [
+      "3acd42e7d11a8cc4b9d43ada7ab42eeedb481c1e9dac2c8a11f80950a132bb0a",
+      "82918d2590e7671524ed6d41ceb6893acce596c3a14b6c7882f73a3ca0c8495c"
+    ],
+    "src/knee/methodology_campaign_colab.py": [
+      "b5f83515200663830178b32c03a7859b8debb39966b73cc04332de9ce5772fa3",
+      "47dc0b584b2678a1d45006c7f21200b7299e83c188aea54635f578f65674b1ad"
+    ],
+    "scripts/train_methodology_campaign_colab.py": [
+      "5388e53d006ad2bae1ecd51c6e646ae2392a2ad83839453c4990f21998a6602f",
+      "23ccf1b663b104704a080f25d668dcca0a0b5fd83c84de4f4880e0a800a8af46"
+    ],
+    "src/knee/methodology_release.py": [
+      "75dcbc5c2a11e83cfd335c9133232125fc868265c0f3c8fba5c75d36d8fe4432",
+      "d9eb754f2e72ae891dab92596fd859299341a9ccfd53d968a78de7ee3e4e9c39"
+    ],
+    "src/knee/clinical_scenarios.py": [
+      "5c6dace255e95ab6220102a43da2c24064bc669d62ae8066803b6cdc17b674a9",
+      "6e0f642cc3e44ae450e176747e286acbcfb4507734a7f8802b40c9590068fb4d"
+    ],
+    "src/knee/training_augmentation.py": [
+      "2c211483049bcb9f8a5d2dfd3dfd5475364e7a443f4f98ad1f79ad08b2898343",
+      "b37fbf7978a678c5959a66f9d57469b8ef82654c5baa57d17faf0f4a44dbfc1b"
+    ],
+    "src/knee/aligned_training/authority.py": [
+      "7c5da67b8197ac2f5613382127413e8d6b265e5132872109318979b9294f0f43",
+      "f04afcee88832db7f6cceb473662ff5efdaf495cab54424ff6e26bc507224de4"
+    ],
+    "src/knee/aligned_training/runner.py": [
+      "7218cc62b515e496d6b11be59605421903098bbe7c053c7633d8a1ceb815f5dc",
+      "4f9b4469f853e82566190f086fd09c15cb7929b557081d56d935e77a29097e3d"
+    ],
+    "src/knee/aligned_training/data.py": [
+      "7753cbabe4a84bed85f2ea2f1471b316a6f7b9d091bd6d8e336f3a3304dcc096",
+      "77421f0a69bda815c59d410ef50e6e0ad4c763c3d838b6131be147fc0263cdb4"
+    ],
+    "src/knee/aligned_training/models.py": [
+      "64d54498fc21b2b94b594d36a3488d8b76918424038c20c89b2a41c1795c41bd",
+      "cddffc3eb2d5c2bb2a5af3c637cfc8f4f34baf43eb6e775a63ef33dc08bbef92"
+    ],
+    "src/knee/aligned_training/engine.py": [
+      "0ac1dc990001d77b1634494ef809d2a1a903eea94fd46130328ee649739b4077",
+      "97b21c9ede749f654e2efd0c0e20e6f5fe203fde2f4cfdade990df75a7397fa5"
+    ],
+    "scripts/train_image_screening_colab.py": [
+      "d5f44ad3db8c29ad048b05d6bac4697bef70e39e8be9711a28704436129f37a9",
+      "76a50a893d93f077378192016a61b0d24cfbaeaad2e6974dfe907a3632996364"
+    ],
+    "scripts/build_image_screening_notebook.py": [
+      "fe524a264751aa31e536cde58b86d5ec49bd28380310935009a5138408624f33",
+      "a32cb663c0894205b4a480df8ed90b90638ec6d846e5b11b87e5005d6e8f75fe"
+    ]
+  },
+  "training_plan_sha256": "a9644a979e4e0f4b1736c78531ea7ccbf8e2e1cfab684bc946334162eeb81b5b",
+  "modeling_release_sha256": "868744d3673e39656a640cc616d12e23b6540a7d4891a9815ac14d18294f7869"
+}

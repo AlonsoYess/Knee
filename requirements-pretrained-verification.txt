@@ -1,0 +1,12 @@
+# Add to the isolated Python 3.12 / Torch 2.6.0+cpu / TorchVision 0.21.0+cpu
+# environment already verified by notebook 32. Do not install into its parent.
+# No timm, trust_remote_code, new neural architecture, or GPU wheel is required.
+transformers==4.50.2
+tokenizers==0.21.1
+regex==2024.11.6
+safetensors==0.5.3
+huggingface-hub==0.30.2
+packaging==26.3
+requests==2.34.2
+PyYAML==6.0.3
+tqdm==4.70.1

@@ -1,0 +1,20 @@
+{
+  "version": "participant_partitions_v1.0",
+  "seed": 2026,
+  "outer_blocks": 5,
+  "reserved_test_block": 0,
+  "test_participant_fraction_approx": 0.2,
+  "development_cv_folds": 5,
+  "group_unit": "participant",
+  "stratum": "any_accepted_knee_with_PROGRESION_48M_1_per_participant",
+  "algorithm": "seeded_sha256_rank_with_continuous_round_robin_class_quotas",
+  "permanent_preprocessing_development_reservations": "never_test_even_if_no_accepted_knee",
+  "outer_non_test_blocks": [1, 2, 3, 4],
+  "cv_assignment": "all_non_test_participants_including_preprocessing_development",
+  "class_presence_gate": "both_classes_in_test_each_cv_validation_and_each_cv_training",
+  "retry_other_seeds_or_assignments": false,
+  "fit_preprocessing": false,
+  "model_specific_normalization": "pending_encoder_integration",
+  "same_assignment_for": ["clinical", "radiographic", "multimodal"],
+  "historical_processing_block_reused_as_partition": false
+}

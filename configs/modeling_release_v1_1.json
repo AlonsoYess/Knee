@@ -1,0 +1,12 @@
+{
+  "version": "final_modeling_release_v1.1",
+  "status": "approved_preparation_only",
+  "governing_change": "MCR-2026-014",
+  "registry": "configs/model_registry_v1_1.json",
+  "training_plan": "configs/training_plan_v1_1.json",
+  "weights_catalog": "configs/pretrained_weights_v1_1.json",
+  "amendment": "configs/governance/final_model_amendment_v1.json",
+  "architecture_search_closed": true,
+  "training_authorized": false,
+  "reserved_test_access_authorized": false
+}

@@ -1,0 +1,23 @@
+{
+  "version": "methodology40_cpu_gpu_test_repair_v1.0",
+  "notebook_revision": "1.1",
+  "status": "published_code_and_notebook_prepared_pending_investigator_colab_execution",
+  "implementation_revision": "22346b30d1e03a16dda3c5865d990cca2931209a",
+  "previous_implementation_revision": "6620536015c6fca88d01dbe68518b74bb6f17df3",
+  "notebook": "notebooks/40_entrenar_densenet121_aumento_v1_2.ipynb",
+  "notebook_sha256": "ebbeebcf87a029bb29a09d3ddd06f14ea7a6b907b4120caef07fac60ee97e2f7",
+  "notebook_bytes": 15644,
+  "original_failure_reproduced": true,
+  "synthetic_campaign_tests_cpu": 105,
+  "synthetic_campaign_tests_simulated_hidden_cuda_build": 105,
+  "broader_regression_tests": 485,
+  "tests_skipped": 0,
+  "actual_cuda_gpu_training_executed_during_repair": false,
+  "local_cuda_build_metadata_simulated": true,
+  "scientific_recipe_changed": false,
+  "partitions_changed": false,
+  "originals_modified": false,
+  "production_cpu_preflight_guard_unchanged": true,
+  "notebook39_unchanged": true,
+  "reserved_test_opened": false
+}
