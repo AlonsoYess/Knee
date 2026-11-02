@@ -10,6 +10,7 @@ from collections import deque
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import errno
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -24,7 +25,7 @@ import threading
 import time
 import uuid
 
-VERSION = "colab_training_supervisor_v1.1"
+VERSION = "colab_training_supervisor_v1.2"
 HOST_MEMORY_POLICY = "glibc_cpu_reclaim_v1.0"
 # GNU libc documents startup knobs for returning freed large CPU allocations:
 # https://sourceware.org/glibc/manual/latest/html_node/Malloc-Tunable-Parameters.html
@@ -37,6 +38,11 @@ DISK_RESERVE = 2 * 1024 ** 3
 MAX_STREAM_BYTES = 8 * 1024 ** 2
 MAX_LINE_BYTES = 64 * 1024
 LEASE_SECONDS = 120
+DRIVE_SYNC_SECONDS = 30
+DRIVE_RETRY_SECONDS = 10
+DRIVE_OUTAGE_SECONDS = 80
+DRIVE_TRANSIENT_ERRNOS = {errno.EIO, errno.ESTALE, errno.ETIMEDOUT}
+MAX_TELEMETRY_BYTES = 8 * 1024 ** 2
 
 
 def sanitize(text):
@@ -131,11 +137,115 @@ def _read(path, limit=16384):
 def _save(path, value):
     path = Path(path)
     temporary = path.with_name(path.name + ".writing_" + uuid.uuid4().hex)
-    with temporary.open("x", encoding="utf-8", newline="\n") as stream:
-        json.dump(value, stream, ensure_ascii=False, indent=2, allow_nan=False)
-        stream.write("\n")
-        _sync(stream)
-    os.replace(temporary, path)
+    try:
+        with temporary.open("x", encoding="utf-8", newline="\n") as stream:
+            json.dump(value, stream, ensure_ascii=False, indent=2, allow_nan=False)
+            stream.write("\n")
+            _sync(stream)
+        os.replace(temporary, path)
+    finally:
+        try:
+            temporary.unlink(missing_ok=True)
+        except OSError:
+            pass
+
+
+def _copy_evidence(source, target):
+    """Replace one bounded snapshot and verify exact readback, never checkpoints."""
+    payload = source.read_bytes()
+    if len(payload) > max(MAX_STREAM_BYTES, MAX_TELEMETRY_BYTES, 128 * 1024):
+        raise ValueError("bounded_operational_snapshot_required")
+    target.parent.mkdir(exist_ok=True)
+    temporary = target.with_name(target.name + ".writing_" + uuid.uuid4().hex)
+    try:
+        with temporary.open("xb") as stream:
+            stream.write(payload)
+            _sync(stream)
+        os.replace(temporary, target)
+        with target.open("rb") as stream:
+            readback = stream.read(len(payload) + 1)
+        if readback != payload:
+            raise ValueError("operational_snapshot_readback_mismatch")
+    finally:
+        try:
+            temporary.unlink(missing_ok=True)
+        except OSError:
+            pass
+
+
+class DriveEvidence:
+    """Frequent writes stay local; a bounded outage never disables supervision."""
+    def __init__(self, local, remote, active_path, lease, interval=DRIVE_SYNC_SECONDS):
+        self.local, self.remote, self.active_path = local, remote, active_path
+        self.lease = lease
+        self.interval = interval
+        self.last_success = None
+        self.next_attempt = 0.0
+        self.warning_active = False
+        self.sync_count = 0
+
+    def _renew_lease(self):
+        # Ownership is checked before and after snapshot copying.
+        current = _json(self.active_path)
+        if current is None:
+            # Read separately so an actual transient I/O error remains identifiable.
+            with self.active_path.open(encoding="utf-8") as stream:
+                current = json.load(stream)
+        if current.get("run_name") != self.lease["run_name"]:
+            raise RuntimeError("active_supervision_ownership_changed")
+        value = {**self.lease, "heartbeat_unix": time.time()}
+        _save(self.active_path, value)
+        with self.active_path.open(encoding="utf-8") as stream:
+            if json.load(stream) != value:
+                raise ValueError("operational_lease_readback_mismatch")
+
+    def _publish(self):
+        self._renew_lease()
+        paths = sorted(self.local.glob("attempt_*/*"))
+        if len(paths) > 8:
+            raise ValueError("bounded_operational_attempt_inventory_required")
+        paths.append(self.local / "run.json")
+        for source in paths:
+            if source.name not in {"status.json", "stdout.log", "stderr.log", "telemetry.jsonl", "run.json"}:
+                raise ValueError("registered_operational_snapshot_only")
+            if source.exists():
+                _copy_evidence(source, self.remote / source.relative_to(self.local))
+        # A slow copy must not make the next outage deadline outlive the lease.
+        self._renew_lease()
+        # Success includes exact readback through the mounted Drive filesystem.
+
+    def sync(self, *, force=False):
+        now = time.monotonic()
+        if (self.last_success is not None and self.lease.get("child") is not None
+                and self.lease.get("state") in ("running", "retrying")
+                and now - self.last_success >= DRIVE_OUTAGE_SECONDS):
+            raise OSError(errno.EIO, "drive_evidence_outage_limit_reached")
+        if not force and now < self.next_attempt:
+            return False
+        last_error = None
+        for attempt in range(3):
+            try:
+                self._publish()
+                self.last_success = time.monotonic()
+                self.next_attempt = self.last_success + self.interval
+                self.sync_count += 1
+                if self.warning_active:
+                    print("Drive volvió a responder; el registro local quedó sincronizado y verificado.", flush=True)
+                self.warning_active = False
+                return True
+            except OSError as error:
+                if error.errno not in DRIVE_TRANSIENT_ERRNOS:
+                    raise
+                last_error = error
+                if attempt < 2:
+                    time.sleep(attempt + 1)
+        if force or self.last_success is None or time.monotonic() - self.last_success >= DRIVE_OUTAGE_SECONDS:
+            raise last_error
+        self.next_attempt = time.monotonic() + DRIVE_RETRY_SECONDS
+        if not self.warning_active:
+            print("Drive no respondió al sincronizar el monitoreo; se conserva el registro local y se reintentará de forma limitada.", flush=True)
+        self.warning_active = True
+        return False
 
 
 def _sync(stream):
@@ -343,7 +453,9 @@ class RunOutcome:
 class TrainingStopped(RuntimeError):
     def __init__(self, report):
         self.report = report
-        super().__init__("La ejecución se detuvo; el diagnóstico quedó guardado en Drive. "
+        location = ("la escritura del diagnóstico se verificó en el montaje de Drive" if report.get("diagnostic_saved_to_drive")
+                    else "el diagnóstico se conserva en el entorno local; no se confirmó su escritura en Drive")
+        super().__init__("La ejecución se detuvo; " + location + ". "
                          f"Motivo registrado: {report.get('failure_kind')}; salida: {report.get('returncode')}. "
                          "Se conserva el avance verificado; no cambies la receta.")
 
@@ -378,7 +490,7 @@ def _terminate(process):
 
 def run(arguments, *, cwd, env, records_root, session_root, code_revision,
         sample_interval=10, heartbeat_interval=30, max_retries=1, retry_delay=30,
-        sample_provider=None, host_memory_policy=None):
+        sample_provider=None, host_memory_policy=None, drive_sync_interval=DRIVE_SYNC_SECONDS):
     arguments = [str(x) for x in arguments]
     def argument(name):
         if arguments.count(name) != 1:
@@ -389,7 +501,7 @@ def run(arguments, *, cwd, env, records_root, session_root, code_revision,
     argument("--output-dir")
     if type(max_retries) is not int or not 0 <= max_retries <= 1:
         raise ValueError("at_most_one_transient_retry_per_invocation")
-    if min(sample_interval, heartbeat_interval) <= 0 or retry_delay < 0:
+    if min(sample_interval, heartbeat_interval, drive_sync_interval) <= 0 or drive_sync_interval > DRIVE_SYNC_SECONDS or retry_delay < 0:
         raise ValueError("positive_supervision_intervals_required")
     root = Path(records_root).resolve()
     session = Path(session_root).resolve()
@@ -412,17 +524,22 @@ def run(arguments, *, cwd, env, records_root, session_root, code_revision,
     run_name = "run_" + uuid.uuid4().hex
     run_dir = logs / run_name
     run_dir.mkdir()
+    local_run_dir = session / LOG_FOLDER / run_name
+    local_run_dir.mkdir(parents=True)
     sampler = sample_provider or sample_resources
     controller = _identity(os.getpid())
     report = {"version": VERSION, "state": "running", "started_at_utc": _now(),
               "code_revision": code_revision, "controller": controller,
               "attempts": 0, "termination_cause_confirmed": False,
               "max_transient_retries": max_retries, "training_recipe_changed": False,
-              "reserved_test_opened": False}
+              "reserved_test_opened": False, "local_evidence_directory": str(local_run_dir),
+              "diagnostic_saved_to_drive": False, "drive_sync_interval_seconds": drive_sync_interval,
+              "maximum_drive_outage_seconds": DRIVE_OUTAGE_SECONDS}
     process = None
     attempt_report = None
     attempt_dir = None
     lease_owned = False
+    publisher = None
     try:
         # O_EXCL protects the initial claim. A stale, finalized claim is retired only here.
         if old is not None:
@@ -434,18 +551,21 @@ def run(arguments, *, cwd, env, records_root, session_root, code_revision,
                        "child": None, "heartbeat_unix": time.time()}, stream)
             _sync(stream)
         lease_owned = True
-        _save(run_dir / "run.json", report)
+        lease = {"run_name": run_name, "state": "running", "controller": controller, "child": None}
+        publisher = DriveEvidence(local_run_dir, run_dir, active_path, lease, drive_sync_interval)
+        _save(local_run_dir / "run.json", report)
+        publisher.sync(force=True)
         _save(logs / "latest.json", {"run_name": run_name})
         child_env, policy_record = host_memory_environment(env, host_memory_policy)
         report["host_memory_policy"] = policy_record
-        _save(run_dir / "run.json", report)
+        _save(local_run_dir / "run.json", report)
         if policy_record["enabled"]:
             print("Comprobando la gestión de RAM con dos procesos sintéticos en CPU; no se abren datos de participantes…", flush=True)
             policy_record["verification"] = verify_host_memory_math(arguments[0], env, child_env)
-            _save(run_dir / "run.json", report)
+            _save(local_run_dir / "run.json", report)
             print("Gestión de RAM preparada; pesos sintéticos, pérdidas y generador aleatorio coinciden. Se conserva el código congelado.", flush=True)
         for attempt in range(1, max_retries + 2):
-            attempt_dir = run_dir / f"attempt_{attempt:03d}"
+            attempt_dir = local_run_dir / f"attempt_{attempt:03d}"
             attempt_dir.mkdir()
             output = session / ("gradual_campaign_" + uuid.uuid4().hex)
             command = list(arguments)
@@ -463,14 +583,23 @@ def run(arguments, *, cwd, env, records_root, session_root, code_revision,
             samples.append(initial)
             report["last_sample"] = initial
             _save(attempt_dir / "status.json", attempt_report)
-            _save(run_dir / "run.json", report)
+            _save(local_run_dir / "run.json", report)
+            publisher.lease.update(state="running", child=None)
+            publisher.sync(force=True)
             if _pressure(initial):
                 pressure_reason = _pressure(initial)
             with (attempt_dir / "stdout.log").open("w", encoding="utf-8", newline="\n") as out_log, \
                  (attempt_dir / "stderr.log").open("w", encoding="utf-8", newline="\n") as err_log, \
                  (attempt_dir / "telemetry.jsonl").open("w", encoding="utf-8", newline="\n") as telemetry:
+                telemetry_bytes = 0
                 def persist_sample(sample):
-                    telemetry.write(json.dumps(sample, ensure_ascii=False, allow_nan=False) + "\n")
+                    nonlocal telemetry_bytes
+                    encoded = json.dumps(sample, ensure_ascii=False, allow_nan=False) + "\n"
+                    if telemetry_bytes + len(encoded.encode("utf-8")) <= MAX_TELEMETRY_BYTES:
+                        telemetry.write(encoded)
+                        telemetry_bytes += len(encoded.encode("utf-8"))
+                    else:
+                        report["telemetry_truncated_at_byte_limit"] = True
                     _sync(telemetry)
                 persist_sample(initial)
                 if not pressure_reason:
@@ -478,6 +607,7 @@ def run(arguments, *, cwd, env, records_root, session_root, code_revision,
                                                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                                start_new_session=os.name == "posix")
                     attempt_report["child"] = _identity(process.pid)
+                    publisher.lease["child"] = attempt_report["child"]
                 messages = queue.Queue(maxsize=1024)
                 def forward(stream, channel):
                     try:
@@ -520,8 +650,9 @@ def run(arguments, *, cwd, env, records_root, session_root, code_revision,
                                 report["last_progress"] = safe.strip()[:1000]
                         if bytes_written[channel] < MAX_STREAM_BYTES:
                             stream = out_log if channel == "stdout" else err_log
-                            stream.write(safe[:MAX_STREAM_BYTES - bytes_written[channel]])
-                            bytes_written[channel] += len(safe.encode("utf-8"))
+                            clipped = safe.encode("utf-8")[:MAX_STREAM_BYTES - bytes_written[channel]].decode("utf-8", errors="ignore")
+                            stream.write(clipped)
+                            bytes_written[channel] += len(clipped.encode("utf-8"))
                     current = time.monotonic()
                     if current - last_sample >= sample_interval:
                         sample = sampler(process.pid)
@@ -532,9 +663,8 @@ def run(arguments, *, cwd, env, records_root, session_root, code_revision,
                             _sync(stream)
                         _save(attempt_dir / "status.json", {**attempt_report, "last_sample": sample,
                                                            "last_progress": report.get("last_progress")})
-                        _save(run_dir / "run.json", report)
-                        _save(active_path, {"run_name": run_name, "state": "running", "controller": controller,
-                                            "child": attempt_report.get("child"), "heartbeat_unix": time.time()})
+                        _save(local_run_dir / "run.json", report)
+                        publisher.sync()
                         last_sample = current
                         reason = _pressure(sample)
                         if reason:
@@ -587,9 +717,11 @@ def run(arguments, *, cwd, env, records_root, session_root, code_revision,
             if retrying:
                 report["state"] = "retrying"
             _save(attempt_dir / "status.json", attempt_report)
-            _save(run_dir / "run.json", report)
-            _save(active_path, {"run_name": run_name, "state": "retrying" if retrying else state, "controller": controller,
-                                "child": attempt_report.get("child"), "heartbeat_unix": time.time()})
+            _save(local_run_dir / "run.json", report)
+            publisher.lease.update(state="retrying" if retrying else state, child=attempt_report.get("child"))
+            report["diagnostic_saved_to_drive"] = True
+            _save(local_run_dir / "run.json", report)
+            publisher.sync(force=True)
             if state == "succeeded":
                 return RunOutcome("".join(stdout_lines), output, run_dir, attempt)
             if category != "transient_http_server_error" or attempt > max_retries:
@@ -608,9 +740,10 @@ def run(arguments, *, cwd, env, records_root, session_root, code_revision,
                       failure_kind="controller_cancelled" if cancelled else (
                           "host_memory_policy_validation_error" if policy_failure else "supervisor_or_persistence_error"),
                       returncode=process.returncode if process is not None else None,
-                      supervisor_error=sanitize(f"{type(error).__name__}: {error}")[:2000])
-        # A Drive failure must never silently turn supervision off. Try local evidence too.
-        for path in (session / (run_name + "_stop.json"), run_dir / "run.json"):
+                      supervisor_error=sanitize(f"{type(error).__name__}: {error}")[:2000],
+                      diagnostic_saved_to_drive=False)
+        # The local record remains authoritative when mounted-Drive write verification fails.
+        for path in (session / (run_name + "_stop.json"), local_run_dir / "run.json"):
             try:
                 _save(path, report)
             except OSError:
@@ -620,12 +753,19 @@ def run(arguments, *, cwd, env, records_root, session_root, code_revision,
                 _save(attempt_dir / "status.json", {**attempt_report, **report})
             except OSError:
                 pass
-        if lease_owned:
+        if lease_owned and publisher is not None:
             try:
-                _save(active_path, {"run_name": run_name, "state": report["state"],
-                                    "controller": controller, "heartbeat_unix": time.time()})
-            except OSError:
-                pass
+                publisher.lease.update(state=report["state"], child=attempt_report.get("child") if attempt_report else None)
+                report["diagnostic_saved_to_drive"] = True
+                _save(local_run_dir / "run.json", report)
+                publisher.sync(force=True)
+            except (OSError, ValueError, RuntimeError):
+                report["diagnostic_saved_to_drive"] = False
+                try:
+                    _save(local_run_dir / "run.json", report)
+                    _save(session / (run_name + "_stop.json"), report)
+                except OSError:
+                    pass
         if cancelled:
             raise
         raise TrainingStopped(report) from error

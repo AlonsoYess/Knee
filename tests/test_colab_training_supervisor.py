@@ -407,6 +407,198 @@ class SupervisorTests(unittest.TestCase):
         self.assertIn("parent done", outcome.stdout)
         self.assertEqual(outcome.attempts, 1)
 
+    def publisher_fixture(self):
+        local = self.session / "local_evidence"
+        remote = self.records / "remote_evidence"
+        local.mkdir(); remote.mkdir()
+        active = self.records / "active_fixture.json"
+        lease = {"run_name": "run_" + "a" * 32, "state": "running"}
+        supervisor._save(active, lease)
+        supervisor._save(local / "run.json", {"state": "running", "fixture": True})
+        return supervisor.DriveEvidence(local, remote, active, lease)
+
+    def test_transient_remote_open_error_is_retried_without_restarting_child(self):
+        real_open = Path.open
+        calls = []
+        def fail_once(path, *args, **kwargs):
+            mode = args[0] if args else kwargs.get("mode", "r")
+            if Path(path).is_relative_to(self.records) and mode == "xb" and not calls:
+                calls.append(path)
+                raise OSError(errno.EIO, "synthetic Drive open error")
+            return real_open(path, *args, **kwargs)
+        with patch.object(Path, "open", fail_once), patch.object(supervisor.time, "sleep") as sleep:
+            outcome = self.invoke("print('only one child')")
+        self.assertEqual(outcome.attempts, 1)
+        self.assertEqual(len(calls), 1)
+        sleep.assert_called_once_with(1)
+        self.assertTrue(self.read(outcome.run_dir / "run.json")["diagnostic_saved_to_drive"])
+
+    def test_transient_remote_replace_is_retried_and_temporary_files_cleaned(self):
+        publisher = self.publisher_fixture()
+        real_replace = supervisor.os.replace
+        calls = []
+        def fail_once(source, target):
+            if Path(target) == publisher.remote / "run.json" and not calls:
+                calls.append(target)
+                raise OSError(errno.ESTALE, "synthetic stale Drive handle")
+            return real_replace(source, target)
+        with patch.object(supervisor.os, "replace", side_effect=fail_once), patch.object(supervisor.time, "sleep"):
+            self.assertTrue(publisher.sync(force=True))
+        self.assertEqual(self.read(publisher.remote / "run.json"), self.read(publisher.local / "run.json"))
+        self.assertEqual(list(publisher.remote.glob("*.writing_*")), [])
+
+    def test_transient_remote_flush_is_retried(self):
+        publisher = self.publisher_fixture()
+        real_sync = supervisor._sync
+        calls = []
+        def fail_once(stream):
+            if Path(stream.name).is_relative_to(publisher.remote) and not calls:
+                calls.append(stream.name)
+                raise OSError(errno.EIO, "synthetic Drive flush error")
+            return real_sync(stream)
+        with patch.object(supervisor, "_sync", side_effect=fail_once), patch.object(supervisor.time, "sleep"):
+            self.assertTrue(publisher.sync(force=True))
+        self.assertEqual(len(calls), 1)
+
+    def test_short_outage_keeps_local_evidence_then_resynchronizes(self):
+        publisher = self.publisher_fixture()
+        with patch.object(supervisor.time, "monotonic", return_value=100):
+            publisher.sync(force=True)
+        supervisor._save(publisher.local / "run.json", {"new_epoch_observation": True})
+        with patch.object(publisher, "_publish", side_effect=OSError(errno.EIO, "temporary Drive outage")), \
+             patch.object(supervisor.time, "monotonic", return_value=131), \
+             patch.object(supervisor.time, "sleep"):
+            self.assertFalse(publisher.sync())
+        self.assertTrue(self.read(publisher.local / "run.json")["new_epoch_observation"])
+        self.assertNotIn("new_epoch_observation", self.read(publisher.remote / "run.json"))
+        with patch.object(supervisor.time, "monotonic", return_value=142):
+            self.assertTrue(publisher.sync())
+        self.assertEqual(self.read(publisher.remote / "run.json"), self.read(publisher.local / "run.json"))
+
+    def test_outage_deadline_stops_before_active_lease_expires(self):
+        publisher = self.publisher_fixture()
+        with patch.object(supervisor.time, "monotonic", return_value=100):
+            publisher.sync(force=True)
+        publisher.lease["child"] = {"pid": 123}
+        with patch.object(supervisor.time, "monotonic", return_value=181), \
+             self.assertRaisesRegex(OSError, "outage_limit"):
+            publisher.sync()
+        self.assertLess(supervisor.DRIVE_OUTAGE_SECONDS + 20, supervisor.LEASE_SECONDS)
+
+    def test_prolonged_remote_failure_reaps_live_child_and_keeps_local_diagnostic(self):
+        original = supervisor.DriveEvidence._publish
+        def fail_running(publisher):
+            if publisher.lease.get("child") is not None:
+                raise OSError(errno.EIO, "persistent synthetic Drive outage")
+            return original(publisher)
+        started = time.monotonic()
+        with patch.object(supervisor.DriveEvidence, "_publish", fail_running), \
+             patch.object(supervisor, "DRIVE_OUTAGE_SECONDS", .12), \
+             patch.object(supervisor, "DRIVE_RETRY_SECONDS", .01), \
+             patch.object(supervisor.time, "sleep"), self.assertRaises(supervisor.TrainingStopped) as caught:
+            self.invoke("import time; time.sleep(5)", drive_sync_interval=.02)
+        self.assertLess(time.monotonic() - started, 3)
+        self.assertIsNotNone(caught.exception.report["returncode"])
+        self.assertFalse(caught.exception.report["diagnostic_saved_to_drive"])
+        self.assertTrue((Path(caught.exception.report["local_evidence_directory"]) / "run.json").is_file())
+
+    def test_nontransient_drive_errors_do_not_retry(self):
+        publisher = self.publisher_fixture()
+        for code in (errno.ENOSPC, errno.EACCES):
+            with self.subTest(errno=code), \
+                 patch.object(publisher, "_publish", side_effect=OSError(code, "persistent failure")) as publish, \
+                 patch.object(supervisor.time, "sleep") as sleep, self.assertRaises(OSError):
+                publisher.sync(force=True)
+            self.assertEqual(publish.call_count, 1)
+            sleep.assert_not_called()
+
+    def test_snapshot_readback_mismatch_is_not_accepted_or_retried(self):
+        publisher = self.publisher_fixture()
+        real_open = Path.open
+        def corrupt_readback(path, *args, **kwargs):
+            mode = args[0] if args else kwargs.get("mode", "r")
+            if Path(path) == publisher.remote / "run.json" and mode == "rb":
+                return io.BytesIO(b'corrupt')
+            return real_open(path, *args, **kwargs)
+        with patch.object(Path, "open", corrupt_readback), patch.object(supervisor.time, "sleep") as sleep, \
+             self.assertRaisesRegex(ValueError, "readback_mismatch"):
+            publisher.sync(force=True)
+        sleep.assert_not_called()
+
+    def test_final_sync_failure_never_returns_success_or_claims_drive_diagnostic(self):
+        original = supervisor.DriveEvidence._publish
+        def fail_terminal(publisher):
+            state = self.read(publisher.local / "run.json").get("state")
+            if state != "running":
+                raise OSError(errno.EIO, "synthetic final Drive outage")
+            return original(publisher)
+        with patch.object(supervisor.DriveEvidence, "_publish", fail_terminal), \
+             patch.object(supervisor.time, "sleep"), self.assertRaises(supervisor.TrainingStopped) as caught:
+            self.invoke("print('child finished')")
+        report = caught.exception.report
+        self.assertFalse(report["diagnostic_saved_to_drive"])
+        self.assertEqual(report["returncode"], 0)
+        self.assertIn("no se confirmó", str(caught.exception))
+        self.assertEqual(self.read(Path(report["local_evidence_directory"]) / "run.json")["state"], "failed")
+
+    def test_frequent_monitoring_stays_local_and_remote_snapshots_are_throttled(self):
+        publications = []
+        original = supervisor.DriveEvidence._publish
+        def record(publisher):
+            publications.append(time.monotonic())
+            return original(publisher)
+        with patch.object(supervisor.DriveEvidence, "_publish", record):
+            outcome = self.invoke("import time; time.sleep(.25); print('finished')", sample_interval=.01)
+        # Initial claim, before child and final; not one remote rewrite per sample.
+        self.assertEqual(len(publications), 3)
+        rows = (outcome.run_dir / "attempt_001/telemetry.jsonl").read_text().splitlines()
+        self.assertGreater(len(rows), 10)
+
+    def test_telemetry_storage_is_bounded_and_truncation_is_explicit(self):
+        with patch.object(supervisor, "MAX_TELEMETRY_BYTES", 300):
+            outcome = self.invoke("import time; time.sleep(.12)", sample_interval=.01)
+        path = outcome.run_dir / "attempt_001/telemetry.jsonl"
+        self.assertLessEqual(path.stat().st_size, 300)
+        self.assertTrue(self.read(outcome.run_dir / "run.json")["telemetry_truncated_at_byte_limit"])
+
+    def test_failed_initial_sync_does_not_poison_next_run_pointer(self):
+        original = supervisor.DriveEvidence._publish
+        with patch.object(supervisor.DriveEvidence, "_publish", side_effect=OSError(errno.EIO, "initial outage")), \
+             patch.object(supervisor.time, "sleep"), self.assertRaises(supervisor.TrainingStopped):
+            self.invoke("raise AssertionError('must not start')")
+        latest = self.records / supervisor.LOG_FOLDER / "latest.json"
+        self.assertFalse(latest.exists())
+        # The failed controller has not published a dangling latest pointer.
+        # Simulate a fresh controller after the previous lease expires; no private
+        # record edit is needed to recover from the storage outage.
+        with patch.object(supervisor, "_alive", return_value=False), \
+             patch.object(supervisor.time, "time", return_value=time.time() + supervisor.LEASE_SECONDS + 1):
+            outcome = self.invoke("print('recovered after restored storage')")
+        self.assertEqual(outcome.attempts, 1)
+        self.assertEqual(supervisor.load_previous_status(self.records)["state"], "succeeded")
+
+    def test_lease_is_refreshed_again_after_snapshot_readback(self):
+        publisher = self.publisher_fixture()
+        original_copy = supervisor._copy_evidence
+        clock = {"now": 100.0}
+        def slow_copy(source, target):
+            original_copy(source, target)
+            clock["now"] += 50
+        with patch.object(supervisor.time, "time", side_effect=lambda: clock["now"]), \
+             patch.object(supervisor.time, "monotonic", side_effect=lambda: clock["now"]), \
+             patch.object(supervisor, "_copy_evidence", slow_copy):
+            publisher.sync(force=True)
+        self.assertEqual(self.read(publisher.active_path)["heartbeat_unix"], 150.0)
+        self.assertEqual(publisher.last_success, 150.0)
+
+    def test_long_preflight_without_child_can_renew_before_starting(self):
+        publisher = self.publisher_fixture()
+        with patch.object(supervisor.time, "monotonic", return_value=100):
+            publisher.sync(force=True)
+        with patch.object(supervisor.time, "monotonic", return_value=300):
+            self.assertTrue(publisher.sync(force=True))
+        self.assertEqual(publisher.last_success, 300)
+
     def test_no_memory_policy_preserves_original_environment(self):
         original = {"CUBLAS_WORKSPACE_CONFIG": ":4096:8", "OMP_NUM_THREADS": "2"}
         result, record = supervisor.host_memory_environment(original)
