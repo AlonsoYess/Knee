@@ -211,8 +211,8 @@ onBeforeUnmount(() => {
 
         <aside class="new-context" aria-label="Guía para preparar el caso">
           <div class="new-context-intro"><span class="new-context-icon"><AppIcon name="evaluations" :size="25" /></span><h2>Primero, prepara los datos</h2><p>Revisa la información de una rodilla antes de continuar con su imagen.</p></div>
-          <div class="new-context-section"><h3>Puedes guardar y retomar</h3><p>Los datos basales se guardan en el servidor. Para explorar la imagen sintética, solo necesitas indicar la rodilla.</p></div>
-          <div class="new-context-section"><h3>Solo datos de ejemplo</h3><p>Utiliza valores ficticios. El siguiente paso permite seleccionar una imagen sintética para explorar la interfaz.</p></div>
+          <div class="new-context-section"><h3>Puedes guardar y retomar</h3><p>Los datos basales se guardan en el servidor. Para cargar el DICOM, solo necesitas indicar la rodilla.</p></div>
+          <div class="new-context-section"><h3>Solo datos de ejemplo</h3><p>Utiliza valores ficticios. El siguiente paso permite cargar un DICOM y registrar la preparación en el servidor.</p></div>
           <div class="new-session-note"><AppIcon name="help" :size="17" /><p>El guardado se confirma solo cuando responde el servidor. Si hay un error, tus campos permanecen aquí sin confirmar. Los cambios sin guardar pueden perderse al recargar.</p></div>
         </aside>
       </div>

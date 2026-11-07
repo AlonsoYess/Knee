@@ -1,6 +1,6 @@
 # Plan de cierre del prototipo KneeOAI para la sustentación
 
-Fecha: 7 de noviembre de 2026. Estado: fases 1 y 2 completadas en v0.8 y v0.9 respectivamente. Las fases 3 a 7 conservan sus condiciones de cierre. Los registros técnicos son `FASE_1_ENTREGA.md` y `FASE_2_ENTREGA.md`.
+Fecha: 7 de noviembre de 2026. Estado: fases 1, 2 y 3 completadas en v0.8, v0.9 y v0.10 respectivamente. PWA, publicación e integración predictiva conservan sus condiciones de cierre. Registros: `FASE_1_ENTREGA.md`, `FASE_2_ENTREGA.md` y `FASE_3_ENTREGA.md`.
 
 El objetivo es terminar la aplicación mientras se completa el trabajo científico, de modo que la última etapa consista en conectar y verificar el paquete predictivo aprobado. Habrá dos cierres: **aplicación preparada para integración** y **prototipo predictivo listo para sustentación**. El segundo requiere evidencia de funcionamiento con el paquete final; finalizar un entrenamiento no basta para declararlo alcanzado.
 
@@ -10,7 +10,7 @@ El trabajo de producto conserva las reglas científicas vigentes, los entrenamie
 
 La interfaz v0.7 contiene acceso, listado, datos basales, radiografía y lado, revisión del recorte y resumen. Usa Vue, TypeScript y Vite. El guardado conserva evaluaciones ficticias en el navegador. La última entrega documentada registra compilación correcta y 43 pruebas de interacción aprobadas; no se volvieron a ejecutar para redactar este plan.
 
-El acceso actual es simulado. No existe todavía una API de aplicación, autenticación de servidor, base de datos central, carga real de DICOM, PWA instalable, despliegue ni conexión predictiva. El botón de predicción permanece bloqueado.
+En ese punto inicial el acceso era simulado y no existían API, autenticación de servidor, base central ni carga real de DICOM. Las fases 2 y 3 incorporan esas funciones. PWA, despliegue y conexión predictiva mantienen sus fases propias.
 
 Al iniciar la fase 1, el frontend estaba presente localmente y la regla general `data/` ocultaba `app/frontend/src/data/`. En v0.8 se resolvió moviendo esos módulos ficticios a `app/frontend/src/demo/`, conservando sus claves y versiones de almacenamiento. La entrega incorpora el frontend completo y su contrato de API, sin relajar las exclusiones de datos privados.
 
@@ -22,7 +22,7 @@ Al iniciar la fase 1, el frontend estaba presente localmente y la regla general 
 | Servidor | FastAPI modular, en el mismo repositorio | Sesiones, permisos, evaluaciones, archivos y coordinación de inferencia. |
 | Datos | SQLite, detrás de FastAPI | Usuarios, sesiones, evaluaciones, revisiones y referencias a resultados. |
 | Archivos | Almacenamiento privado persistente | Imágenes autorizadas, recortes y artefactos necesarios, fuera del directorio público. |
-| Motor científico | Adaptador que importa `src/knee` | Reutilizar el procedimiento y paquete congelados, sin duplicarlos en Vue. |
+| Motor científico | Adaptador a proceso separado con `src/knee` | Reutilizar el procedimiento y paquete congelados, sin duplicarlos en Vue ni instalar dependencias científicas en FastAPI. |
 | Distribución | Configuración reproducible y contenedor Docker | Ejecutar la misma versión en local y en un alojamiento compatible. |
 | Acceso publicado | Dirección gratuita del proveedor con HTTPS; interfaz y API bajo el mismo origen | Empezar sin comprar un dominio y conservar una estructura sencilla. |
 
@@ -36,7 +36,7 @@ Se supone una demostración con cuentas controladas y pocas sesiones simultánea
 | --- | --- | --- | --- |
 | 1. Base reproducible | Completada en v0.8: fuente completo, exclusiones resueltas, dependencias fijadas, contrato y ejecución documentada. | Copia limpia instalada y compilada; 57 pruebas aprobadas, OpenAPI y 98 ejemplos ficticios validados. Ver `FASE_1_ENTREGA.md`. | Cerrada técnicamente para su alcance. |
 | 2. Acceso y guardado reales | Completada en v0.9: FastAPI, usuarios, sesiones, permisos y datos basales persistentes en SQLite. | Copia limpia: 62 pruebas de backend y 29 de navegador, incluidos aislamiento, reinicio, conflicto, respuesta perdida y recuperación. Ver `FASE_2_ENTREGA.md`. | Cerrada para acceso y basales; imagen/QC reales siguen en fase 3. |
-| 3. Recorrido funcional completo | Carga de archivos, preparación, revisión, resumen, estados del motor y diseño de resultado. | Recorrido integrado comprobado con entradas sintéticas y respuestas controladas, incluidos rechazos y errores. | Fase 2; predictor final todavía no requerido. |
+| 3. Recorrido funcional completo | Completada en v0.10: DICOM privado, referencia sellada, preparación, QC y resumen persistentes; predicción bloqueada. | 110 pruebas de backend, 39 de navegador y 19 comprobaciones sintéticas del puente científico; respaldo completo y recuperación. Ver `FASE_3_ENTREGA.md`. | Cerrada para el recorrido de aplicación; no acredita integración predictiva ni validación clínica. |
 | 4. PWA y ejecución local | Instalación, iconos, actualizaciones, estado sin conexión y arranque local sencillo. | Instalar, cerrar, reabrir y actualizar la versión de producción sin perder una edición silenciosamente. | Recorrido estable; puede avanzar junto a fase 3. |
 | 5. Publicación y recuperación | Dirección gratuita, HTTPS, servicio dentro del límite mensual, almacenamiento persistente, copia de seguridad y procedimiento de restauración. | Acceso desde otro equipo; datos conservados tras reinicio y despliegue; restauración comprobada. | Selección del proveedor y cuentas de infraestructura; permite publicar primero con motor no disponible. |
 | 6. Integración científica | Paquete final conectado y verificado, QC vigente y resultados trazables. | Paridad con el pipeline, clasificación concordante y recursos medidos con casos autorizados fuera de prueba. | Paquete científico aprobado y fases de aplicación necesarias. |
@@ -54,7 +54,7 @@ La numeración pertenece al prototipo y no sustituye las fases científicas ni l
 
 **Detalle de la fase 2**
 
-La fase 2 ya incluye usuarios, sesiones, evaluaciones basales, sus revisiones y asociaciones idempotentes de creación. Las referencias a imágenes, decisiones QC, ejecuciones y resultados se incorporarán cuando se implementen esas operaciones en las fases siguientes. Los archivos se guardarán fuera de la base, asociados mediante referencias comprobables. Las actualizaciones basales tienen control de versión para detectar dos ediciones del mismo caso.
+La fase 2 incluye usuarios, sesiones, evaluaciones basales, sus revisiones y asociaciones idempotentes de creación. La fase 3 añade referencias a imágenes y decisiones QC, con archivos fuera de la base y referencias comprobables. Ejecuciones y resultados predictivos se incorporarán durante la integración científica. Las actualizaciones basales tienen control de versión para detectar dos ediciones del mismo caso.
 
 Las cuentas serán administradas. Se implementarán cambio de contraseña y recuperación mediante el administrador, sin añadir una dependencia de correo a esta primera entrega. Las contraseñas usarán un hash adecuado y las sesiones tendrán vencimiento y revocación en el servidor. La configuración publicada utilizará cookies protegidas y defensa CSRF; los permisos se comprobarán en cada operación de la API. [Contraseñas](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html) y [sesiones](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html) en OWASP.
 
@@ -64,7 +64,7 @@ El cierre exige probar aislamiento entre dos usuarios, sesión expirada, cierre 
 
 El recorrido será: acceso → evaluaciones → datos basales → radiografía y lado → revisión de calidad → resumen → cálculo → resultado. Se conservarán los estados de borrador y la siguiente acción clara para el médico.
 
-La carga comprobará el formato DICOM previsto, límites de archivo y lectura válida con fixtures sintéticos. La API preparará la conexión al procesamiento compartido. El catálogo SVG actual seguirá identificado como demostración; no sustituirá una validación de lectura o QC real.
+La fase 3 sustituye el catálogo SVG por carga privada de DICOM, ventanas nativas autenticadas y una referencia visual inmutable antes de la localización. El procedimiento compartido congelado prepara el recorte sin emplear esa referencia como entrada, y comprueba la observación completa antes de aceptar. Se conserva la fuente, el recorte, el QC y la trazabilidad tras recarga/reinicio; el respaldo incluye base y archivos. Las pruebas de aplicación usan píxeles y decisiones sintéticos; se distingue su alcance de la comprobación del puente científico.
 
 Los estados necesarios son carga en curso, archivo inválido, preparación pendiente, revisión pendiente, rechazo con motivo, revisión desactualizada, motor no disponible, cálculo en curso, error recuperable y resultado disponible. Cambiar una entrada relevante invalidará la revisión o el resultado que corresponda; nunca se mostrará un resultado antiguo como si perteneciera a la edición nueva. Los cálculos llevarán un identificador y un estado persistido; reintentar no debe duplicar resultados. Una interrupción del servidor debe dejar un estado recuperable, no un cálculo eterno.
 

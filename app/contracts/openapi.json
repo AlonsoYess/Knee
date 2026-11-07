@@ -3,14 +3,14 @@
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "info": {
     "title": "KneeOAI — contrato propuesto Vue/FastAPI",
-    "version": "1.0.0-phase2",
-    "summary": "Acceso y datos basales implementados; preparación e inferencia pendientes.",
-    "description": "Fase 2: sesiones y evaluaciones basales con FastAPI/SQLite. Las operaciones de preparación, QC y resultados siguen siendo contratos futuros. No se cargan modelos ni se ejecuta inferencia. Todos los ejemplos son ficticios."
+    "version": "1.0.0-phase3",
+    "summary": "Acceso, basales, preparación DICOM y QC persistidos; predicción no disponible.",
+    "description": "Fase3: servidor FastAPI/SQLite y archivos privados. El preparador reutiliza el localizador anatómico y QC congelados en un proceso separado; no carga modelos de progresión. El motor predictivo sigue bloqueado503. Ejemplos íntegramente ficticios; estados futuros se identifican expresamente."
   },
   "servers": [
     {
       "url": "/api/v1",
-      "description": "Mismo origen de la SPA; no es un servidor disponible."
+      "description": "API relativa al mismo origen de la SPA. La configuración y el despliegue son externos al contrato."
     }
   ],
   "security": [
@@ -546,11 +546,11 @@
         "tags": [
           "Preparation"
         ],
-        "summary": "Cargar DICOM e iniciar preparación.",
-        "description": "If-Match de evaluación. Requiere lado guardado, identidad de archivo nueva y trabajo persistido del flujo compartido. Sustituir imagen invalida revisión activa y resultado, preservando historial. 202 no acredita QC ni predicción.",
+        "summary": "Cargar un DICOM y preparar las vistas de fuente.",
+        "description": "Un único archivo multipart file; sin campos adicionales. Sesión/Origin/CSRF, lado guardado, If-Match del caso e Idempotency-Key. Nueva carga devuelve202 tras preparar fuente, normalmente awaiting_reference; nunca apruebaQC. Repetición de clave devuelve200 del recurso asociado, incluso histórico, sin reactivarlo. Nueva clave con mismos bytes/caso/lado reutiliza y activa la preparación existente con200. Si el procesamiento falla después de guardar, el recurso failed y su asociación idempotente permanecen; Location permite recuperarlo.",
         "responses": {
-          "202": {
-            "description": "Carga y trabajo registrados.",
+          "200": {
+            "description": "Carga repetida o preparación existente reutilizada; consultar isCurrent/reused.",
             "headers": {
               "X-Request-Id": {
                 "$ref": "#/components/headers/RequestId"
@@ -574,19 +574,213 @@
                   "id": "preparation-fixture-001",
                   "evaluationId": "evaluation-fixture-001",
                   "sourceEvaluationRevisionId": "revision-fixture-001",
-                  "preparationRevisionId": "preparation-revision-fixture-001",
+                  "preparationRevisionId": "preparation-revision-fixture-crop",
                   "image": {
                     "imageId": "image-fixture-001",
                     "imageVersion": "image-version-fixture-001"
                   },
                   "side": "right",
-                  "status": "queued",
-                  "pipelineVersion": null,
+                  "status": "ready",
+                  "pipelineVersion": "kneel_guided_gradient_contours_contact_anchor_v1",
+                  "reviewContext": {
+                    "qcPolicyVersion": "mcr008_confirmation_v1.0",
+                    "canReview": true,
+                    "blockerCodes": [],
+                    "checks": [],
+                    "originalPreviewUrl": "/api/v1/preparations/preparation-fixture-001/views/half_a?revision=preparation-revision-fixture-crop",
+                    "cropPreviewUrl": "/api/v1/preparations/preparation-fixture-001/views/crop_a?revision=preparation-revision-fixture-crop",
+                    "views": {
+                      "crop_a": "/api/v1/preparations/preparation-fixture-001/views/crop_a?revision=preparation-revision-fixture-crop",
+                      "crop_b": "/api/v1/preparations/preparation-fixture-001/views/crop_b?revision=preparation-revision-fixture-crop"
+                    }
+                  },
+                  "error": null,
+                  "createdAt": "2026-11-07T15:01:00Z",
+                  "updatedAt": "2026-11-07T15:04:00Z",
+                  "activeReview": {
+                    "id": "review-fixture-001",
+                    "evaluationId": "evaluation-fixture-001",
+                    "preparationId": "preparation-fixture-001",
+                    "preparationRevisionId": "preparation-revision-fixture-crop",
+                    "image": {
+                      "imageId": "image-fixture-001",
+                      "imageVersion": "image-version-fixture-001"
+                    },
+                    "side": "right",
+                    "qcPolicyVersion": "mcr008_confirmation_v1.0",
+                    "decision": "accepted",
+                    "confirmedCheckIds": [],
+                    "reason": null,
+                    "reviewerId": "user-fixture-001",
+                    "createdAt": "2026-11-07T15:04:00Z",
+                    "observation": {
+                      "side_supported": true,
+                      "coverage_complete": true,
+                      "visibility": {
+                        "medial_joint_borders": "visible",
+                        "lateral_joint_borders": "visible",
+                        "subchondral_bone": "visible"
+                      },
+                      "hardware": "absent",
+                      "text_or_mask": "absent",
+                      "marks": [],
+                      "mark_effect": "none",
+                      "physical_origin_known": false,
+                      "note": "Ejemplo sintético de observación completa; no corresponde a una imagen clínica real.",
+                      "original_half_inspected": true,
+                      "both_windows_inspected": true,
+                      "outcome_blinded": true,
+                      "lateral_margins_visible": true,
+                      "unclassified_mark_present": false,
+                      "ruler_outside_bone": null,
+                      "ruler_locations_xy": []
+                    },
+                    "assessment": {
+                      "accepted": true,
+                      "reasons": [],
+                      "geometryAdequate": true,
+                      "observation": {
+                        "side_supported": true,
+                        "coverage_complete": true,
+                        "visibility": {
+                          "medial_joint_borders": "visible",
+                          "lateral_joint_borders": "visible",
+                          "subchondral_bone": "visible"
+                        },
+                        "hardware": "absent",
+                        "text_or_mask": "absent",
+                        "marks": [],
+                        "mark_effect": "none",
+                        "physical_origin_known": false,
+                        "note": "Ejemplo sintético de observación completa; no corresponde a una imagen clínica real.",
+                        "original_half_inspected": true,
+                        "both_windows_inspected": true,
+                        "outcome_blinded": true,
+                        "lateral_margins_visible": true,
+                        "unclassified_mark_present": false,
+                        "ruler_outside_bone": null,
+                        "ruler_locations_xy": [],
+                        "knee_alias": "application-fixture-RIGHT"
+                      },
+                      "cropSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+                      "frozenCandidate": "kneel_guided_gradient_contours_contact_anchor_v1",
+                      "qcVersion": "mcr008_confirmation_v1.0"
+                    }
+                  },
+                  "sourceContext": {
+                    "views": {
+                      "full_a": "/api/v1/preparations/preparation-fixture-001/views/full_a?revision=preparation-revision-fixture-crop",
+                      "full_b": "/api/v1/preparations/preparation-fixture-001/views/full_b?revision=preparation-revision-fixture-crop",
+                      "half_a": "/api/v1/preparations/preparation-fixture-001/views/half_a?revision=preparation-revision-fixture-crop",
+                      "half_b": "/api/v1/preparations/preparation-fixture-001/views/half_b?revision=preparation-revision-fixture-crop"
+                    },
+                    "fullNativeShape": [
+                      241,
+                      802
+                    ]
+                  },
+                  "nativeHalfShape": [
+                    241,
+                    400
+                  ],
+                  "sourceReference": {
+                    "id": "reference-fixture-001",
+                    "preparationId": "preparation-fixture-001",
+                    "preparationRevisionId": "preparation-revision-fixture-source",
+                    "confirmedSide": "right",
+                    "centerResolved": true,
+                    "centerXY": [
+                      200,
+                      120
+                    ],
+                    "originalAndHalfInspected": true,
+                    "outcomeBlinded": true,
+                    "note": "Ejemplo ficticio: original y mitad revisados antes de mostrar el recorte automático.",
+                    "reviewerId": "user-fixture-001",
+                    "createdAt": "2026-11-07T15:02:00Z"
+                  },
+                  "cropGeometry": {
+                    "nativeHalfBox": [
+                      110,
+                      82,
+                      290,
+                      158
+                    ],
+                    "previewShapes": {
+                      "crop_a": [
+                        76,
+                        180
+                      ],
+                      "crop_b": [
+                        76,
+                        180
+                      ]
+                    }
+                  },
+                  "isCurrent": true,
+                  "reused": true
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Fuente registrada y vistas preparadas; requiere referencia visual explícita.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/NoStore"
+              },
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Location": {
+                "$ref": "#/components/headers/Location"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Preparation"
+                },
+                "example": {
+                  "id": "preparation-fixture-001",
+                  "evaluationId": "evaluation-fixture-001",
+                  "sourceEvaluationRevisionId": "revision-fixture-001",
+                  "preparationRevisionId": "preparation-revision-fixture-source",
+                  "image": {
+                    "imageId": "image-fixture-001",
+                    "imageVersion": "image-version-fixture-001"
+                  },
+                  "side": "right",
+                  "status": "awaiting_reference",
+                  "pipelineVersion": "kneel_guided_gradient_contours_contact_anchor_v1",
                   "reviewContext": null,
                   "error": null,
                   "createdAt": "2026-11-07T15:01:00Z",
-                  "updatedAt": "2026-11-07T15:01:00Z",
-                  "activeReview": null
+                  "updatedAt": "2026-11-07T15:01:01Z",
+                  "activeReview": null,
+                  "sourceContext": {
+                    "views": {
+                      "full_a": "/api/v1/preparations/preparation-fixture-001/views/full_a?revision=preparation-revision-fixture-source",
+                      "full_b": "/api/v1/preparations/preparation-fixture-001/views/full_b?revision=preparation-revision-fixture-source",
+                      "half_a": "/api/v1/preparations/preparation-fixture-001/views/half_a?revision=preparation-revision-fixture-source",
+                      "half_b": "/api/v1/preparations/preparation-fixture-001/views/half_b?revision=preparation-revision-fixture-source"
+                    },
+                    "fullNativeShape": [
+                      241,
+                      802
+                    ]
+                  },
+                  "nativeHalfShape": [
+                    241,
+                    400
+                  ],
+                  "sourceReference": null,
+                  "cropGeometry": null,
+                  "isCurrent": true,
+                  "reused": false
                 }
               }
             }
@@ -606,12 +800,6 @@
           "412": {
             "$ref": "#/components/responses/PreconditionFailed"
           },
-          "413": {
-            "$ref": "#/components/responses/PayloadTooLarge"
-          },
-          "415": {
-            "$ref": "#/components/responses/UnsupportedMediaType"
-          },
           "422": {
             "$ref": "#/components/responses/ValidationError"
           },
@@ -623,6 +811,12 @@
           },
           "default": {
             "$ref": "#/components/responses/UnexpectedError"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
           }
         },
         "security": [
@@ -634,6 +828,9 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
           }
         ],
         "requestBody": {
@@ -651,7 +848,7 @@
             }
           }
         },
-        "x-implementation-status": "planned"
+        "x-implementation-status": "implemented-phase3"
       }
     },
     "/preparations/{preparationId}": {
@@ -666,10 +863,10 @@
           "Preparation"
         ],
         "summary": "Consultar preparación y contexto QC.",
-        "description": "Acceso por propietario del caso. Su ETag se usa para registrar la decisión exacta.",
+        "description": "Estado persistido del recurso accesible al propietario. ETag pertenece a preparación; el caso tiene otro ETag. isCurrent=false identifica una preparación histórica; no permite nuevas referencias/reintentos/QC. activeReview devuelve solo la revisión vigente y compatible con la política actual.",
         "responses": {
           "200": {
-            "description": "Preparación.",
+            "description": "Preparación y contexto exacto de fuente/recorte.",
             "headers": {
               "X-Request-Id": {
                 "$ref": "#/components/headers/RequestId"
@@ -690,19 +887,82 @@
                   "id": "preparation-fixture-001",
                   "evaluationId": "evaluation-fixture-001",
                   "sourceEvaluationRevisionId": "revision-fixture-001",
-                  "preparationRevisionId": "preparation-revision-fixture-001",
+                  "preparationRevisionId": "preparation-revision-fixture-crop",
                   "image": {
                     "imageId": "image-fixture-001",
                     "imageVersion": "image-version-fixture-001"
                   },
                   "side": "right",
-                  "status": "queued",
-                  "pipelineVersion": null,
-                  "reviewContext": null,
+                  "status": "ready",
+                  "pipelineVersion": "kneel_guided_gradient_contours_contact_anchor_v1",
+                  "reviewContext": {
+                    "qcPolicyVersion": "mcr008_confirmation_v1.0",
+                    "canReview": true,
+                    "blockerCodes": [],
+                    "checks": [],
+                    "originalPreviewUrl": "/api/v1/preparations/preparation-fixture-001/views/half_a?revision=preparation-revision-fixture-crop",
+                    "cropPreviewUrl": "/api/v1/preparations/preparation-fixture-001/views/crop_a?revision=preparation-revision-fixture-crop",
+                    "views": {
+                      "crop_a": "/api/v1/preparations/preparation-fixture-001/views/crop_a?revision=preparation-revision-fixture-crop",
+                      "crop_b": "/api/v1/preparations/preparation-fixture-001/views/crop_b?revision=preparation-revision-fixture-crop"
+                    }
+                  },
                   "error": null,
                   "createdAt": "2026-11-07T15:01:00Z",
-                  "updatedAt": "2026-11-07T15:01:00Z",
-                  "activeReview": null
+                  "updatedAt": "2026-11-07T15:03:00Z",
+                  "activeReview": null,
+                  "sourceContext": {
+                    "views": {
+                      "full_a": "/api/v1/preparations/preparation-fixture-001/views/full_a?revision=preparation-revision-fixture-crop",
+                      "full_b": "/api/v1/preparations/preparation-fixture-001/views/full_b?revision=preparation-revision-fixture-crop",
+                      "half_a": "/api/v1/preparations/preparation-fixture-001/views/half_a?revision=preparation-revision-fixture-crop",
+                      "half_b": "/api/v1/preparations/preparation-fixture-001/views/half_b?revision=preparation-revision-fixture-crop"
+                    },
+                    "fullNativeShape": [
+                      241,
+                      802
+                    ]
+                  },
+                  "nativeHalfShape": [
+                    241,
+                    400
+                  ],
+                  "sourceReference": {
+                    "id": "reference-fixture-001",
+                    "preparationId": "preparation-fixture-001",
+                    "preparationRevisionId": "preparation-revision-fixture-source",
+                    "confirmedSide": "right",
+                    "centerResolved": true,
+                    "centerXY": [
+                      200,
+                      120
+                    ],
+                    "originalAndHalfInspected": true,
+                    "outcomeBlinded": true,
+                    "note": "Ejemplo ficticio: original y mitad revisados antes de mostrar el recorte automático.",
+                    "reviewerId": "user-fixture-001",
+                    "createdAt": "2026-11-07T15:02:00Z"
+                  },
+                  "cropGeometry": {
+                    "nativeHalfBox": [
+                      110,
+                      82,
+                      290,
+                      158
+                    ],
+                    "previewShapes": {
+                      "crop_a": [
+                        76,
+                        180
+                      ],
+                      "crop_b": [
+                        76,
+                        180
+                      ]
+                    }
+                  },
+                  "isCurrent": true,
+                  "reused": false
                 }
               }
             }
@@ -723,7 +983,7 @@
             "$ref": "#/components/responses/UnexpectedError"
           }
         },
-        "x-implementation-status": "planned"
+        "x-implementation-status": "implemented-phase3"
       }
     },
     "/preparations/{preparationId}/views/{view}": {
@@ -738,6 +998,12 @@
           "schema": {
             "type": "string",
             "enum": [
+              "full_a",
+              "full_b",
+              "half_a",
+              "half_b",
+              "crop_a",
+              "crop_b",
               "original",
               "crop"
             ]
@@ -750,7 +1016,7 @@
           "Preparation"
         ],
         "summary": "Obtener vista autenticada de revisión.",
-        "description": "Representación PNG para la revisión solicitada; no publica el DICOM ni crea enlaces públicos. revision identifica la preparación que se está revisando.",
+        "description": "PNG privado del mismo origen, autenticado y sin caché. revision debe coincidir con la revisión ACTUAL de esta preparación; una revisión anterior de esa misma preparación devuelve409. Una preparación histórica del caso puede visualizarse usando su propia revisión actual. full=bilateral, half=mitad seleccionada, crop=recorte; a=ventana1–99, b=5–95. original y crop son alias de half_a/crop_a. No se publica DICOM ni se aplican correcciones geométricas.",
         "responses": {
           "200": {
             "description": "PNG sin caché.",
@@ -788,6 +1054,9 @@
           },
           "default": {
             "$ref": "#/components/responses/UnexpectedError"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
           }
         },
         "parameters": [
@@ -800,7 +1069,7 @@
             }
           }
         ],
-        "x-implementation-status": "planned"
+        "x-implementation-status": "implemented-phase3"
       }
     },
     "/preparations/{preparationId}/reviews": {
@@ -814,11 +1083,11 @@
         "tags": [
           "Preparation"
         ],
-        "summary": "Registrar decisión del recorte presentado.",
-        "description": "If-Match de preparación. Verificar ready, identidad imagen/lado/versión, controles del QC vigente, permisos e impedimentos. accepted no omite el flujo científico. Crear decisión inmutable y actualizar referencia activa del caso, invalidando resultados. Después consultar caso y preparación para obtener sus versiones.",
+        "summary": "Registrar una decisión vinculada al recorte exacto.",
+        "description": "If-Match de preparación e Idempotency-Key. Requiere ready, recurso actual, fuente/referencia/candidato y revisión/lado coincidentes. confirmedCheckIds debe estar vacío. El cliente no envía knee_alias. Aceptar exige observación completa y resultado favorable de qc.assess; si no pasa,409 QC_NOT_ACCEPTABLE sin guardar aceptación. Rechazar exige motivo y admite observation=null/assessment=null, sin fabricar QC. Nuevas decisiones201, replay200; preservan historial y actualizan activeReview y ETags. Reconsultar caso/preparación.",
         "responses": {
-          "201": {
-            "description": "Decisión persistida.",
+          "200": {
+            "description": "Repetición idempotente de la decisión guardada.",
             "headers": {
               "X-Request-Id": {
                 "$ref": "#/components/headers/RequestId"
@@ -831,6 +1100,164 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/QualityReview"
+                },
+                "example": {
+                  "id": "review-fixture-001",
+                  "evaluationId": "evaluation-fixture-001",
+                  "preparationId": "preparation-fixture-001",
+                  "preparationRevisionId": "preparation-revision-fixture-crop",
+                  "image": {
+                    "imageId": "image-fixture-001",
+                    "imageVersion": "image-version-fixture-001"
+                  },
+                  "side": "right",
+                  "qcPolicyVersion": "mcr008_confirmation_v1.0",
+                  "decision": "accepted",
+                  "confirmedCheckIds": [],
+                  "reason": null,
+                  "reviewerId": "user-fixture-001",
+                  "createdAt": "2026-11-07T15:04:00Z",
+                  "observation": {
+                    "side_supported": true,
+                    "coverage_complete": true,
+                    "visibility": {
+                      "medial_joint_borders": "visible",
+                      "lateral_joint_borders": "visible",
+                      "subchondral_bone": "visible"
+                    },
+                    "hardware": "absent",
+                    "text_or_mask": "absent",
+                    "marks": [],
+                    "mark_effect": "none",
+                    "physical_origin_known": false,
+                    "note": "Ejemplo sintético de observación completa; no corresponde a una imagen clínica real.",
+                    "original_half_inspected": true,
+                    "both_windows_inspected": true,
+                    "outcome_blinded": true,
+                    "lateral_margins_visible": true,
+                    "unclassified_mark_present": false,
+                    "ruler_outside_bone": null,
+                    "ruler_locations_xy": []
+                  },
+                  "assessment": {
+                    "accepted": true,
+                    "reasons": [],
+                    "geometryAdequate": true,
+                    "observation": {
+                      "side_supported": true,
+                      "coverage_complete": true,
+                      "visibility": {
+                        "medial_joint_borders": "visible",
+                        "lateral_joint_borders": "visible",
+                        "subchondral_bone": "visible"
+                      },
+                      "hardware": "absent",
+                      "text_or_mask": "absent",
+                      "marks": [],
+                      "mark_effect": "none",
+                      "physical_origin_known": false,
+                      "note": "Ejemplo sintético de observación completa; no corresponde a una imagen clínica real.",
+                      "original_half_inspected": true,
+                      "both_windows_inspected": true,
+                      "outcome_blinded": true,
+                      "lateral_margins_visible": true,
+                      "unclassified_mark_present": false,
+                      "ruler_outside_bone": null,
+                      "ruler_locations_xy": [],
+                      "knee_alias": "application-fixture-RIGHT"
+                    },
+                    "cropSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+                    "frozenCandidate": "kneel_guided_gradient_contours_contact_anchor_v1",
+                    "qcVersion": "mcr008_confirmation_v1.0"
+                  }
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Decisión persistida y vinculada al caso.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/NoStore"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QualityReview"
+                },
+                "example": {
+                  "id": "review-fixture-001",
+                  "evaluationId": "evaluation-fixture-001",
+                  "preparationId": "preparation-fixture-001",
+                  "preparationRevisionId": "preparation-revision-fixture-crop",
+                  "image": {
+                    "imageId": "image-fixture-001",
+                    "imageVersion": "image-version-fixture-001"
+                  },
+                  "side": "right",
+                  "qcPolicyVersion": "mcr008_confirmation_v1.0",
+                  "decision": "accepted",
+                  "confirmedCheckIds": [],
+                  "reason": null,
+                  "reviewerId": "user-fixture-001",
+                  "createdAt": "2026-11-07T15:04:00Z",
+                  "observation": {
+                    "side_supported": true,
+                    "coverage_complete": true,
+                    "visibility": {
+                      "medial_joint_borders": "visible",
+                      "lateral_joint_borders": "visible",
+                      "subchondral_bone": "visible"
+                    },
+                    "hardware": "absent",
+                    "text_or_mask": "absent",
+                    "marks": [],
+                    "mark_effect": "none",
+                    "physical_origin_known": false,
+                    "note": "Ejemplo sintético de observación completa; no corresponde a una imagen clínica real.",
+                    "original_half_inspected": true,
+                    "both_windows_inspected": true,
+                    "outcome_blinded": true,
+                    "lateral_margins_visible": true,
+                    "unclassified_mark_present": false,
+                    "ruler_outside_bone": null,
+                    "ruler_locations_xy": []
+                  },
+                  "assessment": {
+                    "accepted": true,
+                    "reasons": [],
+                    "geometryAdequate": true,
+                    "observation": {
+                      "side_supported": true,
+                      "coverage_complete": true,
+                      "visibility": {
+                        "medial_joint_borders": "visible",
+                        "lateral_joint_borders": "visible",
+                        "subchondral_bone": "visible"
+                      },
+                      "hardware": "absent",
+                      "text_or_mask": "absent",
+                      "marks": [],
+                      "mark_effect": "none",
+                      "physical_origin_known": false,
+                      "note": "Ejemplo sintético de observación completa; no corresponde a una imagen clínica real.",
+                      "original_half_inspected": true,
+                      "both_windows_inspected": true,
+                      "outcome_blinded": true,
+                      "lateral_margins_visible": true,
+                      "unclassified_mark_present": false,
+                      "ruler_outside_bone": null,
+                      "ruler_locations_xy": [],
+                      "knee_alias": "application-fixture-RIGHT"
+                    },
+                    "cropSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+                    "frozenCandidate": "kneel_guided_gradient_contours_contact_anchor_v1",
+                    "qcVersion": "mcr008_confirmation_v1.0"
+                  }
                 }
               }
             }
@@ -872,6 +1299,9 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
           }
         ],
         "requestBody": {
@@ -880,11 +1310,54 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/ReviewSubmission"
+              },
+              "examples": {
+                "accept": {
+                  "value": {
+                    "preparationRevisionId": "preparation-revision-fixture-crop",
+                    "confirmedSide": "right",
+                    "decision": "accepted",
+                    "confirmedCheckIds": [],
+                    "reason": null,
+                    "observation": {
+                      "side_supported": true,
+                      "coverage_complete": true,
+                      "visibility": {
+                        "medial_joint_borders": "visible",
+                        "lateral_joint_borders": "visible",
+                        "subchondral_bone": "visible"
+                      },
+                      "hardware": "absent",
+                      "text_or_mask": "absent",
+                      "marks": [],
+                      "mark_effect": "none",
+                      "physical_origin_known": false,
+                      "note": "Ejemplo sintético de observación completa; no corresponde a una imagen clínica real.",
+                      "original_half_inspected": true,
+                      "both_windows_inspected": true,
+                      "outcome_blinded": true,
+                      "lateral_margins_visible": true,
+                      "unclassified_mark_present": false,
+                      "ruler_outside_bone": null,
+                      "ruler_locations_xy": []
+                    }
+                  }
+                },
+                "administrativeReject": {
+                  "value": {
+                    "preparationRevisionId": "preparation-revision-fixture-crop",
+                    "confirmedSide": "right",
+                    "decision": "rejected",
+                    "confirmedCheckIds": [],
+                    "reason": "Ejemplo ficticio de rechazo administrativo.",
+                    "observation": null
+                  }
+                }
               }
             }
           }
         },
-        "x-implementation-status": "planned"
+        "x-implementation-status": "implemented-phase3"
       }
     },
     "/evaluations/{evaluationId}/executions": {
@@ -898,9 +1371,51 @@
         "tags": [
           "Inference"
         ],
-        "summary": "Solicitar cálculo sobre revisión inmutable.",
-        "description": "If-Match de evaluación e Idempotency-Key obligatorios. Validar política de entradas y ausencias del paquete, revisión, preparación y QC aceptados vigentes. No imponer exclusión de casos por BMI null si el flujo congelado lo imputa. Fijar instantánea y paquete, registrar trabajo atómicamente. Motor ausente: 503 sin cálculo. Repetición exacta ya aceptada: misma ejecución, incluso si luego cambió ETag, tras volver a verificar acceso/CSRF. Misma clave con otro cuerpo: 409.",
+        "summary": "Rechazar cálculo mientras el motor predictivo no esté disponible.",
+        "description": "IMPLEMENTACIÓN FASE3: después de comprobar sesión, Origin/CSRF y propiedad devuelve503 ENGINE_NOT_AVAILABLE; no carga modelos de progresión, valida un paquete, registra ejecuciones ni ajusta calibración. Los parámetros y cuerpo del contrato predictivo futuro se conservan como metadatos x-future-*; todavía no los procesa este endpoint.",
         "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          },
+          "default": {
+            "$ref": "#/components/responses/UnexpectedError"
+          }
+        },
+        "security": [
+          {
+            "SessionCookie": [],
+            "CsrfToken": []
+          }
+        ],
+        "x-implementation-status": "engine-unavailable-only",
+        "x-future-parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "x-future-requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PredictionRequest"
+              }
+            }
+          }
+        },
+        "x-future-responses": {
           "200": {
             "description": "Repetición idempotente: mismo trabajo, sin otro cálculo.",
             "headers": {
@@ -1015,60 +1530,8 @@
                 }
               }
             }
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "412": {
-            "$ref": "#/components/responses/PreconditionFailed"
-          },
-          "422": {
-            "$ref": "#/components/responses/ValidationError"
-          },
-          "428": {
-            "$ref": "#/components/responses/PreconditionRequired"
-          },
-          "503": {
-            "$ref": "#/components/responses/Unavailable"
-          },
-          "default": {
-            "$ref": "#/components/responses/UnexpectedError"
           }
-        },
-        "security": [
-          {
-            "SessionCookie": [],
-            "CsrfToken": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/IfMatch"
-          },
-          {
-            "$ref": "#/components/parameters/IdempotencyKey"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PredictionRequest"
-              }
-            }
-          }
-        },
-        "x-implementation-status": "engine-unavailable-only"
+        }
       }
     },
     "/executions/{executionId}": {
@@ -1210,6 +1673,407 @@
         },
         "x-implementation-status": "implemented"
       }
+    },
+    "/preparations/{preparationId}/reference": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/PreparationId"
+        }
+      ],
+      "post": {
+        "operationId": "sealSourceReference",
+        "tags": [
+          "Preparation"
+        ],
+        "summary": "Sellar referencia visual antes de preparar el recorte.",
+        "description": "If-Match de preparación. Solo recurso actual awaiting_reference, misma revisión/lado y sin referencia previa. Validar inspección, cegamiento, nota y coordenadas nativas. Guardar referencia inmutable antes del localizador; centro no entra a geometría. centerResolved=false con centerXY=null queda sellado sin cálculo ni aprobación. Una referencia resuelta inicia el candidato. Respuesta devuelve SourceReference; volver a consultar preparación y caso. Si el candidato falla, la referencia ya guardada no se revierte; recuperar estado y usar retry explícito. Repetición de clave/cuerpo devuelve200 del mismo registro sin repetir cálculo.",
+        "security": [
+          {
+            "SessionCookie": [],
+            "CsrfToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SourceReferenceSubmission"
+              },
+              "examples": {
+                "resolved": {
+                  "value": {
+                    "preparationRevisionId": "preparation-revision-fixture-source",
+                    "confirmedSide": "right",
+                    "centerResolved": true,
+                    "centerXY": [
+                      200,
+                      120
+                    ],
+                    "originalAndHalfInspected": true,
+                    "outcomeBlinded": true,
+                    "note": "Ejemplo ficticio: original y mitad revisados antes de mostrar el recorte automático."
+                  }
+                },
+                "unresolved": {
+                  "value": {
+                    "preparationRevisionId": "preparation-revision-fixture-source",
+                    "confirmedSide": "right",
+                    "centerResolved": false,
+                    "centerXY": null,
+                    "originalAndHalfInspected": true,
+                    "outcomeBlinded": true,
+                    "note": "Ejemplo ficticio: no se pudo resolver el centro; la referencia queda sellada sin aprobación."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Referencia existente recuperada sin volver a calcular.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/NoStore"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceReference"
+                },
+                "example": {
+                  "id": "reference-fixture-001",
+                  "preparationId": "preparation-fixture-001",
+                  "preparationRevisionId": "preparation-revision-fixture-source",
+                  "confirmedSide": "right",
+                  "centerResolved": true,
+                  "centerXY": [
+                    200,
+                    120
+                  ],
+                  "originalAndHalfInspected": true,
+                  "outcomeBlinded": true,
+                  "note": "Ejemplo ficticio: original y mitad revisados antes de mostrar el recorte automático.",
+                  "reviewerId": "user-fixture-001",
+                  "createdAt": "2026-11-07T15:02:00Z"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Referencia sellada. Consultar preparación para estado posterior del candidato.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/NoStore"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceReference"
+                },
+                "example": {
+                  "id": "reference-fixture-001",
+                  "preparationId": "preparation-fixture-001",
+                  "preparationRevisionId": "preparation-revision-fixture-source",
+                  "confirmedSide": "right",
+                  "centerResolved": true,
+                  "centerXY": [
+                    200,
+                    120
+                  ],
+                  "originalAndHalfInspected": true,
+                  "outcomeBlinded": true,
+                  "note": "Ejemplo ficticio: original y mitad revisados antes de mostrar el recorte automático.",
+                  "reviewerId": "user-fixture-001",
+                  "createdAt": "2026-11-07T15:02:00Z"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "412": {
+            "$ref": "#/components/responses/PreconditionFailed"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "428": {
+            "$ref": "#/components/responses/PreconditionRequired"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          },
+          "default": {
+            "$ref": "#/components/responses/UnexpectedError"
+          }
+        },
+        "x-implementation-status": "implemented-phase3"
+      }
+    },
+    "/preparations/{preparationId}/retry": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/PreparationId"
+        }
+      ],
+      "post": {
+        "operationId": "retryPreparation",
+        "tags": [
+          "Preparation"
+        ],
+        "summary": "Reintentar una preparación fallida conservando fuente y referencia.",
+        "description": "Cuerpo vacío, If-Match de preparación e intención idempotente nueva. Solo recurso actual failed. Reutiliza la misma fuente y referencia sellada; no permite editar centro, parámetros o método. Una referencia no resuelta bloquea el recorte. Nueva intención202; repetir clave devuelve200 del estado existente sin relanzar. Si falla otra vez, recuperar estado antes de decidir un nuevo reintento explícito.",
+        "security": [
+          {
+            "SessionCookie": [],
+            "CsrfToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreparationRetry"
+              },
+              "example": {}
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Repetición idempotente: estado existente, sin volver a ejecutar.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/NoStore"
+              },
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Preparation"
+                },
+                "example": {
+                  "id": "preparation-fixture-001",
+                  "evaluationId": "evaluation-fixture-001",
+                  "sourceEvaluationRevisionId": "revision-fixture-001",
+                  "preparationRevisionId": "preparation-revision-fixture-source",
+                  "image": {
+                    "imageId": "image-fixture-001",
+                    "imageVersion": "image-version-fixture-001"
+                  },
+                  "side": "right",
+                  "status": "failed",
+                  "pipelineVersion": "kneel_guided_gradient_contours_contact_anchor_v1",
+                  "reviewContext": null,
+                  "error": {
+                    "code": "PROCESSOR_UNAVAILABLE",
+                    "message": "Ejemplo ficticio: no se pudo completar esta preparación.",
+                    "requestId": "preparation-fixture-001",
+                    "fields": [],
+                    "retryable": true
+                  },
+                  "createdAt": "2026-11-07T15:01:00Z",
+                  "updatedAt": "2026-11-07T15:02:00Z",
+                  "activeReview": null,
+                  "sourceContext": {
+                    "views": {
+                      "full_a": "/api/v1/preparations/preparation-fixture-001/views/full_a?revision=preparation-revision-fixture-source",
+                      "full_b": "/api/v1/preparations/preparation-fixture-001/views/full_b?revision=preparation-revision-fixture-source",
+                      "half_a": "/api/v1/preparations/preparation-fixture-001/views/half_a?revision=preparation-revision-fixture-source",
+                      "half_b": "/api/v1/preparations/preparation-fixture-001/views/half_b?revision=preparation-revision-fixture-source"
+                    },
+                    "fullNativeShape": [
+                      241,
+                      802
+                    ]
+                  },
+                  "nativeHalfShape": [
+                    241,
+                    400
+                  ],
+                  "sourceReference": null,
+                  "cropGeometry": null,
+                  "isCurrent": true,
+                  "reused": false
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Reintento realizado; consultar estado y revisión resultantes.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/NoStore"
+              },
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Preparation"
+                },
+                "example": {
+                  "id": "preparation-fixture-001",
+                  "evaluationId": "evaluation-fixture-001",
+                  "sourceEvaluationRevisionId": "revision-fixture-001",
+                  "preparationRevisionId": "preparation-revision-fixture-crop",
+                  "image": {
+                    "imageId": "image-fixture-001",
+                    "imageVersion": "image-version-fixture-001"
+                  },
+                  "side": "right",
+                  "status": "ready",
+                  "pipelineVersion": "kneel_guided_gradient_contours_contact_anchor_v1",
+                  "reviewContext": {
+                    "qcPolicyVersion": "mcr008_confirmation_v1.0",
+                    "canReview": true,
+                    "blockerCodes": [],
+                    "checks": [],
+                    "originalPreviewUrl": "/api/v1/preparations/preparation-fixture-001/views/half_a?revision=preparation-revision-fixture-crop",
+                    "cropPreviewUrl": "/api/v1/preparations/preparation-fixture-001/views/crop_a?revision=preparation-revision-fixture-crop",
+                    "views": {
+                      "crop_a": "/api/v1/preparations/preparation-fixture-001/views/crop_a?revision=preparation-revision-fixture-crop",
+                      "crop_b": "/api/v1/preparations/preparation-fixture-001/views/crop_b?revision=preparation-revision-fixture-crop"
+                    }
+                  },
+                  "error": null,
+                  "createdAt": "2026-11-07T15:01:00Z",
+                  "updatedAt": "2026-11-07T15:03:00Z",
+                  "activeReview": null,
+                  "sourceContext": {
+                    "views": {
+                      "full_a": "/api/v1/preparations/preparation-fixture-001/views/full_a?revision=preparation-revision-fixture-crop",
+                      "full_b": "/api/v1/preparations/preparation-fixture-001/views/full_b?revision=preparation-revision-fixture-crop",
+                      "half_a": "/api/v1/preparations/preparation-fixture-001/views/half_a?revision=preparation-revision-fixture-crop",
+                      "half_b": "/api/v1/preparations/preparation-fixture-001/views/half_b?revision=preparation-revision-fixture-crop"
+                    },
+                    "fullNativeShape": [
+                      241,
+                      802
+                    ]
+                  },
+                  "nativeHalfShape": [
+                    241,
+                    400
+                  ],
+                  "sourceReference": {
+                    "id": "reference-fixture-001",
+                    "preparationId": "preparation-fixture-001",
+                    "preparationRevisionId": "preparation-revision-fixture-source",
+                    "confirmedSide": "right",
+                    "centerResolved": true,
+                    "centerXY": [
+                      200,
+                      120
+                    ],
+                    "originalAndHalfInspected": true,
+                    "outcomeBlinded": true,
+                    "note": "Ejemplo ficticio: original y mitad revisados antes de mostrar el recorte automático.",
+                    "reviewerId": "user-fixture-001",
+                    "createdAt": "2026-11-07T15:02:00Z"
+                  },
+                  "cropGeometry": {
+                    "nativeHalfBox": [
+                      110,
+                      82,
+                      290,
+                      158
+                    ],
+                    "previewShapes": {
+                      "crop_a": [
+                        76,
+                        180
+                      ],
+                      "crop_b": [
+                        76,
+                        180
+                      ]
+                    }
+                  },
+                  "isCurrent": true,
+                  "reused": false
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "412": {
+            "$ref": "#/components/responses/PreconditionFailed"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "428": {
+            "$ref": "#/components/responses/PreconditionRequired"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          },
+          "default": {
+            "$ref": "#/components/responses/UnexpectedError"
+          }
+        },
+        "x-implementation-status": "implemented-phase3"
+      }
     }
   },
   "components": {
@@ -1256,7 +2120,7 @@
         "name": "If-Match",
         "in": "header",
         "required": true,
-        "description": "Un ETag fuerte de evaluación; para QC, el de preparación. No listas, comodín ni valores débiles.",
+        "description": "ETag fuerte del caso para PATCH/carga; ETag de preparación para referencia/reintento/QC. Sin listas, comodín o prefijo débil. En repeticiones idempotentes aceptadas se recupera el recurso antes de exigir la versión nueva.",
         "schema": {
           "type": "string",
           "pattern": "^\"[^\"\\r\\n]+\"$"
@@ -1267,7 +2131,7 @@
         "name": "Idempotency-Key",
         "in": "header",
         "required": true,
-        "description": "Clave nueva por intención de cálculo, reutilizada solo para repetir idéntica solicitud; no incluye datos privados.",
+        "description": "Clave nueva por intención de creación/carga/referencia/reintento/QC o cálculo futuro, conservada para repetir exactamente la misma solicitud. No contiene información clínica.",
         "schema": {
           "type": "string",
           "minLength": 16,
@@ -2117,7 +2981,7 @@
         "required": [
           "file"
         ],
-        "description": "El lado se obtiene de la evaluación guardada. Una sustitución crea nueva preparación y conserva historial."
+        "description": "Exactamente un campo file, sin campos de texto ni otro archivo. El lado proviene del caso guardado. Límites por defecto: archivo60MiB, multipart64MiB. Se inspecciona contenido; el nombre o MIME no prueban compatibilidad. Mismos bytes/caso/lado reutilizan una preparación."
       },
       "ImageIdentity": {
         "type": "object",
@@ -2178,7 +3042,8 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ReviewCheck"
-            }
+            },
+            "maxItems": 0
           },
           "originalPreviewUrl": {
             "type": "string",
@@ -2187,6 +3052,9 @@
           "cropPreviewUrl": {
             "type": "string",
             "format": "uri-reference"
+          },
+          "views": {
+            "$ref": "#/components/schemas/CropViews"
           }
         },
         "required": [
@@ -2195,9 +3063,10 @@
           "blockerCodes",
           "checks",
           "originalPreviewUrl",
-          "cropPreviewUrl"
+          "cropPreviewUrl",
+          "views"
         ],
-        "description": "Vistas relativas del mismo origen, autenticadas y sin caché. canReview no significa QC aprobado."
+        "description": "Contexto del recorte disponible; canReview y ready no significan QC aceptado. checks está vacío y la observación completa aplica las reglas congeladas."
       },
       "Preparation": {
         "type": "object",
@@ -2224,8 +3093,8 @@
           "status": {
             "type": "string",
             "enum": [
-              "queued",
               "processing",
+              "awaiting_reference",
               "ready",
               "failed"
             ]
@@ -2276,6 +3145,52 @@
               }
             ],
             "description": "Decisión guardada vigente para esta preparación; null si no existe o quedó desactualizada."
+          },
+          "sourceContext": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SourceContext"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "nativeHalfShape": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NativeShape"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sourceReference": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SourceReference"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cropGeometry": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CropGeometry"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "isCurrent": {
+            "type": "boolean"
+          },
+          "reused": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -2291,9 +3206,15 @@
           "error",
           "createdAt",
           "updatedAt",
-          "activeReview"
+          "activeReview",
+          "sourceContext",
+          "nativeHalfShape",
+          "sourceReference",
+          "cropGeometry",
+          "isCurrent",
+          "reused"
         ],
-        "description": "Preparación del flujo compartido. ready no significa QC aceptado. Una corrección autorizada cambia la revisión de preparación y deja sin vigencia las decisiones anteriores.",
+        "description": "Preparación persistida. awaiting_reference permite inspeccionar original y mitad; una referencia resuelta precede al candidato ready. isCurrent vincula la preparación con la imagen/lado activos. reused indica recuperación o reutilización en esa respuesta, no aprobación.",
         "allOf": [
           {
             "if": {
@@ -2308,10 +3229,56 @@
                 "pipelineVersion": {
                   "$ref": "#/components/schemas/VersionId"
                 },
+                "sourceContext": {
+                  "$ref": "#/components/schemas/SourceContext"
+                },
+                "nativeHalfShape": {
+                  "$ref": "#/components/schemas/NativeShape"
+                },
+                "sourceReference": {
+                  "$ref": "#/components/schemas/SourceReference"
+                },
+                "cropGeometry": {
+                  "$ref": "#/components/schemas/CropGeometry"
+                },
                 "reviewContext": {
                   "$ref": "#/components/schemas/ReviewContext"
                 },
                 "error": {
+                  "type": "null"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "awaiting_reference"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "pipelineVersion": {
+                  "$ref": "#/components/schemas/VersionId"
+                },
+                "sourceContext": {
+                  "$ref": "#/components/schemas/SourceContext"
+                },
+                "nativeHalfShape": {
+                  "$ref": "#/components/schemas/NativeShape"
+                },
+                "reviewContext": {
+                  "type": "null"
+                },
+                "cropGeometry": {
+                  "type": "null"
+                },
+                "error": {
+                  "type": "null"
+                },
+                "activeReview": {
                   "type": "null"
                 }
               }
@@ -2343,10 +3310,7 @@
             "if": {
               "properties": {
                 "status": {
-                  "enum": [
-                    "queued",
-                    "processing"
-                  ]
+                  "const": "processing"
                 }
               }
             },
@@ -2363,6 +3327,371 @@
                 }
               }
             }
+          }
+        ],
+        "examples": [
+          {
+            "id": "preparation-fixture-001",
+            "evaluationId": "evaluation-fixture-001",
+            "sourceEvaluationRevisionId": "revision-fixture-001",
+            "preparationRevisionId": "preparation-revision-fixture-source",
+            "image": {
+              "imageId": "image-fixture-001",
+              "imageVersion": "image-version-fixture-001"
+            },
+            "side": "right",
+            "status": "awaiting_reference",
+            "pipelineVersion": "kneel_guided_gradient_contours_contact_anchor_v1",
+            "reviewContext": null,
+            "error": null,
+            "createdAt": "2026-11-07T15:01:00Z",
+            "updatedAt": "2026-11-07T15:01:01Z",
+            "activeReview": null,
+            "sourceContext": {
+              "views": {
+                "full_a": "/api/v1/preparations/preparation-fixture-001/views/full_a?revision=preparation-revision-fixture-source",
+                "full_b": "/api/v1/preparations/preparation-fixture-001/views/full_b?revision=preparation-revision-fixture-source",
+                "half_a": "/api/v1/preparations/preparation-fixture-001/views/half_a?revision=preparation-revision-fixture-source",
+                "half_b": "/api/v1/preparations/preparation-fixture-001/views/half_b?revision=preparation-revision-fixture-source"
+              },
+              "fullNativeShape": [
+                241,
+                802
+              ]
+            },
+            "nativeHalfShape": [
+              241,
+              400
+            ],
+            "sourceReference": null,
+            "cropGeometry": null,
+            "isCurrent": true,
+            "reused": false
+          },
+          {
+            "id": "preparation-fixture-001",
+            "evaluationId": "evaluation-fixture-001",
+            "sourceEvaluationRevisionId": "revision-fixture-001",
+            "preparationRevisionId": "preparation-revision-fixture-crop",
+            "image": {
+              "imageId": "image-fixture-001",
+              "imageVersion": "image-version-fixture-001"
+            },
+            "side": "right",
+            "status": "ready",
+            "pipelineVersion": "kneel_guided_gradient_contours_contact_anchor_v1",
+            "reviewContext": {
+              "qcPolicyVersion": "mcr008_confirmation_v1.0",
+              "canReview": true,
+              "blockerCodes": [],
+              "checks": [],
+              "originalPreviewUrl": "/api/v1/preparations/preparation-fixture-001/views/half_a?revision=preparation-revision-fixture-crop",
+              "cropPreviewUrl": "/api/v1/preparations/preparation-fixture-001/views/crop_a?revision=preparation-revision-fixture-crop",
+              "views": {
+                "crop_a": "/api/v1/preparations/preparation-fixture-001/views/crop_a?revision=preparation-revision-fixture-crop",
+                "crop_b": "/api/v1/preparations/preparation-fixture-001/views/crop_b?revision=preparation-revision-fixture-crop"
+              }
+            },
+            "error": null,
+            "createdAt": "2026-11-07T15:01:00Z",
+            "updatedAt": "2026-11-07T15:03:00Z",
+            "activeReview": null,
+            "sourceContext": {
+              "views": {
+                "full_a": "/api/v1/preparations/preparation-fixture-001/views/full_a?revision=preparation-revision-fixture-crop",
+                "full_b": "/api/v1/preparations/preparation-fixture-001/views/full_b?revision=preparation-revision-fixture-crop",
+                "half_a": "/api/v1/preparations/preparation-fixture-001/views/half_a?revision=preparation-revision-fixture-crop",
+                "half_b": "/api/v1/preparations/preparation-fixture-001/views/half_b?revision=preparation-revision-fixture-crop"
+              },
+              "fullNativeShape": [
+                241,
+                802
+              ]
+            },
+            "nativeHalfShape": [
+              241,
+              400
+            ],
+            "sourceReference": {
+              "id": "reference-fixture-001",
+              "preparationId": "preparation-fixture-001",
+              "preparationRevisionId": "preparation-revision-fixture-source",
+              "confirmedSide": "right",
+              "centerResolved": true,
+              "centerXY": [
+                200,
+                120
+              ],
+              "originalAndHalfInspected": true,
+              "outcomeBlinded": true,
+              "note": "Ejemplo ficticio: original y mitad revisados antes de mostrar el recorte automático.",
+              "reviewerId": "user-fixture-001",
+              "createdAt": "2026-11-07T15:02:00Z"
+            },
+            "cropGeometry": {
+              "nativeHalfBox": [
+                110,
+                82,
+                290,
+                158
+              ],
+              "previewShapes": {
+                "crop_a": [
+                  76,
+                  180
+                ],
+                "crop_b": [
+                  76,
+                  180
+                ]
+              }
+            },
+            "isCurrent": true,
+            "reused": false
+          },
+          {
+            "id": "preparation-fixture-001",
+            "evaluationId": "evaluation-fixture-001",
+            "sourceEvaluationRevisionId": "revision-fixture-001",
+            "preparationRevisionId": "preparation-revision-fixture-crop",
+            "image": {
+              "imageId": "image-fixture-001",
+              "imageVersion": "image-version-fixture-001"
+            },
+            "side": "right",
+            "status": "ready",
+            "pipelineVersion": "kneel_guided_gradient_contours_contact_anchor_v1",
+            "reviewContext": {
+              "qcPolicyVersion": "mcr008_confirmation_v1.0",
+              "canReview": true,
+              "blockerCodes": [],
+              "checks": [],
+              "originalPreviewUrl": "/api/v1/preparations/preparation-fixture-001/views/half_a?revision=preparation-revision-fixture-crop",
+              "cropPreviewUrl": "/api/v1/preparations/preparation-fixture-001/views/crop_a?revision=preparation-revision-fixture-crop",
+              "views": {
+                "crop_a": "/api/v1/preparations/preparation-fixture-001/views/crop_a?revision=preparation-revision-fixture-crop",
+                "crop_b": "/api/v1/preparations/preparation-fixture-001/views/crop_b?revision=preparation-revision-fixture-crop"
+              }
+            },
+            "error": null,
+            "createdAt": "2026-11-07T15:01:00Z",
+            "updatedAt": "2026-11-07T15:04:00Z",
+            "activeReview": {
+              "id": "review-fixture-001",
+              "evaluationId": "evaluation-fixture-001",
+              "preparationId": "preparation-fixture-001",
+              "preparationRevisionId": "preparation-revision-fixture-crop",
+              "image": {
+                "imageId": "image-fixture-001",
+                "imageVersion": "image-version-fixture-001"
+              },
+              "side": "right",
+              "qcPolicyVersion": "mcr008_confirmation_v1.0",
+              "decision": "accepted",
+              "confirmedCheckIds": [],
+              "reason": null,
+              "reviewerId": "user-fixture-001",
+              "createdAt": "2026-11-07T15:04:00Z",
+              "observation": {
+                "side_supported": true,
+                "coverage_complete": true,
+                "visibility": {
+                  "medial_joint_borders": "visible",
+                  "lateral_joint_borders": "visible",
+                  "subchondral_bone": "visible"
+                },
+                "hardware": "absent",
+                "text_or_mask": "absent",
+                "marks": [],
+                "mark_effect": "none",
+                "physical_origin_known": false,
+                "note": "Ejemplo sintético de observación completa; no corresponde a una imagen clínica real.",
+                "original_half_inspected": true,
+                "both_windows_inspected": true,
+                "outcome_blinded": true,
+                "lateral_margins_visible": true,
+                "unclassified_mark_present": false,
+                "ruler_outside_bone": null,
+                "ruler_locations_xy": []
+              },
+              "assessment": {
+                "accepted": true,
+                "reasons": [],
+                "geometryAdequate": true,
+                "observation": {
+                  "side_supported": true,
+                  "coverage_complete": true,
+                  "visibility": {
+                    "medial_joint_borders": "visible",
+                    "lateral_joint_borders": "visible",
+                    "subchondral_bone": "visible"
+                  },
+                  "hardware": "absent",
+                  "text_or_mask": "absent",
+                  "marks": [],
+                  "mark_effect": "none",
+                  "physical_origin_known": false,
+                  "note": "Ejemplo sintético de observación completa; no corresponde a una imagen clínica real.",
+                  "original_half_inspected": true,
+                  "both_windows_inspected": true,
+                  "outcome_blinded": true,
+                  "lateral_margins_visible": true,
+                  "unclassified_mark_present": false,
+                  "ruler_outside_bone": null,
+                  "ruler_locations_xy": [],
+                  "knee_alias": "application-fixture-RIGHT"
+                },
+                "cropSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+                "frozenCandidate": "kneel_guided_gradient_contours_contact_anchor_v1",
+                "qcVersion": "mcr008_confirmation_v1.0"
+              }
+            },
+            "sourceContext": {
+              "views": {
+                "full_a": "/api/v1/preparations/preparation-fixture-001/views/full_a?revision=preparation-revision-fixture-crop",
+                "full_b": "/api/v1/preparations/preparation-fixture-001/views/full_b?revision=preparation-revision-fixture-crop",
+                "half_a": "/api/v1/preparations/preparation-fixture-001/views/half_a?revision=preparation-revision-fixture-crop",
+                "half_b": "/api/v1/preparations/preparation-fixture-001/views/half_b?revision=preparation-revision-fixture-crop"
+              },
+              "fullNativeShape": [
+                241,
+                802
+              ]
+            },
+            "nativeHalfShape": [
+              241,
+              400
+            ],
+            "sourceReference": {
+              "id": "reference-fixture-001",
+              "preparationId": "preparation-fixture-001",
+              "preparationRevisionId": "preparation-revision-fixture-source",
+              "confirmedSide": "right",
+              "centerResolved": true,
+              "centerXY": [
+                200,
+                120
+              ],
+              "originalAndHalfInspected": true,
+              "outcomeBlinded": true,
+              "note": "Ejemplo ficticio: original y mitad revisados antes de mostrar el recorte automático.",
+              "reviewerId": "user-fixture-001",
+              "createdAt": "2026-11-07T15:02:00Z"
+            },
+            "cropGeometry": {
+              "nativeHalfBox": [
+                110,
+                82,
+                290,
+                158
+              ],
+              "previewShapes": {
+                "crop_a": [
+                  76,
+                  180
+                ],
+                "crop_b": [
+                  76,
+                  180
+                ]
+              }
+            },
+            "isCurrent": true,
+            "reused": false
+          },
+          {
+            "id": "preparation-fixture-001",
+            "evaluationId": "evaluation-fixture-001",
+            "sourceEvaluationRevisionId": "revision-fixture-001",
+            "preparationRevisionId": "preparation-revision-fixture-unresolved",
+            "image": {
+              "imageId": "image-fixture-001",
+              "imageVersion": "image-version-fixture-001"
+            },
+            "side": "right",
+            "status": "awaiting_reference",
+            "pipelineVersion": "kneel_guided_gradient_contours_contact_anchor_v1",
+            "reviewContext": null,
+            "error": null,
+            "createdAt": "2026-11-07T15:01:00Z",
+            "updatedAt": "2026-11-07T15:02:00Z",
+            "activeReview": null,
+            "sourceContext": {
+              "views": {
+                "full_a": "/api/v1/preparations/preparation-fixture-001/views/full_a?revision=preparation-revision-fixture-unresolved",
+                "full_b": "/api/v1/preparations/preparation-fixture-001/views/full_b?revision=preparation-revision-fixture-unresolved",
+                "half_a": "/api/v1/preparations/preparation-fixture-001/views/half_a?revision=preparation-revision-fixture-unresolved",
+                "half_b": "/api/v1/preparations/preparation-fixture-001/views/half_b?revision=preparation-revision-fixture-unresolved"
+              },
+              "fullNativeShape": [
+                241,
+                802
+              ]
+            },
+            "nativeHalfShape": [
+              241,
+              400
+            ],
+            "sourceReference": {
+              "id": "reference-fixture-001",
+              "preparationId": "preparation-fixture-001",
+              "preparationRevisionId": "preparation-revision-fixture-source",
+              "confirmedSide": "right",
+              "centerResolved": false,
+              "centerXY": null,
+              "originalAndHalfInspected": true,
+              "outcomeBlinded": true,
+              "note": "Ejemplo ficticio: no se pudo resolver el centro; la referencia queda sellada sin aprobación.",
+              "reviewerId": "user-fixture-001",
+              "createdAt": "2026-11-07T15:02:00Z"
+            },
+            "cropGeometry": null,
+            "isCurrent": true,
+            "reused": false
+          },
+          {
+            "id": "preparation-fixture-001",
+            "evaluationId": "evaluation-fixture-001",
+            "sourceEvaluationRevisionId": "revision-fixture-001",
+            "preparationRevisionId": "preparation-revision-fixture-source",
+            "image": {
+              "imageId": "image-fixture-001",
+              "imageVersion": "image-version-fixture-001"
+            },
+            "side": "right",
+            "status": "failed",
+            "pipelineVersion": "kneel_guided_gradient_contours_contact_anchor_v1",
+            "reviewContext": null,
+            "error": {
+              "code": "PROCESSOR_UNAVAILABLE",
+              "message": "Ejemplo ficticio: no se pudo completar esta preparación.",
+              "requestId": "preparation-fixture-001",
+              "fields": [],
+              "retryable": true
+            },
+            "createdAt": "2026-11-07T15:01:00Z",
+            "updatedAt": "2026-11-07T15:02:00Z",
+            "activeReview": null,
+            "sourceContext": {
+              "views": {
+                "full_a": "/api/v1/preparations/preparation-fixture-001/views/full_a?revision=preparation-revision-fixture-source",
+                "full_b": "/api/v1/preparations/preparation-fixture-001/views/full_b?revision=preparation-revision-fixture-source",
+                "half_a": "/api/v1/preparations/preparation-fixture-001/views/half_a?revision=preparation-revision-fixture-source",
+                "half_b": "/api/v1/preparations/preparation-fixture-001/views/half_b?revision=preparation-revision-fixture-source"
+              },
+              "fullNativeShape": [
+                241,
+                802
+              ]
+            },
+            "nativeHalfShape": [
+              241,
+              400
+            ],
+            "sourceReference": null,
+            "cropGeometry": null,
+            "isCurrent": true,
+            "reused": false
           }
         ]
       },
@@ -2388,7 +3717,8 @@
             "items": {
               "$ref": "#/components/schemas/OpaqueId"
             },
-            "uniqueItems": true
+            "maxItems": 0,
+            "description": "Vacío en fase3. Los controles reales son la observación completa; no se aceptan identificadores de checks inventados."
           },
           "reason": {
             "anyOf": [
@@ -2401,6 +3731,16 @@
                 "type": "null"
               }
             ]
+          },
+          "observation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QualityObservation"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -2408,10 +3748,27 @@
           "confirmedSide",
           "decision",
           "confirmedCheckIds",
-          "reason"
+          "reason",
+          "observation"
         ],
-        "description": "Decisión sobre la revisión exacta. El servidor verifica permisos, identidad, controles requeridos y bloqueos del QC vigente. Enviar accepted no permite saltarse el procedimiento.",
+        "description": "Aceptar exige observación completa y accepted=true del evaluador del servidor. Rechazar exige motivo y puede conservar observation=null; ese rechazo administrativo no fabrica un resultado científico.",
         "allOf": [
+          {
+            "if": {
+              "properties": {
+                "decision": {
+                  "const": "accepted"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "observation": {
+                  "$ref": "#/components/schemas/QualityObservation"
+                }
+              }
+            }
+          },
           {
             "if": {
               "properties": {
@@ -2429,6 +3786,45 @@
                 }
               }
             }
+          }
+        ],
+        "examples": [
+          {
+            "preparationRevisionId": "preparation-revision-fixture-crop",
+            "confirmedSide": "right",
+            "decision": "accepted",
+            "confirmedCheckIds": [],
+            "reason": null,
+            "observation": {
+              "side_supported": true,
+              "coverage_complete": true,
+              "visibility": {
+                "medial_joint_borders": "visible",
+                "lateral_joint_borders": "visible",
+                "subchondral_bone": "visible"
+              },
+              "hardware": "absent",
+              "text_or_mask": "absent",
+              "marks": [],
+              "mark_effect": "none",
+              "physical_origin_known": false,
+              "note": "Ejemplo sintético de observación completa; no corresponde a una imagen clínica real.",
+              "original_half_inspected": true,
+              "both_windows_inspected": true,
+              "outcome_blinded": true,
+              "lateral_margins_visible": true,
+              "unclassified_mark_present": false,
+              "ruler_outside_bone": null,
+              "ruler_locations_xy": []
+            }
+          },
+          {
+            "preparationRevisionId": "preparation-revision-fixture-crop",
+            "confirmedSide": "right",
+            "decision": "rejected",
+            "confirmedCheckIds": [],
+            "reason": "Ejemplo ficticio de rechazo administrativo.",
+            "observation": null
           }
         ]
       },
@@ -2469,7 +3865,8 @@
             "items": {
               "$ref": "#/components/schemas/OpaqueId"
             },
-            "uniqueItems": true
+            "maxItems": 0,
+            "description": "Vacío en fase3. Los controles reales son la observación completa; no se aceptan identificadores de checks inventados."
           },
           "reason": {
             "anyOf": [
@@ -2488,6 +3885,26 @@
           },
           "createdAt": {
             "$ref": "#/components/schemas/Timestamp"
+          },
+          "observation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QualityObservation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "assessment": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QualityAssessment"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -2502,10 +3919,28 @@
           "confirmedCheckIds",
           "reason",
           "reviewerId",
-          "createdAt"
+          "createdAt",
+          "observation",
+          "assessment"
         ],
-        "description": "Registro inmutable generado por servidor. Identidad, revisor y fecha no provienen de afirmaciones del cliente. Otra decisión crea otro registro.",
+        "description": "Decisión inmutable emitida por servidor para imagen/lado/revisión exactos. El revisor y fecha son del servidor. Rechazo administrativo permite observation/assessment null; aceptación exige evaluación favorable.",
         "allOf": [
+          {
+            "if": {
+              "properties": {
+                "decision": {
+                  "const": "accepted"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "observation": {
+                  "$ref": "#/components/schemas/QualityObservation"
+                }
+              }
+            }
+          },
           {
             "if": {
               "properties": {
@@ -2523,6 +3958,124 @@
                 }
               }
             }
+          },
+          {
+            "if": {
+              "properties": {
+                "decision": {
+                  "const": "accepted"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "assessment": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/QualityAssessment"
+                    },
+                    {
+                      "properties": {
+                        "accepted": {
+                          "const": true
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        ],
+        "examples": [
+          {
+            "id": "review-fixture-001",
+            "evaluationId": "evaluation-fixture-001",
+            "preparationId": "preparation-fixture-001",
+            "preparationRevisionId": "preparation-revision-fixture-crop",
+            "image": {
+              "imageId": "image-fixture-001",
+              "imageVersion": "image-version-fixture-001"
+            },
+            "side": "right",
+            "qcPolicyVersion": "mcr008_confirmation_v1.0",
+            "decision": "accepted",
+            "confirmedCheckIds": [],
+            "reason": null,
+            "reviewerId": "user-fixture-001",
+            "createdAt": "2026-11-07T15:04:00Z",
+            "observation": {
+              "side_supported": true,
+              "coverage_complete": true,
+              "visibility": {
+                "medial_joint_borders": "visible",
+                "lateral_joint_borders": "visible",
+                "subchondral_bone": "visible"
+              },
+              "hardware": "absent",
+              "text_or_mask": "absent",
+              "marks": [],
+              "mark_effect": "none",
+              "physical_origin_known": false,
+              "note": "Ejemplo sintético de observación completa; no corresponde a una imagen clínica real.",
+              "original_half_inspected": true,
+              "both_windows_inspected": true,
+              "outcome_blinded": true,
+              "lateral_margins_visible": true,
+              "unclassified_mark_present": false,
+              "ruler_outside_bone": null,
+              "ruler_locations_xy": []
+            },
+            "assessment": {
+              "accepted": true,
+              "reasons": [],
+              "geometryAdequate": true,
+              "observation": {
+                "side_supported": true,
+                "coverage_complete": true,
+                "visibility": {
+                  "medial_joint_borders": "visible",
+                  "lateral_joint_borders": "visible",
+                  "subchondral_bone": "visible"
+                },
+                "hardware": "absent",
+                "text_or_mask": "absent",
+                "marks": [],
+                "mark_effect": "none",
+                "physical_origin_known": false,
+                "note": "Ejemplo sintético de observación completa; no corresponde a una imagen clínica real.",
+                "original_half_inspected": true,
+                "both_windows_inspected": true,
+                "outcome_blinded": true,
+                "lateral_margins_visible": true,
+                "unclassified_mark_present": false,
+                "ruler_outside_bone": null,
+                "ruler_locations_xy": [],
+                "knee_alias": "application-fixture-RIGHT"
+              },
+              "cropSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+              "frozenCandidate": "kneel_guided_gradient_contours_contact_anchor_v1",
+              "qcVersion": "mcr008_confirmation_v1.0"
+            }
+          },
+          {
+            "id": "review-fixture-002",
+            "evaluationId": "evaluation-fixture-001",
+            "preparationId": "preparation-fixture-001",
+            "preparationRevisionId": "preparation-revision-fixture-crop",
+            "image": {
+              "imageId": "image-fixture-001",
+              "imageVersion": "image-version-fixture-001"
+            },
+            "side": "right",
+            "qcPolicyVersion": "mcr008_confirmation_v1.0",
+            "decision": "rejected",
+            "confirmedCheckIds": [],
+            "reason": "Rechazo administrativo ficticio; no se atribuye una evaluación científica.",
+            "reviewerId": "user-fixture-001",
+            "createdAt": "2026-11-07T15:05:00Z",
+            "observation": null,
+            "assessment": null
           }
         ]
       },
@@ -2764,7 +4317,7 @@
           "result",
           "error"
         ],
-        "description": "Instantánea y paquete inmutables; estado persistido. isCurrentInput se calcula al leer y evita mostrar un resultado histórico como actual. Consultar no ejecuta inferencia.",
+        "description": "Contrato FUTURO, no implementado en fase3. Instantánea y paquete inmutables; estado persistido. isCurrentInput se calcula al leer y evita mostrar un resultado histórico como actual. Consultar no ejecuta inferencia.",
         "allOf": [
           {
             "if": {
@@ -2906,6 +4459,788 @@
               }
             }
           }
+        ]
+      },
+      "NativeShape": {
+        "type": "array",
+        "items": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "minItems": 2,
+        "maxItems": 2,
+        "description": "[alto, ancho] en píxeles nativos. No es una dimensión fija del tensor predictivo."
+      },
+      "NativePoint": {
+        "type": "array",
+        "items": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "minItems": 2,
+        "maxItems": 2,
+        "description": "[x,y] enteros en coordenadas de la mitad nativa seleccionada; el servidor comprueba límites."
+      },
+      "SourceViews": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "full_a": {
+            "type": "string",
+            "format": "uri-reference"
+          },
+          "full_b": {
+            "type": "string",
+            "format": "uri-reference"
+          },
+          "half_a": {
+            "type": "string",
+            "format": "uri-reference"
+          },
+          "half_b": {
+            "type": "string",
+            "format": "uri-reference"
+          }
+        },
+        "required": [
+          "full_a",
+          "full_b",
+          "half_a",
+          "half_b"
+        ],
+        "description": "PNG privados: full=bilateral original, half=mitad seleccionada; a=percentiles1–99, b=5–95; dimensiones nativas conservadas."
+      },
+      "CropViews": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "crop_a": {
+            "type": "string",
+            "format": "uri-reference"
+          },
+          "crop_b": {
+            "type": "string",
+            "format": "uri-reference"
+          }
+        },
+        "required": [
+          "crop_a",
+          "crop_b"
+        ],
+        "description": "Dos ventanas del mismo recorte nativo: a=1–99 y b=5–95."
+      },
+      "SourceContext": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "views": {
+            "$ref": "#/components/schemas/SourceViews"
+          },
+          "fullNativeShape": {
+            "$ref": "#/components/schemas/NativeShape"
+          }
+        },
+        "required": [
+          "views",
+          "fullNativeShape"
+        ],
+        "description": "La referencia se registra sobre half_a/half_b después de inspeccionar original y mitad, antes de mostrar el recorte."
+      },
+      "CropGeometry": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "nativeHalfBox": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "minItems": 4,
+            "maxItems": 4,
+            "description": "Formato PÚBLICO [x0,y0,x1,y1], límites superiores exclusivos. x0<x1 e y0<y1. El orden interno del científico es distinto y no se expone."
+          },
+          "previewShapes": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "crop_a": {
+                "$ref": "#/components/schemas/NativeShape"
+              },
+              "crop_b": {
+                "$ref": "#/components/schemas/NativeShape"
+              }
+            },
+            "required": [
+              "crop_a",
+              "crop_b"
+            ]
+          }
+        },
+        "required": [
+          "nativeHalfBox",
+          "previewShapes"
+        ],
+        "description": "Geometría informada por servidor para transformar clics de vista a coordenadas nativas. Nunca reconstruir la caja mediante reglas clínicas en Vue."
+      },
+      "SourceReferenceSubmission": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "preparationRevisionId": {
+            "$ref": "#/components/schemas/OpaqueId"
+          },
+          "confirmedSide": {
+            "$ref": "#/components/schemas/Side"
+          },
+          "centerResolved": {
+            "type": "boolean"
+          },
+          "centerXY": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NativePoint"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "originalAndHalfInspected": {
+            "type": "boolean",
+            "const": true
+          },
+          "outcomeBlinded": {
+            "type": "boolean",
+            "const": true
+          },
+          "note": {
+            "type": "string",
+            "minLength": 35,
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "preparationRevisionId",
+          "confirmedSide",
+          "centerResolved",
+          "centerXY",
+          "originalAndHalfInspected",
+          "outcomeBlinded",
+          "note"
+        ],
+        "description": "Referencia visual explícita del original y la mitad, sellada antes del localizador/ROI. Nunca se utiliza como entrada de geometría.",
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "centerResolved": {
+                  "const": true
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "centerXY": {
+                  "$ref": "#/components/schemas/NativePoint"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "centerResolved": {
+                  "const": false
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "centerXY": {
+                  "type": "null"
+                }
+              }
+            }
+          }
+        ],
+        "examples": [
+          {
+            "preparationRevisionId": "preparation-revision-fixture-source",
+            "confirmedSide": "right",
+            "centerResolved": true,
+            "centerXY": [
+              200,
+              120
+            ],
+            "originalAndHalfInspected": true,
+            "outcomeBlinded": true,
+            "note": "Ejemplo ficticio: original y mitad revisados antes de mostrar el recorte automático."
+          },
+          {
+            "preparationRevisionId": "preparation-revision-fixture-source",
+            "confirmedSide": "right",
+            "centerResolved": false,
+            "centerXY": null,
+            "originalAndHalfInspected": true,
+            "outcomeBlinded": true,
+            "note": "Ejemplo ficticio: no se pudo resolver el centro; la referencia queda sellada sin aprobación."
+          }
+        ]
+      },
+      "SourceReference": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/OpaqueId"
+          },
+          "preparationId": {
+            "$ref": "#/components/schemas/OpaqueId"
+          },
+          "preparationRevisionId": {
+            "$ref": "#/components/schemas/OpaqueId"
+          },
+          "confirmedSide": {
+            "$ref": "#/components/schemas/Side"
+          },
+          "centerResolved": {
+            "type": "boolean"
+          },
+          "centerXY": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NativePoint"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "originalAndHalfInspected": {
+            "type": "boolean",
+            "const": true
+          },
+          "outcomeBlinded": {
+            "type": "boolean",
+            "const": true
+          },
+          "note": {
+            "type": "string",
+            "minLength": 35,
+            "maxLength": 2000
+          },
+          "reviewerId": {
+            "$ref": "#/components/schemas/OpaqueId"
+          },
+          "createdAt": {
+            "$ref": "#/components/schemas/Timestamp"
+          }
+        },
+        "required": [
+          "id",
+          "preparationId",
+          "preparationRevisionId",
+          "confirmedSide",
+          "centerResolved",
+          "centerXY",
+          "originalAndHalfInspected",
+          "outcomeBlinded",
+          "note",
+          "reviewerId",
+          "createdAt"
+        ],
+        "description": "Registro inmutable. preparationRevisionId identifica la revisión de FUENTE al sellar; puede diferir de la revisión posterior del recorte. Una referencia no resuelta permanece sellada, sin candidato ni aprobación.",
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "centerResolved": {
+                  "const": true
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "centerXY": {
+                  "$ref": "#/components/schemas/NativePoint"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "centerResolved": {
+                  "const": false
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "centerXY": {
+                  "type": "null"
+                }
+              }
+            }
+          }
+        ],
+        "examples": [
+          {
+            "id": "reference-fixture-001",
+            "preparationId": "preparation-fixture-001",
+            "preparationRevisionId": "preparation-revision-fixture-source",
+            "confirmedSide": "right",
+            "centerResolved": true,
+            "centerXY": [
+              200,
+              120
+            ],
+            "originalAndHalfInspected": true,
+            "outcomeBlinded": true,
+            "note": "Ejemplo ficticio: original y mitad revisados antes de mostrar el recorte automático.",
+            "reviewerId": "user-fixture-001",
+            "createdAt": "2026-11-07T15:02:00Z"
+          },
+          {
+            "id": "reference-fixture-001",
+            "preparationId": "preparation-fixture-001",
+            "preparationRevisionId": "preparation-revision-fixture-source",
+            "confirmedSide": "right",
+            "centerResolved": false,
+            "centerXY": null,
+            "originalAndHalfInspected": true,
+            "outcomeBlinded": true,
+            "note": "Ejemplo ficticio: no se pudo resolver el centro; la referencia queda sellada sin aprobación.",
+            "reviewerId": "user-fixture-001",
+            "createdAt": "2026-11-07T15:02:00Z"
+          }
+        ]
+      },
+      "QualityObservation": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "side_supported": {
+            "type": "boolean"
+          },
+          "coverage_complete": {
+            "type": "boolean"
+          },
+          "visibility": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "medial_joint_borders": {
+                "type": "string",
+                "enum": [
+                  "visible",
+                  "obscured",
+                  "uncertain"
+                ]
+              },
+              "lateral_joint_borders": {
+                "type": "string",
+                "enum": [
+                  "visible",
+                  "obscured",
+                  "uncertain"
+                ]
+              },
+              "subchondral_bone": {
+                "type": "string",
+                "enum": [
+                  "visible",
+                  "obscured",
+                  "uncertain"
+                ]
+              }
+            },
+            "required": [
+              "medial_joint_borders",
+              "lateral_joint_borders",
+              "subchondral_bone"
+            ]
+          },
+          "hardware": {
+            "type": "string",
+            "enum": [
+              "absent",
+              "present",
+              "uncertain"
+            ]
+          },
+          "text_or_mask": {
+            "type": "string",
+            "enum": [
+              "absent",
+              "present",
+              "uncertain"
+            ]
+          },
+          "marks": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "peripheral_ruler",
+                "fine_line",
+                "isolated_spot",
+                "hardware",
+                "text_or_mask"
+              ]
+            },
+            "uniqueItems": true
+          },
+          "mark_effect": {
+            "type": "string",
+            "enum": [
+              "none",
+              "non_obscuring",
+              "obscuring",
+              "uncertain"
+            ]
+          },
+          "physical_origin_known": {
+            "type": "boolean"
+          },
+          "note": {
+            "type": "string",
+            "minLength": 35
+          },
+          "original_half_inspected": {
+            "type": "boolean",
+            "const": true
+          },
+          "both_windows_inspected": {
+            "type": "boolean",
+            "const": true
+          },
+          "outcome_blinded": {
+            "type": "boolean",
+            "const": true
+          },
+          "lateral_margins_visible": {
+            "type": "boolean"
+          },
+          "unclassified_mark_present": {
+            "type": "boolean"
+          },
+          "ruler_outside_bone": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ruler_locations_xy": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NativePoint"
+            }
+          }
+        },
+        "required": [
+          "side_supported",
+          "coverage_complete",
+          "visibility",
+          "hardware",
+          "text_or_mask",
+          "marks",
+          "mark_effect",
+          "physical_origin_known",
+          "note",
+          "original_half_inspected",
+          "both_windows_inspected",
+          "outcome_blinded",
+          "lateral_margins_visible",
+          "unclassified_mark_present",
+          "ruler_outside_bone",
+          "ruler_locations_xy"
+        ],
+        "description": "Esquema de observación congelado, sin knee_alias: la identidad la añade el servidor. No es un diagnóstico. El servidor comprueba coherencia de marcas, incertidumbre, centro y posiciones de regla. Los puntos de regla son coordenadas de la MITAD, no del PNG recortado. physical_origin_known=false no excluye por sí solo.",
+        "examples": [
+          {
+            "side_supported": true,
+            "coverage_complete": true,
+            "visibility": {
+              "medial_joint_borders": "visible",
+              "lateral_joint_borders": "visible",
+              "subchondral_bone": "visible"
+            },
+            "hardware": "absent",
+            "text_or_mask": "absent",
+            "marks": [],
+            "mark_effect": "none",
+            "physical_origin_known": false,
+            "note": "Ejemplo sintético de observación completa; no corresponde a una imagen clínica real.",
+            "original_half_inspected": true,
+            "both_windows_inspected": true,
+            "outcome_blinded": true,
+            "lateral_margins_visible": true,
+            "unclassified_mark_present": false,
+            "ruler_outside_bone": null,
+            "ruler_locations_xy": []
+          }
+        ]
+      },
+      "QualityObservationEvidence": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "side_supported": {
+            "type": "boolean"
+          },
+          "coverage_complete": {
+            "type": "boolean"
+          },
+          "visibility": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "medial_joint_borders": {
+                "type": "string",
+                "enum": [
+                  "visible",
+                  "obscured",
+                  "uncertain"
+                ]
+              },
+              "lateral_joint_borders": {
+                "type": "string",
+                "enum": [
+                  "visible",
+                  "obscured",
+                  "uncertain"
+                ]
+              },
+              "subchondral_bone": {
+                "type": "string",
+                "enum": [
+                  "visible",
+                  "obscured",
+                  "uncertain"
+                ]
+              }
+            },
+            "required": [
+              "medial_joint_borders",
+              "lateral_joint_borders",
+              "subchondral_bone"
+            ]
+          },
+          "hardware": {
+            "type": "string",
+            "enum": [
+              "absent",
+              "present",
+              "uncertain"
+            ]
+          },
+          "text_or_mask": {
+            "type": "string",
+            "enum": [
+              "absent",
+              "present",
+              "uncertain"
+            ]
+          },
+          "marks": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "peripheral_ruler",
+                "fine_line",
+                "isolated_spot",
+                "hardware",
+                "text_or_mask"
+              ]
+            },
+            "uniqueItems": true
+          },
+          "mark_effect": {
+            "type": "string",
+            "enum": [
+              "none",
+              "non_obscuring",
+              "obscuring",
+              "uncertain"
+            ]
+          },
+          "physical_origin_known": {
+            "type": "boolean"
+          },
+          "note": {
+            "type": "string",
+            "minLength": 35
+          },
+          "original_half_inspected": {
+            "type": "boolean",
+            "const": true
+          },
+          "both_windows_inspected": {
+            "type": "boolean",
+            "const": true
+          },
+          "outcome_blinded": {
+            "type": "boolean",
+            "const": true
+          },
+          "lateral_margins_visible": {
+            "type": "boolean"
+          },
+          "unclassified_mark_present": {
+            "type": "boolean"
+          },
+          "ruler_outside_bone": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ruler_locations_xy": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NativePoint"
+            }
+          },
+          "knee_alias": {
+            "$ref": "#/components/schemas/OpaqueId"
+          }
+        },
+        "required": [
+          "side_supported",
+          "coverage_complete",
+          "visibility",
+          "hardware",
+          "text_or_mask",
+          "marks",
+          "mark_effect",
+          "physical_origin_known",
+          "note",
+          "original_half_inspected",
+          "both_windows_inspected",
+          "outcome_blinded",
+          "lateral_margins_visible",
+          "unclassified_mark_present",
+          "ruler_outside_bone",
+          "ruler_locations_xy",
+          "knee_alias"
+        ],
+        "description": "Observación normalizada por el servidor, con alias interno opaco sin identidad clínica.",
+        "examples": [
+          {
+            "side_supported": true,
+            "coverage_complete": true,
+            "visibility": {
+              "medial_joint_borders": "visible",
+              "lateral_joint_borders": "visible",
+              "subchondral_bone": "visible"
+            },
+            "hardware": "absent",
+            "text_or_mask": "absent",
+            "marks": [],
+            "mark_effect": "none",
+            "physical_origin_known": false,
+            "note": "Ejemplo sintético de observación completa; no corresponde a una imagen clínica real.",
+            "original_half_inspected": true,
+            "both_windows_inspected": true,
+            "outcome_blinded": true,
+            "lateral_margins_visible": true,
+            "unclassified_mark_present": false,
+            "ruler_outside_bone": null,
+            "ruler_locations_xy": [],
+            "knee_alias": "application-fixture-RIGHT"
+          }
+        ]
+      },
+      "QualityAssessment": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "accepted": {
+            "type": "boolean"
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "geometryAdequate": {
+            "type": "boolean"
+          },
+          "observation": {
+            "$ref": "#/components/schemas/QualityObservationEvidence"
+          },
+          "cropSha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "frozenCandidate": {
+            "$ref": "#/components/schemas/VersionId"
+          },
+          "qcVersion": {
+            "$ref": "#/components/schemas/VersionId"
+          }
+        },
+        "required": [
+          "accepted",
+          "reasons",
+          "geometryAdequate"
+        ],
+        "description": "Evaluación del procedimiento congelado. No acredita precisión anatómica, ausencia de atajos ni validación clínica.",
+        "examples": [
+          {
+            "accepted": true,
+            "reasons": [],
+            "geometryAdequate": true,
+            "observation": {
+              "side_supported": true,
+              "coverage_complete": true,
+              "visibility": {
+                "medial_joint_borders": "visible",
+                "lateral_joint_borders": "visible",
+                "subchondral_bone": "visible"
+              },
+              "hardware": "absent",
+              "text_or_mask": "absent",
+              "marks": [],
+              "mark_effect": "none",
+              "physical_origin_known": false,
+              "note": "Ejemplo sintético de observación completa; no corresponde a una imagen clínica real.",
+              "original_half_inspected": true,
+              "both_windows_inspected": true,
+              "outcome_blinded": true,
+              "lateral_margins_visible": true,
+              "unclassified_mark_present": false,
+              "ruler_outside_bone": null,
+              "ruler_locations_xy": [],
+              "knee_alias": "application-fixture-RIGHT"
+            },
+            "cropSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+            "frozenCandidate": "kneel_guided_gradient_contours_contact_anchor_v1",
+            "qcVersion": "mcr008_confirmation_v1.0"
+          }
+        ]
+      },
+      "PreparationRetry": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {},
+        "required": [],
+        "description": "Cuerpo JSON vacío. Reintento explícito de failed con la misma fuente y referencia sellada; no autoriza reanotar ni cambiar el algoritmo.",
+        "examples": [
+          {}
         ]
       }
     }

@@ -221,3 +221,83 @@ test('an external redirect cannot receive the caller CSRF header', async ({ page
   expect(result.error?.code).toBe('NETWORK_ERROR')
   expect(externalAttempts).toBe(0)
 })
+
+test('multipart preserves the browser boundary and versioned mutation headers', async ({ page }) => {
+  let headers: Record<string, string> = {}, body = ''
+  await page.route('**/api/v1/evaluations/test-only/preparations', async route => {
+    headers = route.request().headers(); body = route.request().postDataBuffer()?.toString('utf8') ?? ''
+    await route.fulfill({ status: 202, contentType: 'application/json', headers: { ETag: '"preparation-test-v1"' }, body: '{"id":"preparation-test"}' })
+  })
+  const result = await page.evaluate(async () => {
+    const modulePath = '/src/api/http.ts'
+    const { apiMultipartRequest } = await import(/* @vite-ignore */ modulePath)
+    const form = new FormData(); form.set('file', new File(['SYNTHETIC-TRANSPORT-ONLY'], 'transport-only.dcm', { type: 'application/dicom' }))
+    return apiMultipartRequest('/evaluations/test-only/preparations', form, { csrfToken: 'csrf-test-only', ifMatch: '"case-v1"', idempotencyKey: 'transport-upload-intent' })
+  })
+  expect(result.status).toBe(202)
+  expect(result.etag).toBe('"preparation-test-v1"')
+  expect(headers['content-type']).toMatch(/^multipart\/form-data; boundary=/)
+  expect(headers).toMatchObject({ 'x-csrf-token': 'csrf-test-only', 'if-match': '"case-v1"', 'idempotency-key': 'transport-upload-intent' })
+  expect(body).toContain('name="file"; filename="transport-only.dcm"')
+  expect(body).toContain('SYNTHETIC-TRANSPORT-ONLY')
+})
+
+test('multipart rejects a missing CSRF token before sending bytes', async ({ page }) => {
+  let requests = 0
+  await page.route('**/api/v1/**', route => { requests += 1; return route.abort() })
+  const code = await page.evaluate(async () => {
+    const modulePath = '/src/api/http.ts'
+    const { apiMultipartRequest } = await import(/* @vite-ignore */ modulePath)
+    try { await apiMultipartRequest('/evaluations/test-only/preparations', new FormData()); return null }
+    catch (error) { return (error as { code: string }).code }
+  })
+  expect(code).toBe('CSRF_TOKEN_REQUIRED')
+  expect(requests).toBe(0)
+})
+
+test('authenticated PNG transport returns a blob without mutation headers', async ({ page }) => {
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a6mMAAAAASUVORK5CYII=', 'base64')
+  let headers: Record<string, string> = {}
+  await page.route('**/api/v1/preparations/test-only/views/half_a?*', route => {
+    headers = route.request().headers()
+    return route.fulfill({ status: 200, contentType: 'image/png', headers: { 'X-Request-Id': 'png-test-only' }, body: png })
+  })
+  const result = await page.evaluate(async () => {
+    const modulePath = '/src/api/http.ts'
+    const { apiBlobRequest } = await import(/* @vite-ignore */ modulePath)
+    const response = await apiBlobRequest('/preparations/test-only/views/half_a?revision=version-test')
+    return { size: response.data.size, type: response.data.type, status: response.status, requestId: response.requestId }
+  })
+  expect(result).toEqual({ size: png.length, type: 'image/png', status: 200, requestId: 'png-test-only' })
+  expect(headers.accept).toBe('image/png')
+  expect(headers['x-csrf-token']).toBeUndefined()
+  expect(headers['content-type']).toBeUndefined()
+})
+
+test('a JSON error or disguised SVG cannot become a PNG preview', async ({ page }) => {
+  for (const scenario of [
+    { contentType: 'application/json', body: '{"error":{"code":"TEST","message":"Only a test","requestId":"test","fields":[],"retryable":false}}' },
+    { contentType: 'image/png', body: '<svg xmlns="http://www.w3.org/2000/svg"></svg>' },
+    { contentType: 'image/png', body: '' },
+  ]) {
+    await page.route('**/api/v1/preparations/test-only/views/crop_a?*', route => route.fulfill({ status: 200, ...scenario }))
+    const code = await page.evaluate(async () => {
+      const modulePath = '/src/api/http.ts'
+      const { apiBlobRequest } = await import(/* @vite-ignore */ modulePath)
+      try { await apiBlobRequest('/preparations/test-only/views/crop_a?revision=version-test'); return null }
+      catch (error) { return (error as { code: string }).code }
+    })
+    expect(code).toBe('INVALID_RESPONSE')
+  }
+})
+
+test('PNG failures preserve the JSON error contract instead of returning a blob', async ({ page }) => {
+  await page.route('**/api/v1/preparations/test-only/views/crop_b?*', route => route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ error: { code: 'ACCESS_DENIED', message: 'Solicitud de prueba no autorizada.', requestId: 'png-forbidden-test', fields: [], retryable: false } }) }))
+  const result = await page.evaluate(async () => {
+    const modulePath = '/src/api/http.ts'
+    const { apiBlobRequest } = await import(/* @vite-ignore */ modulePath)
+    try { await apiBlobRequest('/preparations/test-only/views/crop_b?revision=version-test'); return null }
+    catch (error) { const failure = error as { status: number; code: string; requestId: string }; return { status: failure.status, code: failure.code, requestId: failure.requestId } }
+  })
+  expect(result).toEqual({ status: 403, code: 'ACCESS_DENIED', requestId: 'png-forbidden-test' })
+})

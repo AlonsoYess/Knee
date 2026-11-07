@@ -42,3 +42,33 @@ class CreateEvaluation(StrictModel):
 
 class UpdateEvaluation(StrictModel):
     clinical: ClinicalPatch
+
+class SourceReferenceSubmission(StrictModel):
+    preparationRevisionId: str = Field(min_length=1, max_length=128)
+    confirmedSide: Literal['right', 'left']
+    centerResolved: bool
+    centerXY: list[StrictInt] | None = Field(min_length=2, max_length=2)
+    originalAndHalfInspected: bool
+    outcomeBlinded: bool
+    note: str = Field(min_length=35, max_length=2000)
+
+class QualityReviewSubmission(StrictModel):
+    preparationRevisionId: str = Field(min_length=1, max_length=128)
+    confirmedSide: Literal['right', 'left']
+    decision: Literal['accepted', 'rejected']
+    confirmedCheckIds: list[str]
+    reason: str | None = Field(min_length=1, max_length=2000)
+    observation: dict | None
+
+    @model_validator(mode='after')
+    def valid_decision(self):
+        if len(set(self.confirmedCheckIds)) != len(self.confirmedCheckIds):
+            raise ValueError('Repeated checks')
+        if self.decision == 'rejected' and (self.reason is None or not self.reason.strip()):
+            raise ValueError('A rejection reason is required')
+        if self.decision == 'accepted' and self.observation is None:
+            raise ValueError('A complete quality observation is required')
+        return self
+
+class PreparationRetry(StrictModel):
+    pass

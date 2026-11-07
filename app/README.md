@@ -1,17 +1,21 @@
 # Prototipo KneeOAI
 
-## Estado actual de la fase 2
+## Estado actual de la fase 3
 
-La versión 0.9 implementa acceso real y guardado de datos basales ficticios con Vue, FastAPI y SQLite. Cada cuenta tiene sus evaluaciones, recuperables al recargar o entrar desde otra sesión. La predicción sigue bloqueada; esta aplicación no carga modelos, importa el pipeline científico ni abre la prueba reservada.
+La versión 0.10 incorpora carga privada de DICOM, referencia visual sellada, preparación y revisión de calidad persistentes, además del acceso real y los datos basales de la fase 2. Vue se comunica con FastAPI y SQLite. La predicción de progresión sigue bloqueada; no se abre la prueba reservada.
+
+Alcance y comprobaciones: [entrega de fase 3](FASE_3_ENTREGA.md). El plan conserva PWA, publicación e integración predictiva como fases siguientes.
 
 ```mermaid
 flowchart LR
     U[Médico] --> V[Vue]
     V -->|API bajo /api/v1| F[FastAPI]
     F --> S[(SQLite privado)]
+    F --> A[Archivos privados]
+    F --> P[Proceso separado de preparación aprobada]
 ```
 
-La preparación de radiografías, el QC científico y la inferencia se implementarán en sus fases correspondientes, reutilizando `src/knee`. El catálogo SVG y las decisiones de revisión actuales son una simulación de interfaz en memoria: no se guardan como imágenes o aprobaciones reales en el servidor.
+El preparador reutiliza el procedimiento científico congelado en un proceso y entorno separados: conserva píxeles nativos, muestra dos ventanas y prohíbe modificar manualmente el recorte. El centro visual se sella antes de llamar al localizador y nunca guía su cálculo. La revisión solo se acepta si lo permite el QC aprobado. El localizador no es el predictor de progresión. Sin sus activos privados configurados, la preparación se bloquea explícitamente.
 
 ## Verlo en esta computadora
 
@@ -63,7 +67,7 @@ npm run dev
 
 Vite reenvía `/api` al backend local. `.env.example` permite ajustar ese destino solo para desarrollo. Un despliegue requerirá enrutamiento bajo el mismo origen, HTTPS y almacenamiento persistente; el proxy local no configura un alojamiento.
 
-## Qué se guarda y qué sigue simulado
+## Qué se guarda y qué sigue pendiente
 
 | Información | Comportamiento actual |
 | --- | --- |
@@ -71,7 +75,8 @@ Vite reenvía `/api` al backend local. `.env.example` permite ajustar ese destin
 | Sesión | Cookie opaca del servidor, HttpOnly, con vencimiento y revocación; CSRF en memoria. |
 | Edad, sexo, IMC y lado | Guardado explícito en SQLite; ausencias conservadas como null. |
 | Código, propietario, versión y fechas | Asignados por el servidor; revisiones históricas transaccionales. |
-| Imagen SVG y revisión de ejemplo | Solo memoria de la interfaz; se reinician al recargar, cerrar sesión o cambiar la revisión basal. No son QC científico. |
+| DICOM, matrices y vistas | Archivos privados persistentes; las vistas PNG requieren sesión, propietario y revisión vigente. |
+| Referencia visual y decisión de calidad | SQLite y archivos asociados; referencia inmutable, observación, evaluación congelada, revisor y fechas. |
 | Probabilidad y clasificación | Bloqueadas. No existe resultado sustituto ni modelo conectado. |
 | Borradores locales de v0.8 | La copia permanece intacta y se avisa de su existencia. No se importa ni se sube automáticamente. |
 
@@ -85,15 +90,15 @@ Desde `app/backend`:
 
 ```powershell
 .venv\Scripts\python.exe -m knee_app.cli set-password --email medico@example.invalid
-.venv\Scripts\python.exe -m knee_app.cli backup --destination runtime/backups/copia-nueva.sqlite3
-.venv\Scripts\python.exe -m knee_app.cli restore --source runtime/backups/copia-nueva.sqlite3 --destination runtime/restored/application.sqlite3
+.venv\Scripts\python.exe -m knee_app.cli backup --package --destination runtime/backups/copia-nueva
+.venv\Scripts\python.exe -m knee_app.cli restore --package --source runtime/backups/copia-nueva --destination runtime/restaurada-nueva
 ```
 
-La copia usa la API de SQLite para obtener un estado coherente. La restauración exige un destino nuevo, verifica el esquema e invalida sesiones anteriores. Para adoptar la base restaurada, detener el servicio, cambiar su configuración y arrancarlo; nunca sustituir una base abierta. Guardar copias fuera del servidor y verificar su recuperación corresponde al despliegue final. Los detalles de configuración y recuperación están en `backend/README.md`.
+El paquete usa un snapshot consistente de SQLite e incluye todos los archivos referenciados y un manifiesto SHA-256/tamaños. La restauración exige destino nuevo, verifica integridad y revoca sesiones copiadas. Detener el servicio antes de adoptar su `application.sqlite3` y `private_objects`. Se rechaza una copia de solo SQLite cuando existen imágenes. Los detalles y la configuración privada del preparador están en `backend/README.md`.
 
 ## Comunicación y pruebas
 
-`contracts/openapi.json` distingue operaciones implementadas, preparación futura e inferencia no disponible. No todas las operaciones previstas existen todavía. La guía está en `contracts/README.md`.
+`contracts/openapi.json` describe acceso, evaluaciones, preparación, referencia, reintento, vistas y QC implementados; la predicción sigue no disponible. La guía está en `contracts/README.md`.
 
 Pruebas del backend, desde `app/backend`:
 
@@ -121,7 +126,7 @@ GitHub Actions tiene preparado el mismo flujo de contrato, compilación y prueba
 - `backend/knee_app/`: API, sesiones, validaciones, transacciones SQLite y administración local.
 - `backend/tests/`: controles con bases temporales y datos ficticios.
 - `backend/runtime/`: base y archivos privados de ejecución, excluidos de Git.
-- `frontend/src/state/`: sesión y evaluaciones canónicas del servidor; simulación temporal aislada.
+- `frontend/src/state/`: sesión, evaluaciones y preparaciones canónicas del servidor.
 - `frontend/src/api/`: transporte y validación de respuestas de API.
 - `frontend/src/demo/`: ilustraciones, definiciones y código histórico de demostración; el persistidor antiguo no está conectado a las pantallas actuales.
 - `frontend/src/views/` y `components/`: pantallas y componentes Vue.

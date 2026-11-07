@@ -21,19 +21,26 @@ from .config import Settings, normalized_origin
 from .db import Database, opaque, utc
 from .errors import ApiError
 from .models import Login, CreateEvaluation, UpdateEvaluation
+from .preparations import install_preparation_routes
+from .processor import FrozenProcessor
+from .private_files import ApiBodyLimit
 from .security import COOKIE_NAME, COOKIE_PATH, csrf_token, load_secret, new_token, password_hash, token_hash, verify_csrf, verify_password
 
 LOGGER = logging.getLogger("knee_app")
 TOKEN_PATTERN = re.compile(r"^[A-Za-z0-9_-]{43}$")
 
-def create_app(settings: Settings | None = None, *, clock: Callable[[], float] = time.time) -> FastAPI:
+def create_app(settings: Settings | None = None, *, clock: Callable[[], float] = time.time, processor=None) -> FastAPI:
     settings = settings or Settings.from_env()
     db = Database(settings.database_path, settings.busy_timeout_ms)
     db.initialize()
+    db.interrupt_preparations(float(clock()))
     secret = load_secret(settings.secret_key, settings.database_path)
     dummy_hash = password_hash(new_token())
-    app = FastAPI(title="KneeOAI application API", version="0.2.0", docs_url=None, redoc_url=None, openapi_url=None, redirect_slashes=False)
+    app = FastAPI(title="KneeOAI application API", version="0.3.0", docs_url=None, redoc_url=None, openapi_url=None, redirect_slashes=False)
     app.state.settings, app.state.db, app.state.clock = settings, db, clock
+    app.state.processor = processor if processor is not None else FrozenProcessor(settings)
+    # Added before the authentication middleware below, so authenticated mutation checks run first.
+    app.add_middleware(ApiBodyLimit,max_bytes=settings.max_request_bytes)
 
     def now():
         return float(app.state.clock())
@@ -139,9 +146,11 @@ def create_app(settings: Settings | None = None, *, clock: Callable[[], float] =
             raise ApiError(412, "VERSION_CONFLICT", "El caso cambió. Recupera su versión actual antes de guardar.", headers={"ETag": etag(row)})
 
     def representation(row):
+        with closing(db.connect()) as connection:
+            effective_review=app.state.preparations.effective_review_id(connection,row)
         return {"id": row["id"], "code": row["code"], "currentRevisionId": row["revision_id"],
                 "clinical": {key: row[key] for key in ("age", "sex", "bmi", "side")},
-                "preparationId": None, "reviewId": None, "currentExecutionId": None, "updatedAt": row["updated_at"]}
+                "preparationId": row['preparation_id'], "reviewId": effective_review, "currentExecutionId": None, "updatedAt": row["updated_at"]}
 
     @app.get("/api/v1/session")
     def get_session(request: Request):
@@ -296,9 +305,10 @@ def create_app(settings: Settings | None = None, *, clock: Callable[[], float] =
             clinical = {key: previous[key] for key in ("age", "sex", "bmi", "side")}
             clinical.update(payload.clinical.model_dump(exclude_unset=True))
             moment, revision = now(), opaque("rev")
+            same_side = clinical['side'] == previous['side']
             changed = connection.execute(
-                "UPDATE evaluations SET age=?,sex=?,bmi=?,side=?,version=version+1,revision_id=?,updated_at=? WHERE id=? AND owner_id=? AND version=?",
-                (clinical["age"], clinical["sex"], clinical["bmi"], clinical["side"], revision, utc(moment), evaluationId, session["user_id"], previous["version"]),
+                "UPDATE evaluations SET age=?,sex=?,bmi=?,side=?,version=version+1,revision_id=?,updated_at=?,preparation_id=?,review_id=? WHERE id=? AND owner_id=? AND version=?",
+                (clinical["age"], clinical["sex"], clinical["bmi"], clinical["side"], revision, utc(moment), previous['preparation_id'] if same_side else None, previous['review_id'] if same_side else None, evaluationId, session["user_id"], previous["version"]),
             )
             if changed.rowcount != 1:
                 raise ApiError(412, "VERSION_CONFLICT", "El caso cambió. Recupera su versión actual antes de guardar.")
@@ -318,4 +328,6 @@ def create_app(settings: Settings | None = None, *, clock: Callable[[], float] =
             ownership(connection, evaluationId, session["user_id"])
         raise ApiError(503, "ENGINE_NOT_AVAILABLE", "El motor predictivo todavía no está disponible.", retryable=True)
 
+    install_preparation_routes(app,settings=settings,db=db,processor=app.state.processor,now=now,
+        require_session=require_session,require_mutation=require_mutation,ownership=ownership,require_version=require_version)
     return app

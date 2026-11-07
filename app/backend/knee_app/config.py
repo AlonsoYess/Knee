@@ -36,9 +36,19 @@ class Settings:
     login_limit: int = 5
     login_window_seconds: int = 15 * 60
     busy_timeout_ms: int = 5000
+    private_files_path: Path | None = None
+    max_request_bytes: int = 64 * 1024 * 1024
+    max_dicom_bytes: int = 60 * 1024 * 1024
+    frozen_python: Path | None = None
+    frozen_checkout: Path | None = None
+    frozen_timeout_seconds: int = 120
 
     def __post_init__(self):
         object.__setattr__(self, "database_path", Path(self.database_path).resolve())
+        object.__setattr__(self, "private_files_path", Path(self.private_files_path or self.database_path.parent / 'private_objects').resolve())
+        for key in ('frozen_python', 'frozen_checkout'):
+            if getattr(self, key) is not None:
+                object.__setattr__(self, key, Path(getattr(self, key)).resolve())
         object.__setattr__(self, "allowed_origins", tuple(normalized_origin(v) for v in self.allowed_origins))
         if self.environment not in {"development", "production", "test"}:
             raise ValueError("Unsupported environment")
@@ -48,6 +58,8 @@ class Settings:
             raise ValueError("The server secret must contain at least 32 bytes")
         if any(v <= 0 for v in (self.session_seconds, self.anonymous_session_seconds, self.login_limit, self.login_window_seconds, self.busy_timeout_ms)):
             raise ValueError("Timeouts and limits must be positive")
+        if not 0 < self.max_dicom_bytes <= self.max_request_bytes or self.frozen_timeout_seconds <= 0:
+            raise ValueError('Upload limits and worker timeout must be positive and consistent')
         if self.environment == "production":
             if not self.secure_cookies or any(not v.startswith("https://") for v in self.allowed_origins):
                 raise ValueError("Production requires Secure cookies and HTTPS origins")
@@ -66,4 +78,7 @@ class Settings:
             allowed_origins=tuple(v.strip() for v in origins.split(",") if v.strip()) if origins else DEFAULT_ORIGINS,
             secure_cookies=environment == "production",
             environment=environment,
+            private_files_path=Path(os.environ['KNEEOAI_PRIVATE_FILES']) if os.environ.get('KNEEOAI_PRIVATE_FILES') else None,
+            frozen_python=Path(os.environ['KNEEOAI_FROZEN_PYTHON']) if os.environ.get('KNEEOAI_FROZEN_PYTHON') else None,
+            frozen_checkout=Path(os.environ['KNEEOAI_FROZEN_CHECKOUT']) if os.environ.get('KNEEOAI_FROZEN_CHECKOUT') else None,
         )

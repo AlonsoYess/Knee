@@ -207,13 +207,9 @@ def test_prediction_is_always_unavailable_after_auth_csrf_and_owner_checks(api):
 
 
 @pytest.mark.parametrize("method,path", [
-    ("post", "/evaluations/fictional-case/preparations"),
-    ("get", "/preparations/fictional-preparation"),
-    ("get", "/preparations/fictional-preparation/views/original"),
-    ("post", "/preparations/fictional-preparation/reviews"),
     ("get", "/executions/fictional-execution"),
 ])
-def test_out_of_phase_dicom_qc_and_execution_read_routes_are_not_implemented(api, method, path):
+def test_prediction_execution_read_route_remains_unavailable(api, method, path):
     client = api.client()
     api.login(client)
     response = client.request(method, f"/api/v1{path}", headers=api.headers(client))

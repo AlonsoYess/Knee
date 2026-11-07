@@ -1,322 +1,152 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
-import AppIcon from '../components/AppIcon.vue'
-import { closeOnBackdrop } from '../dialog'
-import {
-  evaluations, createDraftInput, validateDemoDraft,
-  createDemoImageInput, validateDemoImage, saveDemoImage,
-  type DemoImageInput,
-  isEditableDemoEvaluation,
-} from '../state/evaluations'
-import { demoImages } from '../demo/demoImages'
+import PreparationImage from '../components/PreparationImage.vue'
+import { ApiError } from '../api/http'
+import UnsavedChangesDialog from '../components/UnsavedChangesDialog.vue'
+import { evaluations, loadEvaluation } from '../state/evaluations'
+import { getActivePreparation, loadActivePreparation, retryPreparation, sealSourceReference, uploadPreparation } from '../state/preparations'
+import { apiMessage, sessionGeneration } from '../state/session'
+import type { Point, ReferenceDto, SourceView } from '../api/preparationContracts'
 
-const route = useRoute()
-const router = useRouter()
-const requestedId = typeof route.params.id === 'string' ? route.params.id : ''
-const existing = computed(() => evaluations.value.find(item => item.id === requestedId))
-const unavailable = computed(() => !isEditableDemoEvaluation(existing.value))
-const baselineIncomplete = computed(() => Boolean(existing.value && Object.keys(validateDemoDraft(createDraftInput(existing.value), true)).length))
-const form = reactive<DemoImageInput>(existing.value ? createDemoImageInput(existing.value) : { sampleId: '', knee: '', sideConfirmed: false })
-const baseline = ref(JSON.stringify(form))
-const errors = ref<Partial<Record<keyof DemoImageInput, string>>>({})
-const saveError = ref('')
-const saving = ref(false)
-const previewFailed = ref(false)
-const loadedPreviewId = ref<DemoImageInput['sampleId']>('')
-const sourceChangedSinceSave = ref(false)
-const message = ref('')
-const enlarged = ref<HTMLDialogElement | null>(null)
-const confirmation = ref<HTMLDialogElement | null>(null)
-const confirmationMode = ref<'leave' | 'remove'>('leave')
-let resolveConfirmation: ((value: boolean) => void) | null = null
-
-const steps = ['Datos basales', 'Radiografía y lado', 'Revisión del recorte', 'Resumen']
-const selectedImage = computed(() => demoImages.find(image => image.id === form.sampleId))
-const baselineSide = computed(() => existing.value?.knee === 'right' ? 'Derecha del paciente' : existing.value?.knee === 'left' ? 'Izquierda del paciente' : 'Pendiente')
-const sideMismatch = computed(() => Boolean(form.knee && existing.value?.knee && form.knee !== existing.value.knee))
-const previewLoaded = computed(() => Boolean(selectedImage.value && loadedPreviewId.value === selectedImage.value.id && !previewFailed.value))
-const canConfirm = computed(() => Boolean(previewLoaded.value && form.knee && !sideMismatch.value))
-const dirty = computed(() => !unavailable.value && !baselineIncomplete.value && (sourceChangedSinceSave.value || JSON.stringify(form) !== baseline.value))
-const editRoute = computed(() => ({ name: 'edit-evaluation', params: { id: requestedId } }))
-
-function clearMessages() { errors.value = {}; saveError.value = ''; message.value = '' }
-function selectImage(id: DemoImageInput['sampleId']) {
-  if (form.sampleId === id) return
-  sourceChangedSinceSave.value = true
-  form.sampleId = id
-  form.sideConfirmed = false
-  previewFailed.value = false
-  loadedPreviewId.value = ''
-  clearMessages()
-  message.value = 'Imagen de ejemplo seleccionada. Confirma el lado antes de continuar.'
+const route = useRoute(), router = useRouter()
+const evaluationId = typeof route.params.id === 'string' ? route.params.id : ''
+const existing = computed(() => evaluations.value.find(item => item.id === evaluationId))
+const preparation = computed(() => getActivePreparation(evaluationId))
+const selectedFile = ref<File | null>(null), busy = ref(false), loading = ref(true), error = ref(''), message = ref('')
+const discardDialog = ref<InstanceType<typeof UnsavedChangesDialog> | null>(null)
+const confirmedReference = ref<ReferenceDto | null>(null)
+const sealedReference = computed(() => preparation.value?.sourceReference ?? confirmedReference.value)
+const sourceReady = reactive<Record<SourceView, boolean>>({ full_a: false, full_b: false, half_a: false, half_b: false })
+const reference = reactive({ confirmedSide: false, centerResolved: '' as '' | 'resolved' | 'unresolved', x: '', y: '', inspected: false, blinded: false, note: '' })
+const referenceBaseline = ref(JSON.stringify(reference))
+const uploadIntent = ref(crypto.randomUUID())
+const referenceIntent = ref(crypto.randomUUID()), retryIntent = ref<string | null>(null)
+const dirty = computed(() => Boolean(selectedFile.value || (!sealedReference.value && JSON.stringify(reference) !== referenceBaseline.value)))
+const sideLabel = computed(() => existing.value?.knee === 'right' ? 'Derecha del paciente' : existing.value?.knee === 'left' ? 'Izquierda del paciente' : 'Sin indicar')
+const sourceViews: { view: SourceView; label: string }[] = [
+  { view: 'full_a', label: 'Original bilateral — ventana 1–99' }, { view: 'half_a', label: 'Mitad seleccionada — ventana 1–99' },
+  { view: 'full_b', label: 'Original bilateral — ventana 5–95' }, { view: 'half_b', label: 'Mitad seleccionada — ventana 5–95' },
+]
+const allSourceReady = computed(() => Object.values(sourceReady).every(Boolean))
+const center = computed<Point[]>(() => reference.centerResolved === 'resolved' && reference.x !== '' && reference.y !== '' && Number.isInteger(Number(reference.x)) && Number.isInteger(Number(reference.y)) ? [[Number(reference.x), Number(reference.y)]] : [])
+const statusLabel = computed(() => preparation.value ? ({ queued: 'Preparación en cola', processing: 'Procesando la imagen', awaiting_reference: sealedReference.value ? sealedReference.value.centerResolved ? 'Referencia sellada; recuperando estado' : 'Referencia sellada sin centro resuelto' : 'Referencia visual pendiente', ready: 'Preparación disponible', failed: 'Preparación interrumpida o fallida' }[preparation.value.status]) : 'Sin imagen cargada')
+let pollTimer: ReturnType<typeof setTimeout> | null = null
+let pollController: AbortController | null = null
+let active = true, internalNavigation = false
+function stopPolling() { if (pollTimer) clearTimeout(pollTimer); pollTimer = null; pollController?.abort(); pollController = null }
+function schedulePoll() {
+  if (!active || busy.value || !preparation.value || preparation.value.status === 'ready' || preparation.value.status === 'failed' || (preparation.value.status === 'awaiting_reference' && !sealedReference.value?.centerResolved)) return
+  pollTimer = setTimeout(() => { void poll() }, 1200)
 }
-function sideChanged() {
-  sourceChangedSinceSave.value = true
-  form.sideConfirmed = false
-  clearMessages()
+async function poll() {
+  if (!active || busy.value) return
+  const generation = sessionGeneration.value
+  pollController = new AbortController()
+  try { await loadActivePreparation(evaluationId, pollController.signal); if (generation === sessionGeneration.value) schedulePoll() }
+  catch (failure) { if (active && generation === sessionGeneration.value && !pollController?.signal.aborted) error.value = apiMessage(failure) }
 }
-function previewReady(event: Event) {
-  if ((event.currentTarget as HTMLImageElement).getAttribute('src') !== selectedImage.value?.src) return
-  loadedPreviewId.value = form.sampleId
-  previewFailed.value = false
-  delete errors.value.sampleId
+async function discardChanges() { return !dirty.value || Boolean(await discardDialog.value?.ask()) }
+async function reload() {
+  if (busy.value || !await discardChanges()) return
+  stopPolling(); loading.value = true; error.value = ''
+  const generation = sessionGeneration.value
+  try { await loadEvaluation(evaluationId); await loadActivePreparation(evaluationId); if (active && generation === sessionGeneration.value) { selectedFile.value = null; schedulePoll() } }
+  catch (failure) { if (active && generation === sessionGeneration.value) error.value = apiMessage(failure) }
+  finally { if (active && generation === sessionGeneration.value) loading.value = false }
 }
-function previewError(event: Event) {
-  if ((event.currentTarget as HTMLImageElement).getAttribute('src') !== selectedImage.value?.src) return
-  previewFailed.value = true
-  loadedPreviewId.value = ''
-  form.sideConfirmed = false
-  sourceChangedSinceSave.value = true
-}
-function ask(mode: 'leave' | 'remove'): Promise<boolean> {
-  if (resolveConfirmation) return Promise.resolve(false)
-  confirmationMode.value = mode
-  return new Promise(resolve => {
-    resolveConfirmation = resolve
-    confirmation.value?.showModal()
-  })
-}
-function answer(accepted: boolean) {
-  const resolve = resolveConfirmation
-  resolveConfirmation = null
-  confirmation.value?.close()
-  resolve?.(accepted)
-}
-function confirmationClosed() {
-  const resolve = resolveConfirmation
-  resolveConfirmation = null
-  resolve?.(false)
-}
-async function removeImage() {
-  if (!form.sampleId || !await ask('remove')) return
-  sourceChangedSinceSave.value = true
-  form.sampleId = ''
-  form.sideConfirmed = false
-  previewFailed.value = false
-  loadedPreviewId.value = ''
-  clearMessages()
-  message.value = 'Imagen retirada del borrador. Puedes seleccionar otro ejemplo.'
-  await nextTick()
-  document.getElementById('radiograph-sample-0')?.focus()
-}
-async function validate(requireComplete: boolean): Promise<boolean> {
-  if (!existing.value || unavailable.value || baselineIncomplete.value) return false
-  errors.value = validateDemoImage(form, existing.value, requireComplete)
-  if (requireComplete && previewFailed.value) errors.value.sampleId = 'No pudimos mostrar esta imagen. Selecciona otro ejemplo.'
-  else if (requireComplete && selectedImage.value && !previewLoaded.value) errors.value.sampleId = 'Espera a que cargue la imagen antes de continuar.'
-  saveError.value = ''
-  const first = (['sampleId', 'knee', 'sideConfirmed'] as const).find(key => errors.value[key])
-  if (!first) return true
-  await nextTick()
-  document.getElementById(first === 'sampleId' ? 'radiograph-sample-0' : first === 'knee' ? 'radiograph-side-right' : 'radiograph-confirmation')?.focus()
-  return false
-}
-function saveCurrent(): boolean {
+function chooseFile(event: Event) { selectedFile.value = (event.target as HTMLInputElement).files?.[0] ?? null; uploadIntent.value = crypto.randomUUID(); error.value = ''; message.value = '' }
+async function upload() {
+  if (busy.value || !selectedFile.value || !existing.value?.knee) return
+  stopPolling(); busy.value = true; error.value = ''; message.value = ''
+  const generation = sessionGeneration.value
   try {
-    saveDemoImage(form, requestedId, { invalidateReview: sourceChangedSinceSave.value })
-    sourceChangedSinceSave.value = false
-    baseline.value = JSON.stringify(form)
-    return true
-  } catch {
-    saveError.value = 'No pudimos conservar la selección del ejemplo. Revisa la imagen y el lado o vuelve al listado.'
-    return false
+    await uploadPreparation(evaluationId, selectedFile.value, uploadIntent.value)
+    if (!active || generation !== sessionGeneration.value) return
+    selectedFile.value = null; confirmedReference.value = null
+    message.value = 'El servidor confirmó la carga. La preparación todavía no acredita calidad ni permite una predicción.'
+  } catch (failure) { if (active && generation === sessionGeneration.value) error.value = apiMessage(failure) }
+  finally { if (active && generation === sessionGeneration.value) { busy.value = false; schedulePoll() } }
+}
+function markCenter(point: Point) {
+  if (busy.value || sealedReference.value || !preparation.value?.nativeHalfShape) return
+  const [height, width] = preparation.value.nativeHalfShape
+  if (point[0] < 0 || point[0] > width || point[1] < 0 || point[1] > height) return
+  reference.centerResolved = 'resolved'; reference.x = String(Math.min(width - 1, Math.floor(point[0]))); reference.y = String(Math.min(height - 1, Math.floor(point[1])))
+}
+async function seal() {
+  const current = preparation.value
+  if (busy.value || !current || current.status !== 'awaiting_reference' || sealedReference.value) return
+  error.value = ''; message.value = ''
+  if (!allSourceReady.value || !reference.confirmedSide || !reference.inspected || !reference.blinded || !reference.centerResolved || reference.note.trim().length < 35) {
+    error.value = 'Revisa las cuatro vistas, confirma el lado y las declaraciones, indica si el centro está resuelto y escribe una nota de al menos 35 caracteres.'; return
   }
-}
-async function saveDraft() {
-  if (saving.value || !await validate(false)) return
-  saving.value = true
-  try { if (saveCurrent()) await router.push('/evaluaciones') } finally { saving.value = false }
-}
-async function continueToReview() {
-  if (saving.value || !await validate(true)) return
-  saving.value = true
+  const point = reference.centerResolved === 'resolved' ? center.value[0] : null
+  if (reference.centerResolved === 'resolved' && (!point || !current.nativeHalfShape || point[0] < 0 || point[1] < 0 || point[0] >= current.nativeHalfShape[1] || point[1] >= current.nativeHalfShape[0])) { error.value = 'Indica un centro dentro de las dimensiones nativas de la mitad.'; return }
+  stopPolling(); busy.value = true
+  const generation = sessionGeneration.value
   try {
-    if (!saveCurrent()) return
-    await router.push({ name: 'crop-review', params: { id: requestedId } })
-  } finally { saving.value = false }
+    confirmedReference.value = await sealSourceReference(evaluationId, { preparationRevisionId: current.preparationRevisionId, confirmedSide: current.side, centerResolved: reference.centerResolved === 'resolved', centerXY: point ?? null, originalAndHalfInspected: reference.inspected, outcomeBlinded: reference.blinded, note: reference.note.trim() }, referenceIntent.value)
+    if (!active || generation !== sessionGeneration.value) return
+    referenceBaseline.value = JSON.stringify(reference)
+    message.value = 'Referencia visual sellada en el servidor. No podrá editarse después de mostrar el recorte.'
+    await loadActivePreparation(evaluationId)
+  } catch (failure) { if (active && generation === sessionGeneration.value) error.value = apiMessage(failure) }
+  finally { if (active && generation === sessionGeneration.value) { busy.value = false; schedulePoll() } }
 }
-function beforeUnload(event: BeforeUnloadEvent) {
-  if (!dirty.value) return
-  event.preventDefault()
-  event.returnValue = ''
+async function retry() {
+  if (busy.value) return
+  busy.value = true; error.value = ''
+  const generation = sessionGeneration.value
+  try {
+    retryIntent.value ??= crypto.randomUUID()
+    const result = await retryPreparation(evaluationId, retryIntent.value)
+    if (active && generation === sessionGeneration.value) {
+      retryIntent.value = null
+      message.value = result.status === 'failed' ? 'Se recuperó el intento anterior, que terminó fallido. Puedes iniciar un nuevo reintento explícito.' : 'El servidor confirmó el intento de preparación.'
+    }
+  } catch (failure) {
+    if (active && generation === sessionGeneration.value) {
+      error.value = apiMessage(failure)
+      if (failure instanceof ApiError && failure.status === 503) {
+        try { if ((await loadActivePreparation(evaluationId))?.status === 'failed') retryIntent.value = null } catch { /* Keep the same key until failure is confirmed. */ }
+      }
+    }
+  }
+  finally { if (active && generation === sessionGeneration.value) { busy.value = false; schedulePoll() } }
 }
-onBeforeRouteLeave(async () => !dirty.value || await ask('leave'))
-onMounted(() => window.addEventListener('beforeunload', beforeUnload))
-onBeforeUnmount(() => {
-  window.removeEventListener('beforeunload', beforeUnload)
-  resolveConfirmation?.(false)
-  resolveConfirmation = null
+async function continueToReview() { if (preparation.value?.status === 'ready' && !dirty.value && !busy.value) { internalNavigation = true; try { await router.push({ name: 'crop-review', params: { id: evaluationId } }) } finally { internalNavigation = false } } }
+watch(() => JSON.stringify([preparation.value?.id, preparation.value?.preparationRevisionId, preparation.value?.sourceReference?.id]), () => {
+  for (const view of Object.keys(sourceReady) as SourceView[]) sourceReady[view] = false
+  if (!preparation.value?.sourceReference && !confirmedReference.value) {
+    Object.assign(reference, { confirmedSide: false, centerResolved: '', x: '', y: '', inspected: false, blinded: false, note: '' }); referenceBaseline.value = JSON.stringify(reference); referenceIntent.value = crypto.randomUUID()
+  }
 })
+function beforeUnload(event: BeforeUnloadEvent) { if (dirty.value || busy.value) { event.preventDefault(); event.returnValue = '' } }
+onBeforeRouteLeave(async () => internalNavigation || (!busy.value && await discardChanges()))
+onMounted(() => { window.addEventListener('beforeunload', beforeUnload); void reload() })
+onBeforeUnmount(() => { active = false; stopPolling(); window.removeEventListener('beforeunload', beforeUnload) })
 </script>
 
 <template>
-  <div class="rad-page">
-    <p class="simulation-notice" role="status">Las imágenes y la revisión siguen siendo una simulación; sus cambios no se guardan en el servidor. Se reinician al recargar, cerrar sesión o cambiar la revisión basal.</p>
-    <RouterLink to="/evaluaciones" class="rad-back"><AppIcon name="chevron-left" :size="16" />Volver a Mis evaluaciones</RouterLink>
-
-    <section v-if="unavailable" class="rad-unavailable">
-      <span class="rad-section-icon"><AppIcon name="image" :size="25" /></span><h1 tabindex="-1">Borrador no disponible</h1>
-      <p>No pudimos recuperar este caso del servidor o no tienes acceso.</p><RouterLink to="/evaluaciones" class="button button-primary">Volver al listado</RouterLink>
-    </section>
-    <section v-else-if="baselineIncomplete" class="rad-unavailable">
-      <span class="rad-section-icon"><AppIcon name="file" :size="25" /></span><h1 tabindex="-1">Datos basales pendientes</h1>
-      <p>Guarda la rodilla a explorar en los datos basales. Los otros datos ausentes pueden permanecer vacíos.</p><RouterLink :to="editRoute" class="button button-primary">Completar datos basales</RouterLink>
-    </section>
+  <div class="workflow-page">
+    <RouterLink to="/evaluaciones" class="workflow-back">Volver a Mis evaluaciones</RouterLink>
+    <header class="workflow-heading"><div><span class="section-eyebrow">PREPARAR LA IMAGEN</span><h1 tabindex="-1">Radiografía y lado</h1><p>Carga un DICOM, revisa la fuente y sella su referencia visual antes de que se muestre el recorte.</p></div><span v-if="existing" class="workflow-code">{{ existing.code }}</span></header>
+    <p class="workflow-notice">La imagen, la referencia y la preparación se conservan en el servidor de esta aplicación. La predicción sigue bloqueada. No se permite corregir manualmente la geometría del recorte.</p>
+    <p v-if="loading" role="status">Recuperando la preparación guardada…</p>
+    <div v-if="error" id="preparation-error" class="workflow-error" role="alert">{{ error }}</div>
+    <p v-if="message" class="workflow-notice" role="status">{{ message }}</p>
+    <section v-if="!existing" class="workflow-card"><h2>Caso no disponible</h2><p>Recupera el listado para elegir un caso de tu cuenta.</p></section>
     <template v-else>
-      <header class="rad-heading"><div><span class="section-eyebrow">PREPARAR LA IMAGEN</span><h1 tabindex="-1">Radiografía y lado</h1><p>Selecciona un ejemplo y confirma la rodilla que se evaluará.</p></div><span class="rad-code"><AppIcon name="file" :size="15" />{{ existing?.code }}</span></header>
-      <ol class="rad-stepper" aria-label="Recorrido de evaluación"><li v-for="(step, index) in steps" :key="step" :class="{ 'rad-step-current': index === 1, 'rad-step-done': index === 0 }" :aria-current="index === 1 ? 'step' : undefined"><span class="rad-step-number"><AppIcon v-if="index === 0" name="check" :size="14" /><template v-else>{{ index + 1 }}</template></span><span>{{ step }}</span></li></ol>
-
-      <form class="rad-layout" novalidate @submit.prevent="continueToReview">
-        <section class="rad-image-panel" aria-labelledby="rad-image-title">
-          <div class="rad-panel-heading"><div class="rad-panel-title"><span class="rad-section-icon"><AppIcon name="image" /></span><div><h2 id="rad-image-title">Imagen de demostración</h2><p>Ejemplos sintéticos para probar las pantallas.</p></div></div><span class="rad-fiction-label">SIN DATOS CLÍNICOS</span></div>
-          <div class="rad-gallery" aria-label="Catálogo de imágenes ficticias">
-            <button v-for="(image, index) in demoImages" :id="`radiograph-sample-${index}`" :key="image.id" type="button" :class="['rad-sample', { 'rad-sample-selected': form.sampleId === image.id }]" :aria-label="index === 0 ? 'Seleccionar imagen A' : 'Seleccionar imagen B'" :aria-pressed="form.sampleId === image.id" @click="selectImage(image.id)"><img :src="image.src" alt="" :width="image.width" :height="image.height" /><span class="rad-sample-description"><strong>{{ image.label }}</strong><span>Imagen ficticia</span></span><span v-if="form.sampleId === image.id" class="rad-sample-check"><AppIcon name="check" :size="15" /></span></button>
-          </div>
-          <p v-if="errors.sampleId" id="radiograph-sample-error" class="field-error rad-image-error" role="alert">{{ errors.sampleId }}</p>
-          <div v-if="selectedImage" class="rad-preview-section">
-            <div class="rad-preview-heading"><div><h3>Vista de la imagen seleccionada</h3><p>{{ selectedImage.fileName }}</p></div><button type="button" class="text-button" :disabled="!previewLoaded" @click="enlarged?.showModal()"><AppIcon name="scan" :size="16" />Ampliar imagen</button></div>
-            <div class="rad-preview" :aria-busy="!previewLoaded && !previewFailed"><img :key="selectedImage.id" :src="selectedImage.src" :alt="`${selectedImage.label}: imagen sintética sin uso clínico`" :width="selectedImage.width" :height="selectedImage.height" @error="previewError" @load="previewReady" /></div>
-            <p v-if="!previewLoaded && !previewFailed" class="rad-hint" role="status" aria-live="polite">Cargando la imagen. Espera a verla para confirmar el lado y continuar.</p>
-            <p v-if="previewFailed" class="field-error" role="alert">No pudimos mostrar el ejemplo. Selecciona otra imagen.</p>
-            <div class="rad-preview-footer"><span>Imagen ficticia · {{ selectedImage.width }} × {{ selectedImage.height }} px</span><button type="button" class="text-button rad-remove" @click="removeImage"><AppIcon name="x" :size="15" />Quitar imagen</button></div>
-          </div>
-          <div v-else class="rad-empty-preview"><span><AppIcon name="scan" :size="32" /></span><h3>Aquí verás la imagen</h3><p>Selecciona uno de los dos ejemplos para continuar.</p></div>
-          <div class="rad-image-note"><AppIcon name="help" :size="17" /><p>Estos ejemplos son ilustraciones sintéticas. Esta pantalla todavía no recibe archivos de radiografías reales.</p></div>
-        </section>
-
-        <aside class="rad-side-panel" aria-labelledby="rad-side-title">
-          <div class="rad-side-heading"><span class="rad-section-icon"><AppIcon name="user" /></span><h2 id="rad-side-title">Confirma la rodilla</h2></div>
-          <div class="rad-baseline"><span>Rodilla indicada en datos basales</span><strong>{{ baselineSide }}</strong><RouterLink :to="editRoute" class="text-button">Editar datos<AppIcon name="arrow-up-right" :size="14" /></RouterLink></div>
-          <fieldset class="rad-side-options" :aria-describedby="errors.knee || sideMismatch ? 'radiograph-side-error' : 'radiograph-side-hint'"><legend>Lado del ejemplo a evaluar</legend><label :class="['rad-side-choice', { 'rad-side-selected': form.knee === 'right' }]"><input id="radiograph-side-right" v-model="form.knee" type="radio" name="radiograph-side" value="right" :aria-invalid="Boolean(errors.knee || sideMismatch)" @change="sideChanged" /><span>Derecha del paciente</span></label><label :class="['rad-side-choice', { 'rad-side-selected': form.knee === 'left' }]"><input id="radiograph-side-left" v-model="form.knee" type="radio" name="radiograph-side" value="left" :aria-invalid="Boolean(errors.knee || sideMismatch)" @change="sideChanged" /><span>Izquierda del paciente</span></label><p id="radiograph-side-hint" class="rad-hint">El lado debe coincidir con los datos del caso.</p><p v-if="errors.knee || sideMismatch" id="radiograph-side-error" class="field-error" role="alert">{{ errors.knee || 'El lado no coincide con los datos basales. Revisa la selección o vuelve a editar los datos.' }}</p></fieldset>
-          <label :class="['rad-confirmation', { 'rad-confirmation-disabled': !canConfirm }]"><input id="radiograph-confirmation" v-model="form.sideConfirmed" type="checkbox" :disabled="!canConfirm" :aria-invalid="Boolean(errors.sideConfirmed)" :aria-describedby="errors.sideConfirmed ? 'radiograph-confirmation-error' : 'radiograph-confirmation-hint'" @change="errors.sideConfirmed = undefined; message = ''" /><span>Confirmo el lado de este ejemplo</span></label>
-          <p v-if="errors.sideConfirmed" id="radiograph-confirmation-error" class="field-error" role="alert">{{ errors.sideConfirmed }}</p>
-          <p id="radiograph-confirmation-hint" class="rad-hint">Esta confirmación identifica el lado. La revisión de calidad del recorte corresponde al siguiente paso.</p>
-          <div class="rad-session-note"><AppIcon name="clock" :size="17" /><p>Datos basales: guardados en el servidor. Imagen y revisión: simulación temporal que se reinicia al recargar o cerrar sesión.</p></div>
-        </aside>
-
-        <div class="rad-actions-area"><p v-if="saveError" class="rad-save-error" role="alert">{{ saveError }}</p><div class="rad-actions"><RouterLink :to="editRoute" class="button button-secondary"><AppIcon name="chevron-left" :size="16" />Volver a datos basales</RouterLink><div class="rad-main-actions"><button type="button" class="button button-secondary" :disabled="saving" @click="saveDraft">Volver a evaluaciones</button><button type="submit" class="button button-primary" :disabled="saving || Boolean(selectedImage && !previewLoaded)">Continuar con el ejemplo<AppIcon name="arrow-right" :size="17" /></button></div></div><p class="rad-feedback" role="status" aria-live="polite">{{ message }}</p><p class="rad-draft-state">{{ dirty ? 'Tienes cambios sin guardar.' : 'Selecciones aplicadas solo a este recorrido temporal.' }}</p></div>
-      </form>
+      <section class="workflow-card" :aria-busy="busy"><h2>Archivo y lado basal</h2><p><strong>Rodilla guardada: {{ sideLabel }}</strong></p><RouterLink :to="{ name: 'edit-evaluation', params: { id: evaluationId } }" class="text-button">Corregir los datos basales</RouterLink><div v-if="!existing.knee" class="workflow-notice workflow-warning">Guarda el lado antes de cargar el DICOM. Los datos clínicos ausentes pueden permanecer vacíos.</div><div class="workflow-field" style="margin-top: 18px"><label for="dicom-file">DICOM basal</label><input id="dicom-file" type="file" accept=".dcm,application/dicom,application/octet-stream" :disabled="busy || loading || !existing.knee" @change="chooseFile" /><small>El servidor verificará el contenido. El nombre o la extensión no acreditan que sea un DICOM válido.</small></div><p v-if="selectedFile">Archivo pendiente: {{ selectedFile.name }} · {{ (selectedFile.size / 1024 / 1024).toFixed(2) }} MB</p><p v-if="selectedFile && preparation" class="workflow-notice workflow-warning">Sustituir la imagen dejará sin vigencia la revisión activa anterior. El historial se conserva.</p><div class="workflow-actions"><button v-if="selectedFile" type="button" class="button button-secondary" :disabled="busy" @click="selectedFile = null">Descartar archivo pendiente</button><button type="button" class="button button-primary" :disabled="busy || loading || !selectedFile || !existing.knee" @click="upload">{{ busy ? 'Procesando solicitud…' : preparation ? 'Sustituir DICOM' : 'Cargar DICOM' }}</button></div></section>
+      <section v-if="preparation && !selectedFile" class="workflow-card"><h2>Estado de la preparación</h2><span class="workflow-state" role="status" aria-live="polite">{{ statusLabel }}</span><p v-if="preparation.error" class="workflow-error" role="alert">{{ preparation.error.message }}</p><p v-if="!preparation.isCurrent" class="workflow-error">Esta preparación es histórica y no permite registrar una decisión vigente.</p><div class="workflow-actions"><button type="button" class="button button-secondary" :disabled="busy" @click="reload">Actualizar estado</button><button v-if="preparation.status === 'failed' && preparation.isCurrent" type="button" class="button button-secondary" :disabled="busy" @click="retry">Reintentar preparación</button></div></section>
+      <template v-if="preparation?.sourceContext && !selectedFile">
+        <section class="workflow-card"><h2>{{ sealedReference ? 'Fuente de la referencia sellada' : 'Inspección de la fuente antes del recorte' }}</h2><p>Revisa el original bilateral y la mitad seleccionada en las ventanas 1–99 y 5–95. El centro se registra sobre la mitad nativa; esta referencia no modifica ni guía el recorte automático.</p><div class="workflow-grid" style="margin-top: 20px"><PreparationImage v-for="view in sourceViews" :key="`${preparation.preparationRevisionId}:${view.view}`" :preparation="preparation" :view="view.view" :data-view="view.view" :label="view.label" :native-shape="view.view.startsWith('half_') ? preparation.nativeHalfShape : preparation.sourceContext.fullNativeShape" :points="view.view.startsWith('half_') ? sealedReference?.centerXY ? [sealedReference.centerXY] : center : []" :interactive="view.view.startsWith('half_') && preparation.status === 'awaiting_reference' && !sealedReference && !busy && !loading" @ready="sourceReady[view.view] = $event" @point="markCenter" /></div></section>
+        <fieldset v-if="preparation.status === 'awaiting_reference' && !sealedReference" class="workflow-card" :aria-busy="busy || loading" :disabled="busy || loading"><h2>Referencia visual definitiva</h2><p>Debes sellarla antes de acceder al recorte. No habrá edición posterior del centro.</p><label class="workflow-check"><input id="reference-confirm-side" v-model="reference.confirmedSide" type="checkbox" :disabled="busy" />Confirmo que la mitad corresponde a {{ sideLabel.toLocaleLowerCase('es') }}.</label><div class="workflow-fields"><div class="workflow-field"><label for="reference-resolved">¿Pudiste determinar el centro?</label><select id="reference-resolved" v-model="reference.centerResolved" :disabled="busy"><option value="">Seleccionar</option><option value="resolved">Sí, centro resuelto</option><option value="unresolved">No, centro no resuelto</option></select></div><div class="workflow-field"><span>Dimensiones nativas de la mitad</span><p>{{ preparation.nativeHalfShape?.[1] }} × {{ preparation.nativeHalfShape?.[0] }} px</p></div><div class="workflow-field"><label for="reference-center-x">Centro X en la mitad nativa (px)</label><input id="reference-center-x" v-model="reference.x" type="number" step="1" min="0" :max="(preparation.nativeHalfShape?.[1] ?? 1) - 1" :disabled="busy || reference.centerResolved !== 'resolved'" /></div><div class="workflow-field"><label for="reference-center-y">Centro Y en la mitad nativa (px)</label><input id="reference-center-y" v-model="reference.y" type="number" step="1" min="0" :max="(preparation.nativeHalfShape?.[0] ?? 1) - 1" :disabled="busy || reference.centerResolved !== 'resolved'" /></div></div><label class="workflow-check"><input id="reference-inspected" v-model="reference.inspected" type="checkbox" :disabled="busy" />He inspeccionado el original y la mitad en las dos ventanas.</label><label class="workflow-check"><input id="reference-blinded" v-model="reference.blinded" type="checkbox" :disabled="busy" />Realicé esta inspección sin consultar el resultado futuro.</label><div class="workflow-field"><label for="reference-note">Nota de referencia visual</label><textarea id="reference-note" v-model="reference.note" :disabled="busy" maxlength="2000" aria-describedby="reference-note-hint" /><small id="reference-note-hint">Describe la inspección y cómo determinaste el centro, o por qué no pudo resolverse. Mínimo 35 caracteres.</small></div><p v-if="reference.centerResolved === 'unresolved'" class="workflow-notice workflow-warning">Una referencia no resuelta no permitirá aceptar la preparación como adecuada.</p><div class="workflow-actions"><button id="seal-reference" type="button" class="button button-primary" :disabled="busy || !allSourceReady" @click="seal">Sellar referencia visual</button></div></fieldset>
+        <section v-else-if="sealedReference" class="workflow-card"><h2>Referencia sellada</h2><dl class="workflow-meta"><div><dt>Centro</dt><dd>{{ sealedReference.centerResolved ? `${sealedReference.centerXY?.[0]}, ${sealedReference.centerXY?.[1]} px de la mitad nativa` : 'No resuelto' }}</dd></div><div><dt>Nota persistida</dt><dd>{{ sealedReference.note }}</dd></div><div><dt>Fecha</dt><dd>{{ new Date(sealedReference.createdAt).toLocaleString('es-PE') }}</dd></div><div><dt>Referencia inmutable</dt><dd>{{ sealedReference.id }}</dd></div></dl><p>El centro ya no puede editarse. Las coordenadas no se usan como entrada del localizador.</p></section>
+      </template>
+      <div class="workflow-actions"><RouterLink to="/evaluaciones" class="button button-secondary">Volver a evaluaciones</RouterLink><button id="continue-quality-review" type="button" class="button button-primary" :disabled="busy || loading || dirty || preparation?.status !== 'ready' || !preparation?.isCurrent" @click="continueToReview">Revisar el recorte</button></div>
     </template>
-
-    <dialog ref="enlarged" class="app-dialog rad-enlarged" aria-labelledby="rad-enlarged-title" @click="closeOnBackdrop($event, enlarged)"><div class="dialog-heading"><h2 id="rad-enlarged-title">Vista ampliada de la imagen</h2><button type="button" class="icon-button" aria-label="Cerrar vista ampliada" @click="enlarged?.close()"><AppIcon name="x" /></button></div><img v-if="selectedImage" :src="selectedImage.src" :alt="`${selectedImage.label}: ilustración sintética`" :width="selectedImage.width" :height="selectedImage.height" /><p>Imagen ficticia para explorar el recorrido de la aplicación.</p><button type="button" class="button button-primary" @click="enlarged?.close()">Volver a la selección</button></dialog>
-    <dialog ref="confirmation" class="app-dialog" aria-labelledby="rad-confirmation-title" @cancel.prevent="answer(false)" @close="confirmationClosed"><div class="dialog-heading"><span class="dialog-symbol"><AppIcon name="image" :size="24" /></span><button type="button" class="icon-button" aria-label="Cancelar y seguir editando" autofocus @click="answer(false)"><AppIcon name="x" /></button></div><h2 id="rad-confirmation-title">{{ confirmationMode === 'leave' ? 'Tienes cambios sin guardar' : '¿Quitar la imagen seleccionada?' }}</h2><p>{{ confirmationMode === 'leave' ? 'Puedes seguir editando o salir descartando los cambios de esta pantalla.' : 'Se retirará el ejemplo de esta pantalla y tendrás que confirmar el lado de nuevo al elegir otra imagen. Esto solo cambia el recorrido temporal; no modifica el servidor.' }}</p><div class="rad-summary-actions"><button type="button" class="button button-secondary" @click="answer(false)">Seguir editando</button><button type="button" class="button button-primary" @click="answer(true)">{{ confirmationMode === 'leave' ? 'Salir sin guardar' : 'Quitar imagen' }}</button></div></dialog>
+    <UnsavedChangesDialog ref="discardDialog" />
   </div>
 </template>
-
-<style scoped>
-.rad-page { width: 100%; max-width: 1240px; margin: 0 auto; }
-.rad-back { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; font-size: 12px; color: var(--muted); margin-bottom: 25px; }
-.rad-back:hover { color: var(--brand); text-decoration: underline; text-underline-offset: 3px; }
-.rad-heading { display: flex; justify-content: space-between; align-items: center; gap: 20px; margin-bottom: 26px; }
-.rad-heading h1 { margin-top: 8px; font-size: clamp(26px,3vw,32px); line-height: 1.2; font-weight: 650; letter-spacing: -.035em; }
-.rad-heading p { color: var(--muted); font-size: 14px; margin-top: 10px; }
-.rad-code { display: inline-flex; align-items: center; gap: 7px; flex: none; padding: 7px 10px; border: 1px solid var(--border); border-radius: 7px; background: white; color: #4d6878; font-size: 12px; font-weight: 600; }
-.rad-stepper { list-style: none; display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); padding: 0; margin: 0 0 27px; gap: 10px; }
-.rad-stepper li { display: flex; align-items: center; gap: 8px; padding-bottom: 14px; border-bottom: 2px solid #dce6eb; color: #657c8b; font-size: 12px; }
-.rad-step-number { width: 26px; height: 26px; flex: none; display: grid; place-items: center; border-radius: 50%; background: #e7edf1; color: #607684; font-size: 11px; }
-.rad-stepper .rad-step-current { color: var(--brand-dark); border-bottom-color: var(--brand); font-weight: 600; }
-.rad-step-current .rad-step-number { background: var(--brand); color: white; }
-.rad-step-done .rad-step-number { background: #e0efec; color: var(--brand); }
-.rad-layout { display: grid; grid-template-columns: minmax(0,1fr) 295px; gap: 24px; align-items: start; }
-.rad-image-panel,.rad-side-panel { min-width: 0; background: white; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
-.rad-panel-heading { padding: 22px 24px; border-bottom: 1px solid #e8eef1; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
-.rad-panel-title,.rad-side-heading { display: flex; align-items: center; gap: 11px; }
-.rad-panel-title h2,.rad-side-heading h2 { font-size: 16px; font-weight: 650; }
-.rad-panel-title p { margin-top: 3px; font-size: 12px; color: var(--muted); }
-.rad-section-icon { display: grid; place-items: center; flex: none; width: 40px; height: 43px; background: #edf5f6; color: var(--brand); border: 1px solid #dfebed; border-radius: 9px; }
-.rad-fiction-label { font-size: 9px; letter-spacing: 1px; font-weight: 650; color: #55737b; }
-.rad-gallery { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; padding: 22px 24px; }
-.rad-sample { display: flex; gap: 11px; align-items: center; min-width: 0; border: 1px solid #d5e0e6; border-radius: 9px; background: white; padding: 10px; color: var(--ink); text-align: left; position: relative; }
-.rad-sample:hover { border-color: #83aab2; background: #f7fafb; }
-.rad-sample-selected { border-color: var(--brand); background: #f0f8f7; box-shadow: 0 0 0 1px var(--brand); }
-.rad-sample img { display: block; width: 63px; height: 62px; flex: none; object-fit: contain; background: #172532; border-radius: 5px; }
-.rad-sample-description { display: grid; gap: 4px; padding-right: 15px; min-width: 0; }
-.rad-sample-description strong { font-size: 12px; font-weight: 600; }
-.rad-sample-description > span { font-size: 11px; color: var(--muted); }
-.rad-sample-check { position: absolute; right: 7px; top: 8px; color: var(--brand); }
-.rad-image-error { margin: -6px 24px 18px; }
-.rad-preview-section { padding: 0 24px; }
-.rad-preview-heading { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
-.rad-preview-heading h3 { font-size: 12px; font-weight: 600; }
-.rad-preview-heading p { font-size: 11px; color: var(--muted); margin-top: 4px; overflow-wrap: anywhere; }
-.rad-preview-heading .text-button { font-size: 12px; }
-.rad-preview { border-radius: 9px; overflow: hidden; background: #12212e; display: grid; place-items: center; padding: 12px; }
-.rad-preview > img { display: block; width: 100%; max-height: 340px; height: auto; object-fit: contain; }
-.rad-preview-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 12px 0 5px; }
-.rad-preview-footer > span { font-size: 11px; color: var(--muted); }
-.rad-remove { color: #8f4b43; font-size: 12px; }
-.rad-empty-preview { margin: 0 24px; min-height: 220px; border: 1px dashed #cbdbe3; border-radius: 9px; background: #f7fafb; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; gap: 9px; padding: 24px; }
-.rad-empty-preview > span { color: #6e8c9c; margin-bottom: 4px; }
-.rad-empty-preview h3 { font-size: 15px; font-weight: 600; }
-.rad-empty-preview p { font-size: 12px; color: var(--muted); }
-.rad-image-note { display: flex; gap: 8px; align-items: flex-start; padding: 18px 24px; color: #526e7a; }
-.rad-image-note svg { margin-top: 2px; }
-.rad-image-note p { font-size: 11px; line-height: 1.65; }
-.rad-side-panel { padding: 22px; }
-.rad-side-heading { margin-bottom: 22px; }
-.rad-baseline { background: #f4f8f9; border: 1px solid #e2eaee; border-radius: 8px; padding: 13px; margin-bottom: 23px; display: grid; gap: 5px; }
-.rad-baseline > span { color: #56707f; font-size: 11px; }
-.rad-baseline strong { font-size: 17px; font-weight: 600; }
-.rad-baseline .text-button { margin-top: 3px; font-size: 11px; }
-.rad-side-options { margin: 0; padding: 0; border: none; min-width: 0; display: grid; gap: 10px; }
-.rad-side-options legend { padding: 0; margin-bottom: 10px; font-size: 12px; font-weight: 600; }
-.rad-side-choice { display: flex; align-items: center; gap: 10px; border: 1px solid #cddae2; border-radius: 8px; padding: 12px 13px; min-height: 45px; font-size: 13px; cursor: pointer; }
-.rad-side-selected { border-color: var(--brand); background: #f1f8f7; color: var(--brand-dark); }
-.rad-side-choice input { accent-color: var(--brand); width: 16px; height: 16px; margin: 0; }
-.rad-hint { color: #5d7482; font-size: 11px; line-height: 1.65; }
-.rad-confirmation { display: flex; align-items: flex-start; gap: 9px; font-size: 12px; font-weight: 600; margin-top: 24px; margin-bottom: 9px; cursor: pointer; }
-.rad-confirmation input { accent-color: var(--brand); width: 16px; height: 16px; margin: 2px 0 0; flex: none; }
-.rad-confirmation-disabled { color: #667b88; cursor: default; }
-.rad-session-note { display: flex; align-items: flex-start; gap: 8px; border-top: 1px solid #e1e9ed; padding-top: 20px; margin-top: 22px; color: #5c7482; }
-.rad-session-note p { font-size: 11px; line-height: 1.65; }
-.rad-actions-area { grid-column: 1 / -1; }
-.rad-actions { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-.rad-main-actions { display: flex; gap: 10px; flex-wrap: wrap; }
-.rad-feedback { color: var(--brand-dark); font-size: 12px; margin-top: 13px; }
-.rad-feedback:empty { display: none; }
-.rad-draft-state { color: var(--muted); font-size: 11px; margin-top: 13px; }
-.rad-save-error { color: var(--danger); font-size: 12px; margin-bottom: 16px; background: #fbefed; padding: 12px 14px; border-radius: 8px; }
-.rad-summary-data { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 18px; margin: 22px 0; padding: 18px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
-.rad-summary-data dt { color: var(--muted); font-size: 11px; }
-.rad-summary-data dd { margin: 5px 0 0; font-size: 13px; font-weight: 600; }
-.rad-summary-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; flex-wrap: wrap; }
-.rad-enlarged { width: min(840px,calc(100% - 32px)); }
-.rad-enlarged .dialog-heading { gap: 16px; }
-.rad-enlarged h2 { margin: 0; font-size: 21px; }
-.rad-enlarged > img { display: block; width: 100%; height: auto; max-height: 62dvh; object-fit: contain; background: #12212e; border-radius: 9px; }
-.rad-enlarged > p { margin-top: 13px; font-size: 12px; }
-.rad-unavailable { display: grid; justify-items: start; gap: 18px; padding: 32px; border: 1px solid var(--border); border-radius: 12px; background: white; }
-.rad-unavailable h1 { font-size: 27px; letter-spacing: -.5px; }
-.rad-unavailable p { color: var(--muted); }
-@media(max-width:1150px) { .rad-layout { grid-template-columns: minmax(0,1fr) 260px; gap: 18px; } .rad-side-panel { padding: 18px; } .rad-gallery { gap: 9px; padding: 18px; } .rad-sample { padding: 8px; gap: 8px; } .rad-sample img { width: 43px; height: 50px; } .rad-panel-heading { padding: 20px 18px; } .rad-preview-section { padding: 0 18px; } .rad-empty-preview { margin: 0 18px; } }
-@media(max-width:950px) { .rad-layout { grid-template-columns: 1fr; } .rad-side-panel { display: grid; grid-template-columns: 1fr 1fr; gap: 0 22px; } .rad-side-heading,.rad-session-note { grid-column: 1 / -1; } .rad-baseline { grid-column: 1; grid-row: 2 / 5; align-self: start; } .rad-side-options,.rad-confirmation,.rad-side-panel > .rad-hint,.rad-side-panel > .field-error { grid-column: 2; } .rad-confirmation { margin-top: 18px; } }
-@media(max-width:600px) {
-  .rad-heading { align-items: flex-start; flex-wrap: wrap; gap: 16px; }
-  .rad-heading p { font-size: 13px; line-height: 1.7; }
-  .rad-stepper { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px 15px; }
-  .rad-stepper li { font-size: 11px; }
-  .rad-gallery { gap: 10px; padding: 17px; }
-  .rad-sample { flex-direction: column; align-items: stretch; padding: 9px; gap: 8px; }
-  .rad-sample img { width: 100%; height: 78px; }
-  .rad-sample-description { padding-right: 0; }
-  .rad-sample-description strong { font-size: 11px; }
-  .rad-sample-description > span { font-size: 10px; }
-  .rad-panel-heading { padding: 18px; }
-  .rad-panel-title h2 { font-size: 15px; }
-  .rad-panel-title p { font-size: 11px; }
-  .rad-preview-heading { gap: 10px; }
-  .rad-preview { padding: 5px; }
-  .rad-preview-footer > span { font-size: 10px; }
-  .rad-image-note { padding: 17px; }
-  .rad-side-panel { display: block; }
-  .rad-side-heading { margin-bottom: 18px; }
-  .rad-actions,.rad-main-actions { width: 100%; }
-  .rad-actions > .button,.rad-main-actions > .button { width: 100%; }
-  .rad-actions > .button { justify-content: flex-start; }
-  .rad-summary-actions { flex-direction: column; }
-  .rad-summary-actions .button { width: 100%; }
-  .rad-unavailable { padding: 24px; }
-}
-@media(pointer:coarse) { .rad-confirmation { min-height: 44px; align-items: center; } .rad-side-choice,.rad-sample { min-height: 44px; } }
-</style>

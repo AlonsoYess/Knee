@@ -52,7 +52,7 @@ def scientific_import_guard(monkeypatch):
 
 
 class ApiHarness:
-    def __init__(self, tmp_path, contract):
+    def __init__(self, tmp_path, contract, processor=None):
         from knee_app.api import create_app
         from knee_app.db import create_user
 
@@ -60,7 +60,7 @@ class ApiHarness:
         self.clock = MutableClock()
         self.path = tmp_path / "fictional.sqlite3"
         self.settings = self.settings_for(self.path)
-        self.app = create_app(self.settings, clock=self.clock)
+        self.app = create_app(self.settings, clock=self.clock, processor=processor)
         self.stack = ExitStack()
         self.tokens = {}
         self.user_ids = {}

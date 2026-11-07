@@ -1,295 +1,147 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
-import AppIcon from '../components/AppIcon.vue'
-import DemoCropPreview from '../components/DemoCropPreview.vue'
-import { closeOnBackdrop } from '../dialog'
-import {
-  evaluations, createDraftInput, validateDemoDraft, createDemoImageInput,
-  validateDemoImage, isEditableDemoEvaluation, createDemoReviewInput,
-  saveDemoReview, type DemoReviewInput,
-} from '../state/evaluations'
-import { getDemoCrop, demoRejectReasons } from '../demo/demoCrops'
+import PreparationImage from '../components/PreparationImage.vue'
+import UnsavedChangesDialog from '../components/UnsavedChangesDialog.vue'
+import { ApiError } from '../api/http'
+import type { Mark, Point, PreparationView, QcObservation, QualityReviewDto, ReviewSubmission } from '../api/preparationContracts'
+import { evaluations, loadEvaluation } from '../state/evaluations'
+import { getActivePreparation, loadActivePreparation, recordQualityReview } from '../state/preparations'
+import { apiMessage, sessionGeneration } from '../state/session'
 
-const route = useRoute()
-const router = useRouter()
-const requestedId = typeof route.params.id === 'string' ? route.params.id : ''
-const existing = computed(() => evaluations.value.find(item => item.id === requestedId))
-const unavailable = computed(() => !isEditableDemoEvaluation(existing.value))
-const baselineIncomplete = computed(() => Boolean(existing.value && Object.keys(validateDemoDraft(createDraftInput(existing.value), true)).length))
-const crop = computed(() => getDemoCrop(existing.value?.image?.sampleId ?? '', existing.value?.knee ?? null))
-const imageIncomplete = computed(() => !existing.value || !crop.value || Object.keys(validateDemoImage(createDemoImageInput(existing.value), existing.value, true)).length > 0)
-const form = reactive<DemoReviewInput>(existing.value ? createDemoReviewInput(existing.value) : { decision: 'pending', reason: '', reviewed: false })
-const baseline = ref(JSON.stringify(form))
-const decisionLocked = ref(form.decision !== 'pending')
-const originalLoaded = ref(false)
-const cropLoaded = ref(false)
-const previewFailed = ref(false)
-const errors = reactive({ reviewed: '', reason: '', decision: '' })
-const saving = ref(false)
-const saveError = ref('')
-const message = ref('')
-const enlarged = ref<HTMLDialogElement | null>(null)
-const enlargedView = ref<'original' | 'crop'>('original')
-const confirmation = ref<HTMLDialogElement | null>(null)
-const confirmationMode = ref<'leave' | 'reopen'>('leave')
-let resolveConfirmation: ((value: boolean) => void) | null = null
-
-const steps = ['Datos basales', 'Radiografía y lado', 'Revisión del recorte', 'Resumen']
-const ready = computed(() => !unavailable.value && !baselineIncomplete.value && !imageIncomplete.value)
-const imagesVisible = computed(() => originalLoaded.value && cropLoaded.value && !previewFailed.value)
-const dirty = computed(() => ready.value && JSON.stringify(form) !== baseline.value)
-const sideLabel = computed(() => existing.value?.knee === 'right' ? 'Derecha del paciente' : existing.value?.knee === 'left' ? 'Izquierda del paciente' : 'Pendiente')
-const decisionLabel = computed(() => form.decision === 'accepted' ? 'Recorte aceptado · demostración' : form.decision === 'rejected' ? 'Recorte rechazado · demostración' : 'Revisión pendiente')
-const reasonLabel = computed(() => demoRejectReasons.find(reason => reason.id === form.reason)?.label ?? 'Sin motivo seleccionado')
-const imageRoute = computed(() => ({ name: 'radiograph', params: { id: requestedId } }))
-const editRoute = computed(() => ({ name: 'edit-evaluation', params: { id: requestedId } }))
-
-function clearErrors() { errors.reviewed = ''; errors.reason = ''; errors.decision = ''; saveError.value = '' }
-function sourceFailed() {
-  previewFailed.value = true
-  form.reviewed = false
-  form.decision = 'pending'
-  form.reason = ''
-  decisionLocked.value = false
-  clearErrors()
-  message.value = ''
-}
-function reviewedChanged() { errors.reviewed = ''; errors.decision = ''; message.value = '' }
-async function acceptExample() {
-  clearErrors()
-  if (!imagesVisible.value) { errors.reviewed = 'Espera a que se muestren correctamente la imagen y el recorte.'; return }
-  if (!form.reviewed) {
-    errors.reviewed = 'Confirma que has revisado la imagen y el recorte de este ejemplo.'
-    await nextTick(); document.getElementById('crop-reviewed')?.focus(); return
+type Choice = '' | 'yes' | 'no'
+const route = useRoute(), router = useRouter(), evaluationId = typeof route.params.id === 'string' ? route.params.id : ''
+const existing = computed(() => evaluations.value.find(item => item.id === evaluationId))
+const preparation = computed(() => getActivePreparation(evaluationId))
+const busy = ref(false), loading = ref(true), error = ref(''), details = ref<string[]>([]), message = ref(''), editing = ref(true), contextChanged = ref(false)
+const confirmedReview = ref<QualityReviewDto | null>(null)
+const persistedReview = computed(() => confirmedReview.value ?? preparation.value?.activeReview ?? null)
+const discardDialog = ref<InstanceType<typeof UnsavedChangesDialog> | null>(null)
+const readiness = reactive<Record<PreparationView, boolean>>({ full_a: false, full_b: false, half_a: false, half_b: false, crop_a: false, crop_b: false })
+const views: { view: PreparationView; label: string }[] = [
+  { view: 'full_a', label: 'Original bilateral — ventana 1–99' }, { view: 'half_a', label: 'Mitad seleccionada — ventana 1–99' }, { view: 'crop_a', label: 'Recorte automático — ventana 1–99' },
+  { view: 'full_b', label: 'Original bilateral — ventana 5–95' }, { view: 'half_b', label: 'Mitad seleccionada — ventana 5–95' }, { view: 'crop_b', label: 'Recorte automático — ventana 5–95' },
+]
+function emptyForm() { return {
+  confirmedSide: false, confirmedCheckIds: [] as string[], side_supported: '' as Choice, coverage_complete: '' as Choice,
+  visibility: { medial_joint_borders: '', lateral_joint_borders: '', subchondral_bone: '' }, hardware: '', text_or_mask: '', marks: [] as Mark[], mark_effect: '', physical_origin_known: '' as Choice,
+  note: '', original_half_inspected: false, both_windows_inspected: false, outcome_blinded: false, lateral_margins_visible: '' as Choice, unclassified_mark_present: '' as Choice, ruler_outside_bone: '' as Choice, ruler_locations_xy: [] as Point[],
+  reason: '', includeObservationOnReject: false,
+} }
+const form = reactive(emptyForm()), baseline = ref(JSON.stringify(form))
+const reviewIntent = ref(crypto.randomUUID())
+const nextPoint = reactive({ x: '', y: '' })
+const dirty = computed(() => editing.value && JSON.stringify(form) !== baseline.value)
+const allViewsReady = computed(() => Object.values(readiness).every(Boolean))
+const ready = computed(() => preparation.value?.status === 'ready' && preparation.value.isCurrent && Boolean(preparation.value.sourceReference))
+const acceptanceAvailable = computed(() => ready.value && preparation.value?.sourceReference?.centerResolved && preparation.value.reviewContext?.canReview && preparation.value.reviewContext.blockerCodes.length === 0 && allViewsReady.value && !contextChanged.value)
+const hasRuler = computed(() => form.marks.includes('peripheral_ruler'))
+const booleanFields = [
+  { key: 'side_supported' as const, label: '¿La asignación de lado está sustentada por la imagen?' }, { key: 'coverage_complete' as const, label: '¿La cobertura de la región está completa?' },
+  { key: 'physical_origin_known' as const, label: '¿Se conoce el origen físico de las marcas?' }, { key: 'lateral_margins_visible' as const, label: '¿Son visibles ambos márgenes laterales?' }, { key: 'unclassified_mark_present' as const, label: '¿Hay alguna marca sin clasificar?' },
+]
+const visibilityFields = [ { key: 'medial_joint_borders' as const, label: 'Bordes articulares mediales' }, { key: 'lateral_joint_borders' as const, label: 'Bordes articulares laterales' }, { key: 'subchondral_bone' as const, label: 'Hueso subcondral' } ]
+const markOptions: { value: Mark; label: string }[] = [ { value: 'peripheral_ruler', label: 'Regla periférica' }, { value: 'fine_line', label: 'Línea fina' }, { value: 'isolated_spot', label: 'Punto o mancha aislada' }, { value: 'hardware', label: 'Material metálico' }, { value: 'text_or_mask', label: 'Texto o máscara' } ]
+let active = true, internalNavigation = false, allowContextReset = true
+let loadController: AbortController | null = null
+function initialize() {
+  const saved = preparation.value?.activeReview, observation = saved?.observation
+  const next = emptyForm()
+  if (observation) {
+    for (const field of booleanFields) next[field.key] = observation[field.key] ? 'yes' : 'no'
+    Object.assign(next, { visibility: { ...observation.visibility }, hardware: observation.hardware, text_or_mask: observation.text_or_mask, marks: [...observation.marks], mark_effect: observation.mark_effect,
+      note: observation.note, original_half_inspected: observation.original_half_inspected, both_windows_inspected: observation.both_windows_inspected, outcome_blinded: observation.outcome_blinded,
+      ruler_outside_bone: observation.ruler_outside_bone === null ? '' : observation.ruler_outside_bone ? 'yes' : 'no', ruler_locations_xy: observation.ruler_locations_xy.map(point => [...point] as Point), includeObservationOnReject: true,
+    })
   }
-  form.decision = 'accepted'
-  form.reason = ''
-  decisionLocked.value = true
-  message.value = 'Aceptación del ejemplo seleccionada. Continúa para verla en el resumen temporal.'
-  await nextTick(); document.getElementById('crop-save-summary')?.focus()
+  if (saved) { next.confirmedSide = true; next.confirmedCheckIds = [...saved.confirmedCheckIds]; next.reason = saved.reason ?? '' }
+  reviewIntent.value = crypto.randomUUID(); Object.assign(form, next); baseline.value = JSON.stringify(form); editing.value = !saved; contextChanged.value = false; confirmedReview.value = null
 }
-async function rejectExample() {
-  clearErrors()
-  if (!form.reason || !demoRejectReasons.some(reason => reason.id === form.reason)) {
-    errors.reason = 'Selecciona un motivo para rechazar el recorte de ejemplo.'
-    await nextTick(); document.getElementById('crop-reason')?.focus(); return
+watch(() => `${preparation.value?.id}:${preparation.value?.preparationRevisionId}:${preparation.value?.reviewContext?.qcPolicyVersion}:${preparation.value?.activeReview?.id}`, () => {
+  if (dirty.value && !allowContextReset) contextChanged.value = true
+  else initialize()
+  allowContextReset = false
+})
+async function discardChanges() { return !dirty.value || Boolean(await discardDialog.value?.ask()) }
+async function reload() {
+  if (busy.value || !await discardChanges()) return
+  loading.value = true; error.value = ''; details.value = []; loadController?.abort(); loadController = new AbortController(); allowContextReset = true
+  const generation = sessionGeneration.value
+  try { await loadEvaluation(evaluationId); await loadActivePreparation(evaluationId, loadController.signal); if (active && generation === sessionGeneration.value) initialize() }
+  catch (failure) { if (active && generation === sessionGeneration.value && !loadController.signal.aborted) error.value = apiMessage(failure) }
+  finally { if (active && generation === sessionGeneration.value) { loading.value = false; allowContextReset = false } }
+}
+function startNewReview() { reviewIntent.value = crypto.randomUUID(); editing.value = true; confirmedReview.value = null; message.value = 'Vas a registrar una nueva decisión. El registro anterior se conservará en el historial.'; baseline.value = JSON.stringify(form) }
+function rulerChanged() { if (!hasRuler.value) { form.ruler_locations_xy = []; form.ruler_outside_bone = '' } }
+function addPoint(point?: Point) {
+  if (busy.value || !editing.value || !hasRuler.value || !preparation.value?.cropGeometry || !preparation.value.nativeHalfShape) return
+  const candidate: Point = point ?? [Number(nextPoint.x), Number(nextPoint.y)]
+  const [height, width] = preparation.value.nativeHalfShape
+  if ((!point && (!nextPoint.x.trim() || !nextPoint.y.trim())) || !candidate.every(Number.isFinite) || candidate[0] < 0 || candidate[1] < 0 || candidate[0] >= width || candidate[1] >= height) { error.value = 'El punto debe estar dentro de las dimensiones nativas de la mitad.'; return }
+  form.ruler_locations_xy.push(candidate); nextPoint.x = ''; nextPoint.y = ''; error.value = ''
+}
+function observation(): QcObservation | null {
+  if (booleanFields.some(field => !form[field.key]) || visibilityFields.some(field => !['visible', 'obscured', 'uncertain'].includes(form.visibility[field.key])) || !['absent', 'present', 'uncertain'].includes(form.hardware) || !['absent', 'present', 'uncertain'].includes(form.text_or_mask) || !['none', 'non_obscuring', 'obscuring', 'uncertain'].includes(form.mark_effect) || form.note.trim().length < 35 || !form.original_half_inspected || !form.both_windows_inspected || !form.outcome_blinded) {
+    error.value = 'Completa todas las observaciones, confirma la inspección y el cegamiento, y escribe una nota de al menos 35 caracteres.'; return null
   }
-  form.decision = 'rejected'
-  decisionLocked.value = true
-  message.value = 'Rechazo del ejemplo seleccionado. Solo se mantendrá en este recorrido temporal.'
-  await nextTick(); document.getElementById('crop-save-exit')?.focus()
+  if (hasRuler.value && (!preparation.value?.cropGeometry || !form.ruler_outside_bone || form.ruler_locations_xy.length === 0)) { error.value = 'Para una regla periférica, indica su relación con el hueso y registra sus puntos en la mitad nativa. La captura requiere la geometría exacta del recorte.'; return null }
+  const dimensions = preparation.value?.nativeHalfShape
+  if (!dimensions || form.ruler_locations_xy.some(point => point.some(value => !Number.isFinite(value)) || point[0] < 0 || point[1] < 0 || point[0] >= dimensions[1] || point[1] >= dimensions[0])) { error.value = 'Revisa los puntos de la regla: deben estar dentro de la mitad nativa.'; return null }
+  return {
+    side_supported: form.side_supported === 'yes', coverage_complete: form.coverage_complete === 'yes', visibility: { ...form.visibility } as QcObservation['visibility'], hardware: form.hardware as QcObservation['hardware'], text_or_mask: form.text_or_mask as QcObservation['text_or_mask'], marks: [...form.marks], mark_effect: form.mark_effect as QcObservation['mark_effect'], physical_origin_known: form.physical_origin_known === 'yes', note: form.note.trim(), original_half_inspected: form.original_half_inspected, both_windows_inspected: form.both_windows_inspected, outcome_blinded: form.outcome_blinded, lateral_margins_visible: form.lateral_margins_visible === 'yes', unclassified_mark_present: form.unclassified_mark_present === 'yes', ruler_outside_bone: hasRuler.value ? form.ruler_outside_bone === 'yes' : null, ruler_locations_xy: hasRuler.value ? form.ruler_locations_xy.map(point => [point[0], point[1]]) : [],
+  }
 }
-function ask(mode: 'leave' | 'reopen'): Promise<boolean> {
-  if (resolveConfirmation) return Promise.resolve(false)
-  confirmationMode.value = mode
-  return new Promise(resolve => { resolveConfirmation = resolve; confirmation.value?.showModal() })
-}
-function answer(accepted: boolean) {
-  const resolve = resolveConfirmation
-  resolveConfirmation = null
-  confirmation.value?.close()
-  resolve?.(accepted)
-}
-function confirmationClosed() {
-  const resolve = resolveConfirmation
-  resolveConfirmation = null
-  resolve?.(false)
-}
-async function reopenReview() {
-  if (!await ask('reopen')) return
-  Object.assign(form, { decision: 'pending', reason: '', reviewed: false })
-  decisionLocked.value = false
-  clearErrors()
-  message.value = 'Revisión simulada reabierta en esta pantalla. No modifica el QC del servidor.'
-  await nextTick(); document.getElementById('crop-reviewed')?.focus()
-}
-function saveCurrent(reachSummary = false): boolean {
+async function submit(decision: 'accepted' | 'rejected') {
+  const current = preparation.value
+  if (busy.value || !current || !ready.value || contextChanged.value) return
+  error.value = ''; details.value = []; message.value = ''
+  if (!form.confirmedSide) { error.value = 'Confirma la rodilla que estás revisando.'; return }
+  if (decision === 'accepted' && !acceptanceAvailable.value) { error.value = 'La referencia, las vistas o el procedimiento QC todavía no permiten registrar una aceptación.'; return }
+  if (decision === 'rejected' && (!form.reason.trim() || form.reason.trim().length > 2000)) { error.value = 'Escribe un motivo de rechazo entre 1 y 2000 caracteres.'; return }
+  if (decision === 'accepted' && current.reviewContext?.checks.some(check => check.required && !form.confirmedCheckIds.includes(check.id))) { error.value = 'Confirma los controles obligatorios indicados por el procedimiento vigente.'; return }
+  const raw = decision === 'accepted' || form.includeObservationOnReject ? observation() : null
+  if ((decision === 'accepted' || form.includeObservationOnReject) && !raw) return
+  const payload: ReviewSubmission = { preparationRevisionId: current.preparationRevisionId, confirmedSide: current.side, decision, confirmedCheckIds: [...form.confirmedCheckIds], reason: decision === 'rejected' ? form.reason.trim() : null, observation: raw }
+  busy.value = true
+  const generation = sessionGeneration.value
   try {
-    saveDemoReview(form, requestedId, { reachSummary })
-    baseline.value = JSON.stringify(form)
-    decisionLocked.value = form.decision !== 'pending'
-    return true
-  } catch {
-    saveError.value = 'No pudimos conservar la revisión del ejemplo. Vuelve a comprobar la imagen, el lado y la decisión.'
-    return false
-  }
+    const saved = await recordQualityReview(evaluationId, payload, reviewIntent.value)
+    if (!active || generation !== sessionGeneration.value) return
+    confirmedReview.value = saved; editing.value = false; baseline.value = JSON.stringify(form); message.value = 'El servidor confirmó la decisión y sus observaciones.'
+    internalNavigation = true
+    await router.push({ name: 'case-summary', params: { id: evaluationId } })
+  } catch (failure) { if (active && generation === sessionGeneration.value) { error.value = apiMessage(failure); if (failure instanceof ApiError) details.value = failure.fields.map(field => field.message) } }
+  finally { if (active && generation === sessionGeneration.value) { busy.value = false; internalNavigation = false } }
 }
-async function saveReview() {
-  if (!ready.value || saving.value) return
-  clearErrors()
-  saving.value = true
-  try { if (saveCurrent()) await router.push('/evaluaciones') } finally { saving.value = false }
-}
-async function continueToSummary() {
-  if (!ready.value || saving.value) return
-  clearErrors()
-  if (form.decision !== 'accepted') {
-    errors.decision = form.decision === 'rejected' ? 'El recorte rechazado no permite continuar. Vuelve a la imagen o reabre la revisión del ejemplo.' : 'Selecciona una aceptación explícita del recorte antes de continuar.'
-    await nextTick(); document.getElementById(form.decision === 'pending' ? 'crop-reviewed' : 'crop-reopen')?.focus(); return
-  }
-  if (!imagesVisible.value || !form.reviewed) { errors.reviewed = 'La imagen y el recorte deben mostrarse y estar revisados para continuar.'; return }
-  saving.value = true
-  try {
-    if (saveCurrent(true)) {
-      await router.push({ name: 'case-summary', params: { id: requestedId } })
-    }
-  } finally { saving.value = false }
-}
-function enlarge(view: 'original' | 'crop') { enlargedView.value = view; enlarged.value?.showModal() }
-function beforeUnload(event: BeforeUnloadEvent) { if (dirty.value) { event.preventDefault(); event.returnValue = '' } }
-onBeforeRouteLeave(async () => !dirty.value || await ask('leave'))
-onMounted(() => window.addEventListener('beforeunload', beforeUnload))
-onBeforeUnmount(() => { window.removeEventListener('beforeunload', beforeUnload); resolveConfirmation?.(false); resolveConfirmation = null })
+function beforeUnload(event: BeforeUnloadEvent) { if (dirty.value || busy.value) { event.preventDefault(); event.returnValue = '' } }
+onBeforeRouteLeave(async () => internalNavigation || (!busy.value && await discardChanges()))
+onMounted(() => { window.addEventListener('beforeunload', beforeUnload); void reload() })
+onBeforeUnmount(() => { active = false; loadController?.abort(); window.removeEventListener('beforeunload', beforeUnload) })
 </script>
 
 <template>
-  <div class="crop-page">
-    <p class="simulation-notice" role="status">Las imágenes y la revisión siguen siendo una simulación; sus cambios no se guardan en el servidor. Se reinician al recargar, cerrar sesión o cambiar la revisión basal.</p>
-    <RouterLink to="/evaluaciones" class="crop-back"><AppIcon name="chevron-left" :size="16" />Volver a Mis evaluaciones</RouterLink>
-    <section v-if="unavailable" class="crop-unavailable"><span class="crop-symbol"><AppIcon name="image" :size="25" /></span><h1 tabindex="-1">Revisión no disponible</h1><p>No pudimos recuperar este caso del servidor o no tienes acceso.</p><RouterLink to="/evaluaciones" class="button button-primary">Volver al listado</RouterLink></section>
-    <section v-else-if="baselineIncomplete" class="crop-unavailable"><span class="crop-symbol"><AppIcon name="file" :size="25" /></span><h1 tabindex="-1">Datos basales pendientes</h1><p>Guarda la rodilla a explorar antes de revisar el ejemplo. No es necesario inventar los datos ausentes.</p><RouterLink :to="editRoute" class="button button-primary">Completar datos basales</RouterLink></section>
-    <section v-else-if="imageIncomplete" class="crop-unavailable"><span class="crop-symbol"><AppIcon name="image" :size="25" /></span><h1 tabindex="-1">Imagen y lado pendientes</h1><p>Selecciona una imagen de demostración y confirma el lado antes de revisar el recorte.</p><RouterLink :to="imageRoute" class="button button-primary">Volver a Radiografía y lado</RouterLink></section>
-    <template v-else>
-      <header class="crop-heading"><div><span class="section-eyebrow">REVISAR EL EJEMPLO</span><h1 tabindex="-1">Revisión del recorte</h1><p>Compara ambas vistas y registra una decisión de demostración.</p></div><span class="crop-code"><AppIcon name="file" :size="15" />{{ existing?.code }}</span></header>
-      <ol class="crop-stepper" aria-label="Recorrido de evaluación"><li v-for="(step,index) in steps" :key="step" :class="{ 'crop-step-current': index === 2, 'crop-step-done': index < 2 }" :aria-current="index === 2 ? 'step' : undefined"><span class="crop-step-number"><AppIcon v-if="index < 2" name="check" :size="14" /><template v-else>{{ index + 1 }}</template></span><span>{{ step }}</span></li></ol>
-
-      <div class="crop-scope-note"><AppIcon name="shield" :size="19" /><p><strong>Revisión de demostración.</strong> Las imágenes y los recortes son sintéticos. Esta decisión prueba el recorrido de la interfaz.</p></div>
-      <div class="crop-layout">
-        <section class="crop-comparison" aria-labelledby="crop-comparison-title">
-          <div class="crop-panel-heading"><div><h2 id="crop-comparison-title">Imagen y región seleccionada</h2><p>{{ sideLabel }} · {{ crop?.label }}</p></div><span class="crop-fixture-version">{{ crop?.version }}</span></div>
-          <div v-if="crop" class="crop-views">
-            <figure><figcaption><span>Imagen original</span><button type="button" class="text-button" :disabled="!originalLoaded || previewFailed" @click="enlarge('original')"><AppIcon name="scan" :size="15" />Ampliar original</button></figcaption><div class="crop-preview-frame"><DemoCropPreview :fixture="crop" view="original" @load="originalLoaded = true" @error="sourceFailed" /></div><p>El marco señala la región fija de este ejemplo.</p></figure>
-            <figure><figcaption><span>Recorte del ejemplo</span><button type="button" class="text-button" :disabled="!cropLoaded || previewFailed" @click="enlarge('crop')"><AppIcon name="scan" :size="15" />Ampliar recorte</button></figcaption><div class="crop-preview-frame"><DemoCropPreview :fixture="crop" view="crop" @load="cropLoaded = true" @error="sourceFailed" /></div><p>Vista del mismo lado y de la misma imagen.</p></figure>
-          </div>
-          <p v-if="previewFailed" class="crop-load-error" role="alert">No pudimos mostrar correctamente las dos vistas. La aceptación queda bloqueada; vuelve a la imagen para seleccionar otro ejemplo.</p>
-          <p v-else-if="!imagesVisible" class="crop-loading" role="status">Preparando las vistas del ejemplo…</p>
-          <div class="crop-identity"><AppIcon name="lock" :size="15" /><p>La decisión corresponde a este ejemplo, este lado y esta versión del recorte. Cambiar la imagen o el lado exige una nueva revisión.</p></div>
-        </section>
-
-        <aside class="crop-decision-panel" aria-labelledby="crop-decision-title">
-          <div class="crop-decision-heading"><span class="crop-symbol"><AppIcon name="check" /></span><h2 id="crop-decision-title">Decisión del ejemplo</h2></div>
-          <div :class="['crop-status', `crop-status-${form.decision}`]" role="status" aria-live="polite"><AppIcon :name="form.decision === 'accepted' ? 'check' : form.decision === 'rejected' ? 'x' : 'clock'" :size="17" /><span>{{ decisionLabel }}</span></div>
-          <template v-if="decisionLocked">
-            <p class="crop-record-note">{{ dirty ? 'Decisión simulada seleccionada, pendiente de continuar.' : 'Esta decisión solo pertenece al recorrido temporal; no es QC del servidor.' }}</p>
-            <div v-if="form.decision === 'rejected'" class="crop-rejected-reason"><span>Motivo del ejemplo</span><strong>{{ reasonLabel }}</strong></div>
-            <button id="crop-reopen" type="button" class="button button-secondary crop-reopen" @click="reopenReview">Reabrir revisión</button>
-          </template>
-          <template v-else>
-            <label class="crop-reviewed-label"><input id="crop-reviewed" v-model="form.reviewed" type="checkbox" :disabled="!imagesVisible" :aria-invalid="Boolean(errors.reviewed)" :aria-describedby="errors.reviewed ? 'crop-reviewed-error' : 'crop-reviewed-hint'" @change="reviewedChanged" /><span>He revisado la imagen y el recorte de este ejemplo</span></label>
-            <p id="crop-reviewed-hint" class="crop-hint">Revisa ambas vistas y el lado indicado antes de seleccionar la aceptación.</p>
-            <p v-if="errors.reviewed" id="crop-reviewed-error" class="field-error" role="alert">{{ errors.reviewed }}</p>
-            <button type="button" class="button button-primary crop-accept" :disabled="!imagesVisible || saving" @click="acceptExample"><AppIcon name="check" :size="16" />Aceptar recorte de ejemplo</button>
-            <div class="crop-reject-section"><label for="crop-reason">Si el recorte no es utilizable</label><select id="crop-reason" v-model="form.reason" :aria-invalid="Boolean(errors.reason)" :aria-describedby="errors.reason ? 'crop-reason-error' : 'crop-reason-hint'" @change="errors.reason = ''; message = ''"><option value="">Seleccionar motivo</option><option v-for="reason in demoRejectReasons" :key="reason.id" :value="reason.id">{{ reason.label }}</option></select><p id="crop-reason-hint" class="crop-hint">Opciones de ejemplo para diseñar el registro del rechazo.</p><p v-if="errors.reason" id="crop-reason-error" class="field-error" role="alert">{{ errors.reason }}</p><button type="button" class="button button-secondary crop-reject" :disabled="saving" @click="rejectExample"><AppIcon name="x" :size="16" />Rechazar recorte de ejemplo</button></div>
-          </template>
-          <div class="crop-session-note"><AppIcon name="clock" :size="17" /><p>Datos basales: guardados en el servidor. Imagen y revisión: simulación temporal que se reinicia al recargar o cerrar sesión.</p></div>
-        </aside>
-      </div>
-      <p v-if="errors.decision" class="crop-action-error" role="alert">{{ errors.decision }}</p>
-      <p v-if="saveError" class="crop-action-error" role="alert">{{ saveError }}</p>
-      <div class="crop-actions"><RouterLink :to="imageRoute" class="button button-secondary"><AppIcon name="chevron-left" :size="16" />Volver a Radiografía y lado</RouterLink><div class="crop-primary-actions"><button id="crop-save-exit" type="button" class="button button-secondary" :disabled="saving" @click="saveReview">Volver a evaluaciones</button><button id="crop-save-summary" type="button" class="button button-primary" :disabled="saving || form.decision === 'rejected' || (form.decision === 'accepted' && !imagesVisible)" @click="continueToSummary">Continuar con el ejemplo<AppIcon name="arrow-right" :size="17" /></button></div></div>
-      <p class="crop-feedback" role="status" aria-live="polite">{{ message }}</p><p class="crop-dirty-note">{{ dirty ? 'Tienes cambios sin guardar.' : 'La revisión solo permanece en este recorrido temporal.' }}</p>
+  <div class="workflow-page">
+    <RouterLink to="/evaluaciones" class="workflow-back">Volver a Mis evaluaciones</RouterLink>
+    <header class="workflow-heading"><div><span class="section-eyebrow">REVISIÓN DE CALIDAD</span><h1 tabindex="-1">Revisión del recorte</h1><p>Registra lo que observas en la fuente y en el recorte automático. El procedimiento QC congelado decide si las observaciones permiten aceptar.</p></div><span v-if="existing" class="workflow-code">{{ existing.code }}</span></header>
+    <p class="workflow-notice">Se muestran dos ventanas y vistas a tamaño nativo. No se permite desplazar, redibujar ni corregir manualmente el recorte. La predicción permanece bloqueada.</p>
+    <p v-if="loading" role="status">Recuperando la preparación y su revisión persistida…</p>
+    <div v-if="error" id="quality-review-error" class="workflow-error" role="alert">{{ error }}<ul v-if="details.length"><li v-for="(detail, index) in details" :key="index">{{ detail }}</li></ul></div>
+    <p v-if="message" class="workflow-notice" role="status">{{ message }}</p>
+    <div v-if="contextChanged" class="workflow-error" role="alert">La revisión de preparación o la política cambió mientras editabas. Tus observaciones siguen aquí, pero no se pueden aplicar a otra revisión. Recupera el estado actual para comenzar de nuevo.</div>
+    <section v-if="!ready" class="workflow-card"><h2>La preparación todavía no permite revisar el recorte</h2><p>Debe existir una referencia sellada y una preparación vigente disponible.</p><RouterLink :to="{ name: 'radiograph', params: { id: evaluationId } }" class="button button-primary">Ir a la preparación</RouterLink></section>
+    <template v-else-if="preparation">
+      <section v-if="persistedReview && !editing" class="workflow-card"><h2>Decisión guardada en el servidor</h2><span id="quality-review-saved-status" class="workflow-state">{{ persistedReview.decision === 'accepted' ? 'Aceptado por el procedimiento QC' : 'Rechazado' }}</span><dl class="workflow-meta"><div><dt>Fecha</dt><dd>{{ new Date(persistedReview.createdAt).toLocaleString('es-PE') }}</dd></div><div><dt>Política QC</dt><dd>{{ persistedReview.qcPolicyVersion }}</dd></div><div v-if="persistedReview.reason"><dt>Motivo del rechazo</dt><dd>{{ persistedReview.reason }}</dd></div><div v-if="persistedReview.observation"><dt>Nota de inspección</dt><dd>{{ persistedReview.observation.note }}</dd></div></dl><div class="workflow-actions"><button type="button" class="button button-secondary" :disabled="busy || loading" @click="startNewReview">Registrar nueva decisión</button><RouterLink :to="{ name: 'case-summary', params: { id: evaluationId } }" class="button button-primary">Ver resumen</RouterLink></div></section>
+      <section class="workflow-card"><h2>Fuente y recorte en las dos ventanas</h2><p>La referencia visual ya fue sellada antes de obtener estas vistas. Las marcas de regla son anotaciones de observación, no correcciones geométricas.</p><div v-if="!preparation.sourceReference?.centerResolved" class="workflow-notice workflow-warning">El centro de referencia no pudo resolverse. Esta preparación no puede aceptarse como adecuada.</div><div v-if="!preparation.reviewContext?.canReview || preparation.reviewContext.blockerCodes.length" class="workflow-notice workflow-warning">El procedimiento del servidor mantiene un bloqueo para aceptar esta preparación.<span v-for="blocker in preparation.reviewContext?.blockerCodes ?? []" :key="blocker"> {{ blocker }}</span></div><div class="workflow-grid" style="margin-top: 22px"><PreparationImage v-for="view in views" :key="`${preparation.preparationRevisionId}:${view.view}`" :data-view="view.view" :preparation="preparation" :view="view.view" :label="view.label" :native-shape="view.view.startsWith('crop_') ? preparation.cropGeometry?.previewShapes[view.view as 'crop_a' | 'crop_b'] : view.view.startsWith('full_') ? preparation.sourceContext?.fullNativeShape : preparation.nativeHalfShape" :coordinate-box="view.view.startsWith('crop_') ? preparation.cropGeometry?.nativeHalfBox : null" :points="view.view.startsWith('crop_') ? form.ruler_locations_xy : []" :interactive="view.view.startsWith('crop_') && hasRuler && editing && !busy && !loading && Boolean(preparation.cropGeometry)" @ready="readiness[view.view] = $event" @point="addPoint" /></div></section>
+      <fieldset v-if="editing" class="workflow-card" :aria-busy="busy || loading" :disabled="busy || loading"><h2>Observaciones de calidad</h2><label class="workflow-check"><input id="qc-confirm-side" v-model="form.confirmedSide" type="checkbox" :disabled="busy" />Confirmo que reviso la rodilla {{ preparation.side === 'right' ? 'derecha' : 'izquierda' }} del paciente.</label><div class="workflow-fields"><div v-for="field in booleanFields" :key="field.key" class="workflow-field"><label :for="`qc-${field.key}`">{{ field.label }}</label><select :id="`qc-${field.key}`" v-model="form[field.key]" :disabled="busy"><option value="">Seleccionar</option><option value="yes">Sí</option><option value="no">No</option></select></div><div v-for="field in visibilityFields" :key="field.key" class="workflow-field"><label :for="`qc-${field.key}`">{{ field.label }}</label><select :id="`qc-${field.key}`" v-model="form.visibility[field.key]" :disabled="busy"><option value="">Seleccionar</option><option value="visible">Visible</option><option value="obscured">Oculto</option><option value="uncertain">Incierto</option></select></div><div class="workflow-field"><label for="qc-hardware">Material metálico</label><select id="qc-hardware" v-model="form.hardware" :disabled="busy"><option value="">Seleccionar</option><option value="absent">Ausente</option><option value="present">Presente</option><option value="uncertain">Incierto</option></select></div><div class="workflow-field"><label for="qc-text_or_mask">Texto o máscara</label><select id="qc-text_or_mask" v-model="form.text_or_mask" :disabled="busy"><option value="">Seleccionar</option><option value="absent">Ausente</option><option value="present">Presente</option><option value="uncertain">Incierto</option></select></div><div class="workflow-field"><label for="qc-mark_effect">Efecto de las marcas</label><select id="qc-mark_effect" v-model="form.mark_effect" :disabled="busy"><option value="">Seleccionar</option><option value="none">Sin marcas</option><option value="non_obscuring">No ocultan la región</option><option value="obscuring">Ocultan la región</option><option value="uncertain">Incierto</option></select></div></div>
+      <fieldset :disabled="busy" style="border: 1px solid #dae4ea; border-radius: 9px; padding: 15px"><legend>Marcas observadas</legend><label v-for="mark in markOptions" :key="mark.value" class="workflow-check"><input v-model="form.marks" type="checkbox" :value="mark.value" :id="`qc-mark-${mark.value}`" @change="rulerChanged" />{{ mark.label }}</label></fieldset>
+      <section v-if="hasRuler" id="ruler-point-capture"><h3>Puntos de la regla en la mitad nativa</h3><p>Haz clic sobre el recorte para registrar puntos o utiliza las coordenadas. La conversión usa exclusivamente la caja XYXY comunicada por el servidor.</p><p v-if="!preparation.cropGeometry" class="workflow-error" role="alert">El servidor no proporcionó la transformación exacta. No se permite inferir coordenadas ni aceptar con puntos aproximados.</p><div class="workflow-fields"><div class="workflow-field"><label for="qc-ruler_outside_bone">¿La regla está fuera del hueso?</label><select id="qc-ruler_outside_bone" v-model="form.ruler_outside_bone" :disabled="busy"><option value="">Seleccionar</option><option value="yes">Sí</option><option value="no">No</option></select></div><div class="workflow-field"><label for="ruler-point-x">Nuevo punto X (mitad nativa)</label><input id="ruler-point-x" v-model="nextPoint.x" type="number" step="any" :disabled="busy || !preparation.cropGeometry" /></div><div class="workflow-field"><label for="ruler-point-y">Nuevo punto Y (mitad nativa)</label><input id="ruler-point-y" v-model="nextPoint.y" type="number" step="any" :disabled="busy || !preparation.cropGeometry" /></div></div><button id="add-ruler-point" type="button" class="button button-secondary" :disabled="busy || !preparation.cropGeometry" @click="addPoint()">Añadir punto</button><ol class="workflow-points" style="margin-top: 18px"><li v-for="(point, index) in form.ruler_locations_xy" :key="index"><div class="workflow-field"><label :for="`ruler-x-${index}`">Punto {{ index + 1 }} · X</label><input :id="`ruler-x-${index}`" v-model.number="point[0]" type="number" step="any" :disabled="busy" /></div><div class="workflow-field"><label :for="`ruler-y-${index}`">Punto {{ index + 1 }} · Y</label><input :id="`ruler-y-${index}`" v-model.number="point[1]" type="number" step="any" :disabled="busy" /></div><button type="button" class="button button-secondary" :disabled="busy" :aria-label="`Quitar punto ${index + 1}`" @click="form.ruler_locations_xy.splice(index, 1)">Quitar</button></li></ol></section>
+      <div class="workflow-field" style="margin-top: 22px"><label for="qc-note">Nota de inspección QC</label><textarea id="qc-note" v-model="form.note" maxlength="2000" :disabled="busy" aria-describedby="qc-note-hint" /><small id="qc-note-hint">Describe los hallazgos de las vistas y las marcas. Mínimo 35 caracteres; no consultes el resultado futuro.</small></div><label class="workflow-check"><input id="qc-original_half_inspected" v-model="form.original_half_inspected" type="checkbox" :disabled="busy" />He inspeccionado el original bilateral y la mitad.</label><label class="workflow-check"><input id="qc-both_windows_inspected" v-model="form.both_windows_inspected" type="checkbox" :disabled="busy" />He inspeccionado ambas ventanas, incluido el recorte.</label><label class="workflow-check"><input id="qc-outcome_blinded" v-model="form.outcome_blinded" type="checkbox" :disabled="busy" />La inspección se realizó sin consultar el resultado futuro.</label><label v-for="check in preparation.reviewContext?.checks ?? []" :key="check.id" class="workflow-check"><input v-model="form.confirmedCheckIds" type="checkbox" :value="check.id" :disabled="busy" />{{ check.label }}{{ check.required ? ' (obligatorio)' : '' }}</label>
+      <div class="workflow-notice">Registrar una aceptación envía estas observaciones completas al procedimiento QC congelado. La solicitud puede ser rechazada aunque hayas seleccionado todos los controles.</div><div class="workflow-actions"><button id="submit-qc-accepted" type="button" class="button button-primary" :disabled="busy || !acceptanceAvailable" @click="submit('accepted')">Registrar aceptación</button></div>
+      <h3>Registrar rechazo</h3><div class="workflow-field"><label for="qc-rejection-reason">Motivo del rechazo</label><textarea id="qc-rejection-reason" v-model="form.reason" maxlength="2000" :disabled="busy" /></div><label class="workflow-check"><input id="qc-include-observation" v-model="form.includeObservationOnReject" type="checkbox" :disabled="busy" />Incluir también las observaciones QC completas.</label><p class="workflow-notice">Puedes registrar solo el motivo del rechazo o adjuntar las observaciones de calidad completas.</p><div class="workflow-actions"><button id="submit-qc-rejected" type="button" class="button button-secondary" :disabled="busy || contextChanged" @click="submit('rejected')">Registrar rechazo</button></div>
+      </fieldset>
     </template>
-
-    <dialog ref="enlarged" class="app-dialog crop-enlarged" aria-labelledby="crop-enlarged-title" @click="closeOnBackdrop($event,enlarged)"><div class="dialog-heading"><h2 id="crop-enlarged-title">{{ enlargedView === 'original' ? 'Imagen original ampliada' : 'Recorte ampliado' }}</h2><button type="button" class="icon-button" aria-label="Cerrar vista ampliada" @click="enlarged?.close()"><AppIcon name="x" /></button></div><DemoCropPreview v-if="crop" :fixture="crop" :view="enlargedView" /><p>{{ sideLabel }} · Ilustración sintética</p><button type="button" class="button button-primary" @click="enlarged?.close()">Volver a la revisión</button></dialog>
-    <dialog ref="confirmation" class="app-dialog" aria-labelledby="crop-confirmation-title" @cancel.prevent="answer(false)" @close="confirmationClosed"><div class="dialog-heading"><span class="dialog-symbol"><AppIcon name="file" :size="24" /></span><button type="button" class="icon-button" aria-label="Cancelar y seguir editando" autofocus @click="answer(false)"><AppIcon name="x" /></button></div><h2 id="crop-confirmation-title">{{ confirmationMode === 'leave' ? 'Tienes cambios sin guardar' : '¿Reabrir la revisión?' }}</h2><p>{{ confirmationMode === 'leave' ? 'Puedes seguir editando o salir descartando los cambios de esta pantalla.' : 'La revisión de esta pantalla volverá a pendiente. La decisión solo afecta al ejemplo temporal; no modifica el servidor.' }}</p><div class="crop-dialog-actions"><button type="button" class="button button-secondary" @click="answer(false)">{{ confirmationMode === 'leave' ? 'Seguir editando' : 'Conservar decisión' }}</button><button type="button" class="button button-primary" @click="answer(true)">{{ confirmationMode === 'leave' ? 'Salir sin guardar' : 'Reabrir revisión' }}</button></div></dialog>
+    <div class="workflow-actions"><button type="button" class="button button-secondary" :disabled="busy" @click="reload">Recuperar estado actual</button><RouterLink :to="{ name: 'radiograph', params: { id: evaluationId } }" class="button button-secondary">Volver a la imagen</RouterLink></div>
+    <p v-if="dirty" class="workflow-notice" role="status">Tienes observaciones sin guardar. Se conservan en esta pantalla mientras resuelves cualquier error.</p>
+    <UnsavedChangesDialog ref="discardDialog" />
   </div>
 </template>
-
-<style scoped>
-.crop-page { width: 100%; max-width: 1240px; margin: 0 auto; }
-.crop-back { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; margin-bottom: 25px; color: var(--muted); text-decoration: none; font-size: 12px; }
-.crop-back:hover { color: var(--brand); text-decoration: underline; text-underline-offset: 3px; }
-.crop-heading { display: flex; justify-content: space-between; align-items: center; gap: 20px; margin-bottom: 26px; }
-.crop-heading h1 { margin-top: 8px; font-size: clamp(26px,3vw,32px); font-weight: 650; line-height: 1.2; letter-spacing: -.035em; }
-.crop-heading p { font-size: 14px; color: var(--muted); margin-top: 10px; }
-.crop-code { display: inline-flex; align-items: center; gap: 7px; flex: none; padding: 7px 10px; border: 1px solid var(--border); border-radius: 7px; background: white; color: #4d6878; font-size: 12px; font-weight: 600; }
-.crop-stepper { list-style: none; padding: 0; margin: 0 0 25px; display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 10px; }
-.crop-stepper li { display: flex; align-items: center; gap: 8px; padding-bottom: 14px; border-bottom: 2px solid #dce6eb; color: #657c8b; font-size: 12px; }
-.crop-step-number { display: grid; place-items: center; flex: none; width: 26px; height: 26px; border-radius: 50%; background: #e7edf1; color: #607684; font-size: 11px; }
-.crop-stepper .crop-step-current { border-bottom-color: var(--brand); color: var(--brand-dark); font-weight: 600; }
-.crop-step-current .crop-step-number { background: var(--brand); color: white; }
-.crop-step-done .crop-step-number { background: #e0efec; color: var(--brand); }
-.crop-scope-note { display: flex; align-items: flex-start; gap: 10px; padding: 13px 16px; background: #edf6f5; border: 1px solid #d9e9e6; border-radius: 9px; margin-bottom: 23px; color: #486c6c; }
-.crop-scope-note > svg { flex: none; margin-top: 1px; color: var(--brand); }
-.crop-scope-note p { font-size: 12px; line-height: 1.7; }
-.crop-scope-note strong { color: #31595b; font-weight: 600; }
-.crop-layout { display: grid; grid-template-columns: minmax(0,1fr) 310px; gap: 24px; align-items: start; }
-.crop-comparison,.crop-decision-panel { min-width: 0; background: white; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
-.crop-panel-heading { padding: 20px 22px; border-bottom: 1px solid #e8eef1; display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap; }
-.crop-panel-heading h2,.crop-decision-heading h2 { font-size: 16px; font-weight: 650; }
-.crop-panel-heading p { font-size: 12px; color: var(--muted); margin-top: 4px; }
-.crop-fixture-version { background: #f1f5f7; color: #567181; padding: 4px 7px; border-radius: 5px; font-size: 10px; white-space: nowrap; }
-.crop-views { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 18px; padding: 21px 22px 12px; }
-.crop-views figure { min-width: 0; margin: 0; }
-.crop-views figcaption { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; font-size: 12px; font-weight: 600; }
-.crop-views .text-button { min-height: 32px; font-size: 12px; font-weight: 500; }
-.crop-preview-frame { display: grid; align-items: center; background: #13222e; border-radius: 8px; overflow: hidden; min-height: 230px; padding: 8px; }
-.crop-preview-frame :deep(svg) { display: block; width: 100%; height: auto; max-height: 330px; }
-.crop-views figure > p { font-size: 11px; line-height: 1.65; color: var(--muted); margin-top: 10px; }
-.crop-identity { display: flex; align-items: flex-start; gap: 8px; margin: 6px 22px 21px; padding: 13px; background: #f5f8fa; border-radius: 8px; color: #536c7b; }
-.crop-identity > svg { margin-top: 2px; flex: none; }
-.crop-identity p { font-size: 11px; line-height: 1.7; }
-.crop-load-error { margin: 8px 22px 18px; font-size: 12px; line-height: 1.7; padding: 12px; border-radius: 8px; background: #fbefed; color: var(--danger); }
-.crop-loading { margin: 8px 22px 16px; color: var(--muted); font-size: 12px; }
-.crop-decision-panel { padding: 21px; }
-.crop-decision-heading { display: flex; gap: 11px; align-items: center; margin-bottom: 20px; }
-.crop-symbol { display: grid; place-items: center; flex: none; width: 40px; height: 43px; border: 1px solid #dfebed; border-radius: 9px; background: #edf5f6; color: var(--brand); }
-.crop-status { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; line-height: 1.6; border-radius: 7px; padding: 11px 12px; background: #f1f5f7; color: #516a79; }
-.crop-status-accepted { background: #eaf5ef; color: #286846; }
-.crop-status-rejected { background: #fff0ee; color: #963f37; }
-.crop-reviewed-label { display: flex; align-items: flex-start; gap: 9px; font-size: 12px; font-weight: 600; margin-top: 23px; cursor: pointer; }
-.crop-reviewed-label input { width: 16px; height: 16px; margin: 2px 0 0; flex: none; accent-color: var(--brand); }
-.crop-hint { font-size: 11px; color: #5b7381; line-height: 1.7; margin-top: 8px; }
-.crop-accept { margin-top: 17px; width: 100%; padding: 10px 11px; font-size: 12px; }
-.crop-reject-section { border-top: 1px solid #e6edf0; padding-top: 20px; margin-top: 23px; }
-.crop-reject-section > label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 9px; }
-.crop-reject-section select { width: 100%; min-width: 0; min-height: 44px; padding: 10px 11px; color: var(--ink); background: white; border: 1px solid #ccd9e1; border-radius: 8px; font-size: 12px; }
-.crop-reject { margin-top: 13px; width: 100%; color: #963f37; padding: 10px; font-size: 12px; }
-.crop-decision-panel .field-error { margin-top: 8px; line-height: 1.7; }
-.crop-record-note { font-size: 12px; line-height: 1.7; color: var(--muted); margin-top: 17px; }
-.crop-rejected-reason { display: grid; gap: 5px; margin-top: 18px; padding: 12px; background: #f8f5f4; border-radius: 7px; }
-.crop-rejected-reason > span { font-size: 11px; color: var(--muted); }
-.crop-rejected-reason > strong { font-size: 12px; font-weight: 600; }
-.crop-reopen { margin-top: 18px; width: 100%; }
-.crop-session-note { display: flex; align-items: flex-start; gap: 8px; border-top: 1px solid #e1e9ed; padding-top: 18px; margin-top: 22px; color: #5c7482; }
-.crop-session-note > svg { flex: none; margin-top: 2px; }
-.crop-session-note p { font-size: 11px; line-height: 1.7; }
-.crop-actions { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 24px; }
-.crop-primary-actions { display: flex; gap: 10px; flex-wrap: wrap; }
-.crop-feedback { color: var(--brand-dark); font-size: 12px; margin-top: 13px; }
-.crop-feedback:empty { display: none; }
-.crop-dirty-note { color: var(--muted); font-size: 11px; margin-top: 12px; }
-.crop-action-error { font-size: 12px; line-height: 1.7; color: var(--danger); background: #fbefed; padding: 12px 14px; border-radius: 8px; margin-top: 18px; }
-.crop-dialog-actions { display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap; margin-top: 24px; }
-.crop-enlarged { width: min(840px,calc(100% - 32px)); }
-.crop-enlarged .dialog-heading h2 { margin: 0; }
-.crop-enlarged > :deep(svg) { display: block; max-height: 62dvh; width: 100%; height: auto; background: #13222e; border-radius: 8px; margin-bottom: 15px; }
-.crop-enlarged > .button { margin-top: 8px; }
-.crop-unavailable { display: grid; justify-items: start; gap: 18px; padding: 34px; background: white; border: 1px solid var(--border); border-radius: 12px; }
-.crop-unavailable h1 { font-size: 27px; letter-spacing: -.03em; }
-.crop-unavailable p { color: var(--muted); font-size: 14px; }
-@media(max-width:1120px) { .crop-layout { grid-template-columns: 1fr; } .crop-decision-panel { max-width: none; } .crop-views { gap: 22px; } }
-@media(max-width:720px) {
-  .crop-heading { align-items: flex-start; flex-direction: column; gap: 17px; margin-bottom: 24px; }
-  .crop-heading p { font-size: 13px; line-height: 1.7; }
-  .crop-stepper { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px 12px; }
-  .crop-stepper li { font-size: 11px; }
-  .crop-scope-note { padding: 12px; }
-  .crop-scope-note p { font-size: 11px; }
-  .crop-panel-heading { padding: 18px; }
-  .crop-panel-heading h2 { font-size: 15px; }
-  .crop-views { grid-template-columns: 1fr; padding: 19px 18px 12px; gap: 23px; }
-  .crop-views figcaption { font-size: 13px; }
-  .crop-preview-frame { min-height: 210px; }
-  .crop-preview-frame :deep(svg) { max-height: 300px; }
-  .crop-identity { margin: 7px 18px 18px; }
-  .crop-decision-panel { padding: 20px 18px; }
-  .crop-actions { align-items: stretch; }
-  .crop-actions > .button,.crop-primary-actions { width: 100%; }
-  .crop-primary-actions > .button { flex: 1 1 130px; }
-  .crop-unavailable { padding: 24px; }
-  .crop-dialog-actions > .button { flex: 1 1 180px; }
-}
-@media(pointer:coarse) { .crop-reject-section select { font-size: 16px; } .crop-views .text-button { min-height: 40px; } }
-</style>

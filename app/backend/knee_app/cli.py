@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 from dataclasses import replace
 from getpass import getpass
 from pathlib import Path
@@ -8,7 +9,7 @@ import sqlite3
 import sys
 
 from .config import Settings
-from .db import Database, backup_database, create_user, disable_user, restore_database, set_password
+from .db import Database, backup_database, backup_package, create_user, disable_user, restore_database, restore_package, set_password
 
 def prompted_password():
     password = getpass('Contraseña nueva (mínimo 12 caracteres): ')
@@ -31,20 +32,28 @@ def main(argv=None):
     disable.add_argument('--email', required=True)
     backup = commands.add_parser('backup', help='Crear una copia coherente de la base mediante SQLite Backup API')
     backup.add_argument('--destination', type=Path, required=True)
+    backup.add_argument('--package', action='store_true', help='Incluir base e imágenes privadas en una carpeta verificada')
     restore = commands.add_parser('restore', help='Restaurar en un archivo nuevo; el servidor debe estar detenido antes de cambiar su configuración')
     restore.add_argument('--source', type=Path, required=True)
     restore.add_argument('--destination', type=Path, required=True)
+    restore.add_argument('--package', action='store_true', help='Restaurar un paquete de base e imágenes en una carpeta nueva')
     args = parser.parse_args(argv)
     try:
         settings = Settings.from_env()
         if args.database:
-            settings = replace(settings, database_path=args.database)
+            settings = replace(settings, database_path=args.database, private_files_path=Path(os.environ['KNEEOAI_PRIVATE_FILES']) if os.environ.get('KNEEOAI_PRIVATE_FILES') else None)
         if args.command == 'restore':
-            restore_database(args.source, args.destination)
+            if args.package:
+                restore_package(args.source,args.destination)
+            else:
+                restore_database(args.source, args.destination)
             print('Copia restaurada en el destino nuevo; las sesiones anteriores fueron revocadas. Cambia la configuración solo con el servicio detenido.')
             return 0
         if args.command == 'backup':
-            backup_database(settings.database_path, args.destination)
+            if args.package:
+                backup_package(settings.database_path,args.destination,settings.private_files_path)
+            else:
+                backup_database(settings.database_path, args.destination)
             print('Copia consistente creada y verificada. Aún debe comprobarse su restauración.')
             return 0
         db = Database(settings.database_path, settings.busy_timeout_ms)
