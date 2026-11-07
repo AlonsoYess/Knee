@@ -24,6 +24,7 @@ La fase 1 deja una versión reproducible del frontend y define la comunicación 
 | Validez OpenAPI 3.1 y referencias internas | Correcta. |
 | Ejemplos ficticios contra los esquemas JSON | 98 comprobaciones correctas; no representan 98 casos reales ni únicos. |
 | Inclusión de código y exclusión de dependencias y resultados generados | Fuente ficticio visible para Git; `node_modules`, `dist` y resultados de pruebas excluidos. |
+| Ejecución remota en GitHub Actions | Pendiente: el trabajo se detuvo antes de ejecutar pasos por una restricción externa de la cuenta. El resultado local anterior es independiente; no se declara aprobada la ejecución remota. |
 
 Las pruebas de comunicación cubren cabeceras de sesión, CSRF, versiones e idempotencia, respuestas sin cuerpo, errores HTTP y de red, HTML inesperado, JSON inválido, rutas externas o codificadas ambiguamente, errores recibidos bajo HTTP exitoso y cancelación durante la lectura. Ninguna respuesta de error se convierte en una predicción o guardado ficticio.
 
