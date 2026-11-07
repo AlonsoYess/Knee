@@ -1,10 +1,10 @@
 # Contrato propuesto Vue–FastAPI, v1
 
-Estado: **propuesta de comunicación de fase 1; backend no implementado**. Fecha: 7 de noviembre de 2026.
+Estado: **sesión y datos basales implementados en fase 2; preparación y resultados futuros**. Fecha: 7 de noviembre de 2026.
 
-[openapi.json](openapi.json) describe OpenAPI 3.1.0 con esquemas JSON Schema 2020-12. Se usa JSON para leerlo sin instalar un procesador YAML. La versión es **1.0.0-proposed**: no es una versión de modelo ni una aprobación de despliegue. IDs, datos basales y trabajos de ejemplo son completamente ficticios. No hay ejemplos de porcentajes predictivos ni credenciales operativas.
+[openapi.json](openapi.json) describe OpenAPI 3.1.0 con esquemas JSON Schema 2020-12. Se usa JSON para leerlo sin instalar un procesador YAML. La versión es **1.0.0-phase2**: no es una versión de modelo ni una aprobación de despliegue. IDs, datos basales y trabajos de ejemplo son completamente ficticios. No hay ejemplos de porcentajes predictivos ni credenciales operativas. Cada operación declara su estado mediante `x-implementation-status`.
 
-Estos archivos no conectan Vue, crean usuarios o bases de datos, leen imágenes, aceptan QC real, cargan pesos, entrenan ni abren la prueba reservada. La interfaz conserva su demostración. Las obligaciones siguientes corresponden a la futura implementación del servidor.
+La implementación de sesiones y evaluaciones está en `app/backend`; Vue utiliza estas operaciones. Las cuentas se administran mediante CLI, fuera de este contrato web. La preparación de imágenes, QC y resultados siguen previstos para fases posteriores; no se cargan pesos ni se ejecuta inferencia. La solicitud de cálculo solo implementa el bloqueo 503 después de comprobar el acceso. La simulación SVG de la interfaz no genera una preparación o decisión QC en este contrato.
 
 ## Cuatro contratos funcionales
 
@@ -41,6 +41,8 @@ Todas las rutas parten de **/api/v1** y del mismo origen que la SPA.
 Se mantienen fuera de este contrato administración completa de cuentas, recuperación de contraseña, corrección geométrica manual, selección de modelos, entrenamiento, publicación y sincronización. Una corrección geométrica que permita el flujo vigente deberá crear otra revisión de preparación; este documento no autoriza reglas nuevas para corregir imágenes.
 
 ## Sesión, permisos y CSRF
+
+En fase 2, POST /evaluations admite Idempotency-Key opcional y la interfaz siempre lo envía. Una nueva intención crea el caso con 201; la repetición exacta de una creación aceptada devuelve 200 con el mismo caso y su estado actual, sin aplicar nuevamente el cuerpo. Otra carga con esa clave devuelve 409. La asociación se registra en la misma transacción que el caso y persiste tras un reinicio.
 
 - GET /session permite el primer acceso sin credenciales y emite cookie de contexto anónimo más csrfToken. Una sesión válida devuelve usuario y vencimiento. El contexto anónimo no permite acceder a evaluaciones.
 - Login exige esa cookie y **X-CSRF-Token**. Tras autenticar se rotan identificador y token. Toda mutación, incluido logout, exige sesión y CSRF. La marca actual de sessionStorage no participa en la autorización del servidor.
@@ -110,6 +112,6 @@ Estados previstos: 401 acceso requerido; 403 permiso/CSRF; 404 recurso no accesi
 
 El JSON debe validar como OpenAPI 3.1: referencias locales resolubles, operationId únicos, parámetros declarados y ejemplos ficticios compatibles con sus esquemas. Mutaciones requieren cookie y CSRF; operaciones versionadas requieren If-Match; solicitud de cálculo requiere idempotencia.
 
-Las futuras pruebas de servidor deben cubrir permisos entre cuentas, revisión/ETag, idempotencia concurrente, interrupciones, ausencias admitidas por el paquete y rechazo de QC incompatible. La validez del archivo no demuestra que estos controles estén implementados. El frontend no queda conectado por la presencia de este contrato.
+Las pruebas de fase 2 verifican sesiones, permisos entre cuentas, ETag, creación idempotente, transacciones y recuperación con datos ficticios. La validez del archivo por sí sola no acredita esos controles: su implementación se comprueba en la suite del backend y del navegador. Las pruebas de preparación/QC e inferencia se incorporarán al implementar esas operaciones.
 
 Fuentes: [OpenAPI 3.1.0](https://spec.openapis.org/oas/v3.1.0), [cookies en OpenAPI](https://swagger.io/docs/specification/v3_0/authentication/cookie-authentication/) y los documentos locales docs/00_ALCANCE_Y_TRAZABILIDAD.md, docs/04_ARQUITECTURA_REPRODUCIBLE.md y app/PLAN_CIERRE_PROTOTIPO.md. No se modificaron esas fuentes.

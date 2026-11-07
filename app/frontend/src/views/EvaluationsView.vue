@@ -2,168 +2,44 @@
 import { computed, nextTick, ref, toRefs } from 'vue'
 import { useRouter } from 'vue-router'
 import AppIcon from '../components/AppIcon.vue'
-import { type Evaluation, type EvaluationStatus } from '../demo/demoEvaluations'
-import { evaluations } from '../demo/demoEvaluationStore'
+import type { Evaluation, EvaluationStatus } from '../demo/demoEvaluations'
+import { evaluations, evaluationIssue, listFailed, listLoading, loadEvaluations } from '../state/evaluations'
 import { demoListPreferences } from '../demoListPreferences'
 
 const router = useRouter()
-
 const { search, statusFilter } = toRefs(demoListPreferences)
-const dialog = ref<HTMLDialogElement | null>(null)
 const searchInput = ref<HTMLInputElement | null>(null)
-const selected = ref<Evaluation | null>(null)
-const dialogOpener = ref<HTMLElement | null>(null)
-
-const statuses: Record<EvaluationStatus, { label: string; description: string; icon: string }> = {
-  draft: { label: 'Borrador', description: 'Los datos o la imagen todavía están pendientes.', icon: 'file' },
-  review: { label: 'Revisión pendiente', description: 'El recorte necesita una revisión antes de continuar.', icon: 'image' },
-  rejected: { label: 'Imagen no utilizable', description: 'La imagen del ejemplo requiere sustitución. No hay resultado.', icon: 'x' },
-  model_pending: { label: 'Modelo no disponible', description: 'El ejemplo llegó al resumen. La predicción permanece deshabilitada.', icon: 'clock' },
-  crop_accepted: { label: 'Recorte aceptado (demo)', description: 'Decisión ficticia guardada. Los modelos siguen sin conectar.', icon: 'check' },
-  crop_rejected: { label: 'Recorte rechazado (demo)', description: 'Rechazo ficticio guardado. Sustituye la imagen para una nueva revisión.', icon: 'x' },
+const statuses: Partial<Record<EvaluationStatus, { label: string; icon: string }>> = {
+  draft: { label: 'Datos basales guardados', icon: 'file' },
+  crop_accepted: { label: 'Ejemplo aceptado solo en esta sesión', icon: 'check' },
+  crop_rejected: { label: 'Ejemplo rechazado solo en esta sesión', icon: 'x' },
 }
-const steps = ['Datos basales', 'Radiografía y lado', 'Revisión del recorte', 'Resumen']
-const filtered = computed(() => {
-  const query = search.value.trim().toLocaleLowerCase('es')
-  return evaluations.value.filter((item) =>
-    item.code.toLocaleLowerCase('es').includes(query)
-      && (statusFilter.value === 'all' || item.status === statusFilter.value),
-  )
-})
-const hasFilters = computed(() => search.value.trim() !== '' || statusFilter.value !== 'all')
-const dateFormatter = new Intl.DateTimeFormat('es-PE', {
-  day: '2-digit', month: 'short', year: 'numeric', timeZone: 'America/Lima',
-})
-const timeFormatter = new Intl.DateTimeFormat('es-PE', {
-  hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Lima',
-})
-
-function openDialog(item: Evaluation | null, event: MouseEvent) {
-  if (!item) { void router.push('/evaluaciones/nueva'); return }
-  if (item.progressStep === 4 && item.review) { void router.push({ name: 'case-summary', params: { id: item.id } }); return }
-  if (item.review || (item.status === 'draft' && item.progressStep === 3)) { void router.push({ name: 'crop-review', params: { id: item.id } }); return }
-  if (item.status === 'draft') { void router.push({ name: item.progressStep === 2 ? 'radiograph' : 'edit-evaluation', params: { id: item.id } }); return }
-  selected.value = item
-  dialogOpener.value = event.currentTarget instanceof HTMLElement ? event.currentTarget : null
-  dialog.value?.showModal()
+const steps = ['Datos basales en servidor', 'Imagen simulada', 'Revisión simulada', 'Resumen del ejemplo']
+const filtered = computed(() => evaluations.value.filter(item => item.code.toLocaleLowerCase('es').includes(search.value.trim().toLocaleLowerCase('es')) && (statusFilter.value === 'all' || item.status === statusFilter.value)))
+const hasFilters = computed(() => Boolean(search.value.trim() || statusFilter.value !== 'all'))
+const dateFormatter = new Intl.DateTimeFormat('es-PE', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'America/Lima' })
+const timeFormatter = new Intl.DateTimeFormat('es-PE', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Lima' })
+function actionLabel(item: Evaluation): string { return item.progressStep === 4 ? 'Ver resumen' : item.review ? 'Ver revisión' : 'Retomar' }
+function openCase(item: Evaluation) {
+  void router.push({ name: item.progressStep === 4 ? 'case-summary' : item.review ? 'crop-review' : item.progressStep === 2 ? 'radiograph' : 'edit-evaluation', params: { id: item.id } })
 }
-function actionLabel(item: Evaluation): string {
-  return item.progressStep === 4 && item.review ? 'Ver resumen' : item.review ? 'Ver revisión' : item.status === 'draft' ? 'Retomar' : 'Ver detalle'
-}
-
-function closeDialog() {
-  dialog.value?.close()
-}
-
-function afterClose() {
-  dialogOpener.value?.focus()
-}
-
-function backdropClick(event: MouseEvent) {
-  if (event.target !== dialog.value || !dialog.value) return
-  const bounds = dialog.value.getBoundingClientRect()
-  if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) closeDialog()
-}
-
-async function clearFilters() {
-  search.value = ''
-  statusFilter.value = 'all'
-  await nextTick()
-  searchInput.value?.focus()
-}
+async function clearFilters() { search.value = ''; statusFilter.value = 'all'; await nextTick(); searchInput.value?.focus() }
+async function reloadList() { try { await loadEvaluations() } catch { /* Error remains visible; never populate fixtures. */ } }
 </script>
 
 <template>
   <div class="eval-page">
-    <header class="eval-page-heading">
-      <div>
-        <p class="eval-eyebrow">ESPACIO DE TRABAJO</p>
-        <h1 tabindex="-1">Mis evaluaciones</h1>
-        <p class="eval-intro">Encuentra tus casos y retoma cada revisión donde la dejaste.</p>
-      </div>
-      <button type="button" class="eval-button eval-button-primary" @click="openDialog(null, $event)">
-        <AppIcon name="plus" /><span>Nueva evaluación</span>
-      </button>
-    </header>
-
-    <div class="eval-demo-notice">
-      <span class="eval-demo-symbol"><AppIcon name="shield" /></span>
-      <div><strong>Espacio de demostración</strong><p>Los casos son ficticios. Ninguna imagen ni predicción real está disponible.</p></div>
-    </div>
-
-    <section class="eval-workspace" aria-label="Listado de evaluaciones">
-      <div class="eval-toolbar">
-        <div class="eval-search-group">
-          <label for="evaluation-search">Buscar evaluación</label>
-          <div class="eval-search-field">
-            <AppIcon name="search" />
-            <input id="evaluation-search" ref="searchInput" v-model="search" type="search" autocomplete="off" placeholder="Buscar por código, p. ej. DEMO-002" />
-          </div>
-        </div>
-        <div class="eval-filter-group">
-          <label for="evaluation-status">Estado</label>
-          <div class="eval-select-field">
-            <select id="evaluation-status" v-model="statusFilter">
-              <option value="all">Todos los estados</option>
-              <option v-for="(value, key) in statuses" :key="key" :value="key">{{ value.label }}</option>
-            </select>
-            <AppIcon name="chevron-down" />
-          </div>
-        </div>
-      </div>
-
-      <div class="eval-list-meta">
-        <p role="status" aria-live="polite"><strong>{{ filtered.length }}</strong> {{ filtered.length === 1 ? 'evaluación' : 'evaluaciones' }}{{ hasFilters ? ' encontradas' : ' de ejemplo' }}</p>
-        <button v-if="hasFilters" type="button" class="eval-reset-button" @click="clearFilters"><AppIcon name="x" />Limpiar filtros</button>
-        <span v-else class="eval-sort-label">Más recientes primero</span>
-      </div>
-
-      <div v-if="filtered.length" class="eval-table-scroll">
-        <table class="eval-table">
-          <caption class="eval-sr-only">Evaluaciones ficticias ordenadas por actualización más reciente</caption>
-          <thead><tr><th scope="col">Evaluación</th><th scope="col">Última actualización</th><th scope="col">Paso actual</th><th scope="col">Estado</th><th scope="col"><span class="eval-sr-only">Acción</span></th></tr></thead>
-          <tbody>
-            <tr v-for="item in filtered" :key="item.id">
-              <th scope="row" class="eval-case-cell"><span class="eval-file-icon"><AppIcon name="file" /></span><span><RouterLink :to="{ name: 'case-summary', params: { id: item.id } }" class="eval-code eval-code-link" :aria-label="`Ver resumen del caso ${item.code}`">{{ item.code }}</RouterLink><span class="eval-cell-secondary">{{ item.knee === 'right' ? 'Rodilla derecha' : item.knee === 'left' ? 'Rodilla izquierda' : 'Rodilla pendiente' }}</span></span></th>
-              <td class="eval-date-cell"><time :datetime="item.updatedAt">{{ dateFormatter.format(new Date(item.updatedAt)) }}</time><span class="eval-cell-secondary">{{ timeFormatter.format(new Date(item.updatedAt)) }} · Lima</span></td>
-              <td class="eval-step-cell"><span class="eval-step-label">{{ steps[item.progressStep - 1] }}</span><span class="eval-step-track" :aria-label="`Paso ${item.progressStep} de 4`"><span v-for="n in 4" :key="n" :class="{ 'eval-step-done': n <= item.progressStep }"></span></span></td>
-              <td class="eval-status-cell"><span :class="['eval-status', `eval-status-${item.status}`]"><AppIcon :name="statuses[item.status].icon" />{{ statuses[item.status].label }}</span></td>
-              <td class="eval-action-cell"><button type="button" class="eval-row-button" :aria-label="`${actionLabel(item)}${actionLabel(item) === 'Ver detalle' ? ' de' : ''} ${item.code}`" @click="openDialog(item, $event)">{{ actionLabel(item) }}<AppIcon name="arrow-right" /></button></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div v-else class="eval-empty-state">
-        <span class="eval-empty-icon"><AppIcon name="search" /></span>
-        <h2>No encontramos evaluaciones</h2>
-        <p>Prueba con otro código o cambia el filtro de estado.</p>
-        <button type="button" class="eval-button eval-button-secondary" @click="clearFilters">Mostrar todas las evaluaciones</button>
-      </div>
-
-      <footer class="eval-table-footer"><AppIcon name="lock" /><p>En la versión con acceso real, cada médico verá únicamente sus casos autorizados.</p></footer>
+    <header class="eval-page-heading"><div><p class="eval-eyebrow">ESPACIO DE TRABAJO</p><h1 tabindex="-1">Mis evaluaciones</h1><p class="eval-intro">Datos basales ficticios guardados en el servidor y disponibles para tu cuenta.</p></div><button type="button" class="eval-button eval-button-primary" :disabled="listLoading" @click="router.push('/evaluaciones/nueva')"><AppIcon name="plus" /><span>Nueva evaluación</span></button></header>
+    <div class="eval-demo-notice"><span class="eval-demo-symbol"><AppIcon name="shield" /></span><div><strong>Acceso real · casos ficticios</strong><p>El servidor conserva los datos basales. Las imágenes y la revisión siguen siendo una simulación temporal; la predicción permanece bloqueada.</p></div></div>
+    <section class="eval-workspace" aria-label="Listado de evaluaciones" :aria-busy="listLoading">
+      <div class="eval-toolbar"><div class="eval-search-group"><label for="evaluation-search">Buscar evaluación</label><div class="eval-search-field"><AppIcon name="search" /><input id="evaluation-search" ref="searchInput" v-model="search" type="search" autocomplete="off" placeholder="Buscar por código" /></div></div><div class="eval-filter-group"><label for="evaluation-status">Estado del recorrido</label><div class="eval-select-field"><select id="evaluation-status" v-model="statusFilter"><option value="all">Todos los estados</option><option v-for="(value, key) in statuses" :key="key" :value="key">{{ value?.label }}</option></select><AppIcon name="chevron-down" /></div></div></div>
+      <div class="eval-list-meta"><p role="status" aria-live="polite"><template v-if="listLoading">Consultando el servidor…</template><template v-else-if="!listFailed"><strong>{{ filtered.length }}</strong> {{ filtered.length === 1 ? 'evaluación' : 'evaluaciones' }}{{ hasFilters ? ' encontradas' : ' guardadas en el servidor' }}</template></p><button v-if="hasFilters" class="eval-reset-button" @click="clearFilters"><AppIcon name="x" />Limpiar filtros</button><button v-else type="button" class="eval-reset-button" :disabled="listLoading" @click="reloadList">Actualizar listado</button></div>
+      <div v-if="listFailed" id="server-evaluations-error" class="eval-empty-state" role="alert"><h2>No pudimos recuperar tus evaluaciones</h2><p>{{ evaluationIssue }}</p><p>No se muestran ejemplos locales como sustituto del servidor.</p><button type="button" class="eval-button eval-button-secondary" :disabled="listLoading" @click="reloadList">Reintentar</button></div>
+      <div v-else-if="filtered.length" class="eval-table-scroll"><table class="eval-table"><caption class="eval-sr-only">Casos ficticios de tu cuenta ordenados por actualización del servidor</caption><thead><tr><th scope="col">Evaluación</th><th scope="col">Último guardado basal</th><th scope="col">Paso del recorrido</th><th scope="col">Estado</th><th scope="col"><span class="eval-sr-only">Acción</span></th></tr></thead><tbody><tr v-for="item in filtered" :key="item.id"><th scope="row" class="eval-case-cell"><span class="eval-file-icon"><AppIcon name="file" /></span><span><RouterLink :to="{ name: 'case-summary', params: { id: item.id } }" class="eval-code eval-code-link" :aria-label="`Ver resumen del caso ${item.code}`">{{ item.code }}</RouterLink><span class="eval-cell-secondary">{{ item.knee === 'right' ? 'Rodilla derecha' : item.knee === 'left' ? 'Rodilla izquierda' : 'Rodilla pendiente' }}</span></span></th><td class="eval-date-cell"><time :datetime="item.updatedAt">{{ dateFormatter.format(new Date(item.updatedAt)) }}</time><span class="eval-cell-secondary">{{ timeFormatter.format(new Date(item.updatedAt)) }} · Lima</span></td><td class="eval-step-cell"><span class="eval-step-label">{{ steps[item.progressStep - 1] }}</span></td><td class="eval-status-cell"><span :class="['eval-status', `eval-status-${item.status}`]"><AppIcon :name="statuses[item.status]?.icon ?? 'file'" />{{ statuses[item.status]?.label ?? 'Datos basales guardados' }}</span></td><td class="eval-action-cell"><button type="button" class="eval-row-button" :aria-label="`${actionLabel(item)} ${item.code}`" @click="openCase(item)">{{ actionLabel(item) }}<AppIcon name="arrow-right" /></button></td></tr></tbody></table></div>
+      <div v-else-if="!listLoading" class="eval-empty-state"><span class="eval-empty-icon"><AppIcon name="search" /></span><h2>{{ hasFilters ? 'No encontramos evaluaciones' : 'Todavía no tienes evaluaciones' }}</h2><p>{{ hasFilters ? 'Prueba con otro código o cambia el filtro.' : 'Crea un caso ficticio para guardar sus datos basales en tu cuenta.' }}</p><button v-if="hasFilters" class="eval-button eval-button-secondary" @click="clearFilters">Mostrar todas las evaluaciones</button></div>
+      <footer class="eval-table-footer"><AppIcon name="lock" /><p>El servidor verifica tu sesión y el acceso a cada caso. La simulación de imágenes no es una revisión clínica guardada.</p></footer>
     </section>
-
-    <p class="eval-bottom-note">Una evaluación corresponde a una rodilla. La revisión de imagen precede a cualquier resultado.</p>
-
-    <dialog ref="dialog" class="eval-dialog" aria-labelledby="evaluation-dialog-title" aria-describedby="evaluation-dialog-description" @close="afterClose" @click="backdropClick">
-      <div class="eval-dialog-heading"><span class="eval-dialog-eyebrow">VISTA DE DISEÑO</span><button type="button" class="eval-dialog-close" aria-label="Cerrar detalle" autofocus @click="closeDialog"><AppIcon name="x" /></button></div>
-      <template v-if="selected">
-        <h2 id="evaluation-dialog-title">{{ selected.code }}</h2>
-        <p id="evaluation-dialog-description" class="eval-dialog-description">{{ selected.knee === 'right' ? 'Rodilla derecha' : selected.knee === 'left' ? 'Rodilla izquierda' : 'Rodilla pendiente' }} · Caso ficticio</p>
-        <span :class="['eval-status', `eval-status-${selected.status}`]"><AppIcon :name="statuses[selected.status].icon" />{{ statuses[selected.status].label }}</span>
-        <dl class="eval-detail-grid"><div><dt>Edad basal</dt><dd>{{ selected.age == null ? 'Pendiente' : `${selected.age} años` }}</dd></div><div><dt>Sexo registrado</dt><dd>{{ selected.sex === 'F' ? 'Femenino' : selected.sex === 'M' ? 'Masculino' : 'Pendiente' }}</dd></div><div><dt>IMC basal</dt><dd>{{ selected.bmi == null ? 'Pendiente' : `${selected.bmi.toLocaleString('es-PE', { minimumFractionDigits: 1 })} kg/m²` }}</dd></div><div><dt>Paso del recorrido</dt><dd>{{ selected.progressStep }} de 4 · {{ steps[selected.progressStep - 1] }}</dd></div></dl>
-        <div class="eval-dialog-callout"><AppIcon :name="statuses[selected.status].icon" /><p>{{ statuses[selected.status].description }}</p></div>
-        <p class="eval-dialog-scope">Este ejemplo precargado no tiene un recorte asociado. Inicia una nueva evaluación para recorrer la revisión con imágenes sintéticas.</p>
-      </template>
-      <template v-else>
-        <h2 id="evaluation-dialog-title">Nueva evaluación</h2>
-        <p id="evaluation-dialog-description" class="eval-dialog-description">El siguiente recorrido tendrá cuatro pasos.</p>
-        <ol class="eval-next-steps"><li v-for="(name, index) in steps" :key="name"><span>{{ index + 1 }}</span>{{ name }}</li></ol>
-        <div class="eval-dialog-callout"><AppIcon name="clock" /><p>El formulario se diseñará a continuación. Este botón todavía no crea ni guarda una evaluación.</p></div>
-      </template>
-      <div class="eval-dialog-actions"><button type="button" class="eval-button eval-button-primary" @click="closeDialog">Volver a mis evaluaciones</button></div>
-    </dialog>
+    <p class="eval-bottom-note">Una evaluación corresponde a una rodilla. Usa únicamente datos ficticios en esta fase.</p>
   </div>
 </template>
 

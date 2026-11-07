@@ -3,9 +3,9 @@
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "info": {
     "title": "KneeOAI — contrato propuesto Vue/FastAPI",
-    "version": "1.0.0-proposed",
-    "summary": "Fase 1: comunicación, sin backend implementado.",
-    "description": "Propuesta; no acredita servidor, acceso real, lectura DICOM, QC o inferencia implementados. Todos los ejemplos son ficticios, sin porcentajes predictivos. No altera transformaciones, cohortes, entrenamiento o prueba reservada. JSON directo sin wrapper data; errores uniformes. No permite seleccionar modelos, entrenar ni acceder a reserva."
+    "version": "1.0.0-phase2",
+    "summary": "Acceso y datos basales implementados; preparación e inferencia pendientes.",
+    "description": "Fase 2: sesiones y evaluaciones basales con FastAPI/SQLite. Las operaciones de preparación, QC y resultados siguen siendo contratos futuros. No se cargan modelos ni se ejecuta inferencia. Todos los ejemplos son ficticios."
   },
   "servers": [
     {
@@ -80,7 +80,8 @@
           "default": {
             "$ref": "#/components/responses/UnexpectedError"
           }
-        }
+        },
+        "x-implementation-status": "implemented"
       },
       "post": {
         "operationId": "login",
@@ -145,7 +146,8 @@
               }
             }
           }
-        }
+        },
+        "x-implementation-status": "implemented"
       },
       "delete": {
         "operationId": "logout",
@@ -193,7 +195,8 @@
             "SessionCookie": [],
             "CsrfToken": []
           }
-        ]
+        ],
+        "x-implementation-status": "implemented"
       }
     },
     "/evaluations": {
@@ -280,7 +283,8 @@
               "default": 25
             }
           }
-        ]
+        ],
+        "x-implementation-status": "implemented"
       },
       "post": {
         "operationId": "createEvaluation",
@@ -288,7 +292,7 @@
           "Evaluations"
         ],
         "summary": "Crear un borrador.",
-        "description": "El servidor asigna propietario, código e identificadores. Admite campos ausentes null; no prepara imágenes ni ejecuta modelos.",
+        "description": "El servidor asigna propietario, código e identificadores. Admite campos ausentes null; no prepara imágenes ni ejecuta modelos. Idempotency-Key opcional: la UI siempre lo envía. Repetición exacta devuelve 200 con la representación actual del caso, sin aplicar de nuevo el cuerpo; otra carga con esa clave produce 409. La asociación se guarda atómicamente y persiste entre reinicios.",
         "responses": {
           "201": {
             "description": "Borrador creado.",
@@ -346,6 +350,10 @@
           },
           "default": {
             "$ref": "#/components/responses/UnexpectedError"
+          },
+          "200": {
+            "$ref": "#/paths/~1evaluations/post/responses/201",
+            "description": "Recuperación de una creación ya aceptada; mismo identificador y estado actual, sin duplicado."
           }
         },
         "security": [
@@ -363,7 +371,22 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "description": "La interfaz envía una clave por intención de creación y la reutiliza tras una respuesta incierta. El mismo usuario, clave y cuerpo canónico recuperan el caso sin volver a crearlo; otro cuerpo devuelve 409. No contiene datos privados.",
+            "schema": {
+              "type": "string",
+              "minLength": 16,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          }
+        ],
+        "x-implementation-status": "implemented"
       }
     },
     "/evaluations/{evaluationId}": {
@@ -431,7 +454,8 @@
           "default": {
             "$ref": "#/components/responses/UnexpectedError"
           }
-        }
+        },
+        "x-implementation-status": "implemented"
       },
       "patch": {
         "operationId": "updateEvaluation",
@@ -507,7 +531,8 @@
               }
             }
           }
-        }
+        },
+        "x-implementation-status": "implemented"
       }
     },
     "/evaluations/{evaluationId}/preparations": {
@@ -625,7 +650,8 @@
               }
             }
           }
-        }
+        },
+        "x-implementation-status": "planned"
       }
     },
     "/preparations/{preparationId}": {
@@ -696,7 +722,8 @@
           "default": {
             "$ref": "#/components/responses/UnexpectedError"
           }
-        }
+        },
+        "x-implementation-status": "planned"
       }
     },
     "/preparations/{preparationId}/views/{view}": {
@@ -772,7 +799,8 @@
               "$ref": "#/components/schemas/OpaqueId"
             }
           }
-        ]
+        ],
+        "x-implementation-status": "planned"
       }
     },
     "/preparations/{preparationId}/reviews": {
@@ -855,7 +883,8 @@
               }
             }
           }
-        }
+        },
+        "x-implementation-status": "planned"
       }
     },
     "/evaluations/{evaluationId}/executions": {
@@ -1038,7 +1067,8 @@
               }
             }
           }
-        }
+        },
+        "x-implementation-status": "engine-unavailable-only"
       }
     },
     "/executions/{executionId}": {
@@ -1126,7 +1156,8 @@
           "default": {
             "$ref": "#/components/responses/UnexpectedError"
           }
-        }
+        },
+        "x-implementation-status": "planned"
       }
     },
     "/engine-status": {
@@ -1176,7 +1207,8 @@
           "default": {
             "$ref": "#/components/responses/UnexpectedError"
           }
-        }
+        },
+        "x-implementation-status": "implemented"
       }
     }
   },
@@ -2236,8 +2268,12 @@
           },
           "activeReview": {
             "anyOf": [
-              { "$ref": "#/components/schemas/QualityReview" },
-              { "type": "null" }
+              {
+                "$ref": "#/components/schemas/QualityReview"
+              },
+              {
+                "type": "null"
+              }
             ],
             "description": "Decisión guardada vigente para esta preparación; null si no existe o quedó desactualizada."
           }

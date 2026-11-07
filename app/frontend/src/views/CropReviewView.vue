@@ -8,8 +8,7 @@ import {
   evaluations, createDraftInput, validateDemoDraft, createDemoImageInput,
   validateDemoImage, isEditableDemoEvaluation, createDemoReviewInput,
   saveDemoReview, type DemoReviewInput,
-} from '../demo/demoEvaluationStore'
-import { demoStorageIssue } from '../demo/demoEvaluationPersistence'
+} from '../state/evaluations'
 import { getDemoCrop, demoRejectReasons } from '../demo/demoCrops'
 
 const route = useRoute()
@@ -67,7 +66,7 @@ async function acceptExample() {
   form.decision = 'accepted'
   form.reason = ''
   decisionLocked.value = true
-  message.value = 'Aceptación del ejemplo seleccionada. Guarda la revisión para conservarla.'
+  message.value = 'Aceptación del ejemplo seleccionada. Continúa para verla en el resumen temporal.'
   await nextTick(); document.getElementById('crop-save-summary')?.focus()
 }
 async function rejectExample() {
@@ -78,7 +77,7 @@ async function rejectExample() {
   }
   form.decision = 'rejected'
   decisionLocked.value = true
-  message.value = 'Rechazo del ejemplo seleccionado. Guarda la revisión para conservarlo.'
+  message.value = 'Rechazo del ejemplo seleccionado. Solo se mantendrá en este recorrido temporal.'
   await nextTick(); document.getElementById('crop-save-exit')?.focus()
 }
 function ask(mode: 'leave' | 'reopen'): Promise<boolean> {
@@ -102,7 +101,7 @@ async function reopenReview() {
   Object.assign(form, { decision: 'pending', reason: '', reviewed: false })
   decisionLocked.value = false
   clearErrors()
-  message.value = 'Revisión reabierta en esta pantalla. La decisión guardada solo cambiará cuando vuelvas a guardarla.'
+  message.value = 'Revisión simulada reabierta en esta pantalla. No modifica el QC del servidor.'
   await nextTick(); document.getElementById('crop-reviewed')?.focus()
 }
 function saveCurrent(reachSummary = false): boolean {
@@ -112,7 +111,7 @@ function saveCurrent(reachSummary = false): boolean {
     decisionLocked.value = form.decision !== 'pending'
     return true
   } catch {
-    saveError.value = demoStorageIssue.value?.message ?? 'No pudimos conservar la revisión del ejemplo. Vuelve a comprobar la imagen, el lado y la decisión.'
+    saveError.value = 'No pudimos conservar la revisión del ejemplo. Vuelve a comprobar la imagen, el lado y la decisión.'
     return false
   }
 }
@@ -146,9 +145,10 @@ onBeforeUnmount(() => { window.removeEventListener('beforeunload', beforeUnload)
 
 <template>
   <div class="crop-page">
+    <p class="simulation-notice" role="status">Las imágenes y la revisión siguen siendo una simulación; sus cambios no se guardan en el servidor. Se reinician al recargar, cerrar sesión o cambiar la revisión basal.</p>
     <RouterLink to="/evaluaciones" class="crop-back"><AppIcon name="chevron-left" :size="16" />Volver a Mis evaluaciones</RouterLink>
-    <section v-if="unavailable" class="crop-unavailable"><span class="crop-symbol"><AppIcon name="image" :size="25" /></span><h1 tabindex="-1">Revisión no disponible</h1><p>Este caso no existe en la demostración o no tiene un borrador editable asociado.</p><RouterLink to="/evaluaciones" class="button button-primary">Volver al listado</RouterLink></section>
-    <section v-else-if="baselineIncomplete" class="crop-unavailable"><span class="crop-symbol"><AppIcon name="file" :size="25" /></span><h1 tabindex="-1">Datos basales pendientes</h1><p>Completa los datos ficticios antes de revisar la imagen.</p><RouterLink :to="editRoute" class="button button-primary">Completar datos basales</RouterLink></section>
+    <section v-if="unavailable" class="crop-unavailable"><span class="crop-symbol"><AppIcon name="image" :size="25" /></span><h1 tabindex="-1">Revisión no disponible</h1><p>No pudimos recuperar este caso del servidor o no tienes acceso.</p><RouterLink to="/evaluaciones" class="button button-primary">Volver al listado</RouterLink></section>
+    <section v-else-if="baselineIncomplete" class="crop-unavailable"><span class="crop-symbol"><AppIcon name="file" :size="25" /></span><h1 tabindex="-1">Datos basales pendientes</h1><p>Guarda la rodilla a explorar antes de revisar el ejemplo. No es necesario inventar los datos ausentes.</p><RouterLink :to="editRoute" class="button button-primary">Completar datos basales</RouterLink></section>
     <section v-else-if="imageIncomplete" class="crop-unavailable"><span class="crop-symbol"><AppIcon name="image" :size="25" /></span><h1 tabindex="-1">Imagen y lado pendientes</h1><p>Selecciona una imagen de demostración y confirma el lado antes de revisar el recorte.</p><RouterLink :to="imageRoute" class="button button-primary">Volver a Radiografía y lado</RouterLink></section>
     <template v-else>
       <header class="crop-heading"><div><span class="section-eyebrow">REVISAR EL EJEMPLO</span><h1 tabindex="-1">Revisión del recorte</h1><p>Compara ambas vistas y registra una decisión de demostración.</p></div><span class="crop-code"><AppIcon name="file" :size="15" />{{ existing?.code }}</span></header>
@@ -171,7 +171,7 @@ onBeforeUnmount(() => { window.removeEventListener('beforeunload', beforeUnload)
           <div class="crop-decision-heading"><span class="crop-symbol"><AppIcon name="check" /></span><h2 id="crop-decision-title">Decisión del ejemplo</h2></div>
           <div :class="['crop-status', `crop-status-${form.decision}`]" role="status" aria-live="polite"><AppIcon :name="form.decision === 'accepted' ? 'check' : form.decision === 'rejected' ? 'x' : 'clock'" :size="17" /><span>{{ decisionLabel }}</span></div>
           <template v-if="decisionLocked">
-            <p class="crop-record-note">{{ dirty ? 'Decisión seleccionada, pendiente de guardar.' : 'Esta decisión está conservada en el borrador de demostración.' }}</p>
+            <p class="crop-record-note">{{ dirty ? 'Decisión simulada seleccionada, pendiente de continuar.' : 'Esta decisión solo pertenece al recorrido temporal; no es QC del servidor.' }}</p>
             <div v-if="form.decision === 'rejected'" class="crop-rejected-reason"><span>Motivo del ejemplo</span><strong>{{ reasonLabel }}</strong></div>
             <button id="crop-reopen" type="button" class="button button-secondary crop-reopen" @click="reopenReview">Reabrir revisión</button>
           </template>
@@ -182,17 +182,17 @@ onBeforeUnmount(() => { window.removeEventListener('beforeunload', beforeUnload)
             <button type="button" class="button button-primary crop-accept" :disabled="!imagesVisible || saving" @click="acceptExample"><AppIcon name="check" :size="16" />Aceptar recorte de ejemplo</button>
             <div class="crop-reject-section"><label for="crop-reason">Si el recorte no es utilizable</label><select id="crop-reason" v-model="form.reason" :aria-invalid="Boolean(errors.reason)" :aria-describedby="errors.reason ? 'crop-reason-error' : 'crop-reason-hint'" @change="errors.reason = ''; message = ''"><option value="">Seleccionar motivo</option><option v-for="reason in demoRejectReasons" :key="reason.id" :value="reason.id">{{ reason.label }}</option></select><p id="crop-reason-hint" class="crop-hint">Opciones de ejemplo para diseñar el registro del rechazo.</p><p v-if="errors.reason" id="crop-reason-error" class="field-error" role="alert">{{ errors.reason }}</p><button type="button" class="button button-secondary crop-reject" :disabled="saving" @click="rejectExample"><AppIcon name="x" :size="16" />Rechazar recorte de ejemplo</button></div>
           </template>
-          <div class="crop-session-note"><AppIcon name="clock" :size="17" /><p>Lo que guardes se conserva en este navegador. Los cambios sin guardar pueden perderse.</p></div>
+          <div class="crop-session-note"><AppIcon name="clock" :size="17" /><p>Datos basales: guardados en el servidor. Imagen y revisión: simulación temporal que se reinicia al recargar o cerrar sesión.</p></div>
         </aside>
       </div>
       <p v-if="errors.decision" class="crop-action-error" role="alert">{{ errors.decision }}</p>
       <p v-if="saveError" class="crop-action-error" role="alert">{{ saveError }}</p>
-      <div class="crop-actions"><RouterLink :to="imageRoute" class="button button-secondary"><AppIcon name="chevron-left" :size="16" />Volver a Radiografía y lado</RouterLink><div class="crop-primary-actions"><button id="crop-save-exit" type="button" class="button button-secondary" :disabled="saving" @click="saveReview">Guardar y salir</button><button id="crop-save-summary" type="button" class="button button-primary" :disabled="saving || form.decision === 'rejected' || (form.decision === 'accepted' && !imagesVisible)" @click="continueToSummary">Guardar y ver resumen<AppIcon name="arrow-right" :size="17" /></button></div></div>
-      <p class="crop-feedback" role="status" aria-live="polite">{{ message }}</p><p class="crop-dirty-note">{{ dirty ? 'Tienes cambios sin guardar.' : 'La revisión guardada permanece asociada al ejemplo en este navegador.' }}</p>
+      <div class="crop-actions"><RouterLink :to="imageRoute" class="button button-secondary"><AppIcon name="chevron-left" :size="16" />Volver a Radiografía y lado</RouterLink><div class="crop-primary-actions"><button id="crop-save-exit" type="button" class="button button-secondary" :disabled="saving" @click="saveReview">Volver a evaluaciones</button><button id="crop-save-summary" type="button" class="button button-primary" :disabled="saving || form.decision === 'rejected' || (form.decision === 'accepted' && !imagesVisible)" @click="continueToSummary">Continuar con el ejemplo<AppIcon name="arrow-right" :size="17" /></button></div></div>
+      <p class="crop-feedback" role="status" aria-live="polite">{{ message }}</p><p class="crop-dirty-note">{{ dirty ? 'Tienes cambios sin guardar.' : 'La revisión solo permanece en este recorrido temporal.' }}</p>
     </template>
 
     <dialog ref="enlarged" class="app-dialog crop-enlarged" aria-labelledby="crop-enlarged-title" @click="closeOnBackdrop($event,enlarged)"><div class="dialog-heading"><h2 id="crop-enlarged-title">{{ enlargedView === 'original' ? 'Imagen original ampliada' : 'Recorte ampliado' }}</h2><button type="button" class="icon-button" aria-label="Cerrar vista ampliada" @click="enlarged?.close()"><AppIcon name="x" /></button></div><DemoCropPreview v-if="crop" :fixture="crop" :view="enlargedView" /><p>{{ sideLabel }} · Ilustración sintética</p><button type="button" class="button button-primary" @click="enlarged?.close()">Volver a la revisión</button></dialog>
-    <dialog ref="confirmation" class="app-dialog" aria-labelledby="crop-confirmation-title" @cancel.prevent="answer(false)" @close="confirmationClosed"><div class="dialog-heading"><span class="dialog-symbol"><AppIcon name="file" :size="24" /></span><button type="button" class="icon-button" aria-label="Cancelar y seguir editando" autofocus @click="answer(false)"><AppIcon name="x" /></button></div><h2 id="crop-confirmation-title">{{ confirmationMode === 'leave' ? 'Tienes cambios sin guardar' : '¿Reabrir la revisión?' }}</h2><p>{{ confirmationMode === 'leave' ? 'Puedes seguir editando o salir descartando los cambios de esta pantalla.' : 'La revisión de esta pantalla volverá a pendiente. La decisión conservada en el borrador solo cambiará cuando vuelvas a guardarla.' }}</p><div class="crop-dialog-actions"><button type="button" class="button button-secondary" @click="answer(false)">{{ confirmationMode === 'leave' ? 'Seguir editando' : 'Conservar decisión' }}</button><button type="button" class="button button-primary" @click="answer(true)">{{ confirmationMode === 'leave' ? 'Salir sin guardar' : 'Reabrir revisión' }}</button></div></dialog>
+    <dialog ref="confirmation" class="app-dialog" aria-labelledby="crop-confirmation-title" @cancel.prevent="answer(false)" @close="confirmationClosed"><div class="dialog-heading"><span class="dialog-symbol"><AppIcon name="file" :size="24" /></span><button type="button" class="icon-button" aria-label="Cancelar y seguir editando" autofocus @click="answer(false)"><AppIcon name="x" /></button></div><h2 id="crop-confirmation-title">{{ confirmationMode === 'leave' ? 'Tienes cambios sin guardar' : '¿Reabrir la revisión?' }}</h2><p>{{ confirmationMode === 'leave' ? 'Puedes seguir editando o salir descartando los cambios de esta pantalla.' : 'La revisión de esta pantalla volverá a pendiente. La decisión solo afecta al ejemplo temporal; no modifica el servidor.' }}</p><div class="crop-dialog-actions"><button type="button" class="button button-secondary" @click="answer(false)">{{ confirmationMode === 'leave' ? 'Seguir editando' : 'Conservar decisión' }}</button><button type="button" class="button button-primary" @click="answer(true)">{{ confirmationMode === 'leave' ? 'Salir sin guardar' : 'Reabrir revisión' }}</button></div></dialog>
   </div>
 </template>
 

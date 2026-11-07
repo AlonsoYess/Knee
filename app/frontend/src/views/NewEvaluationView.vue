@@ -6,8 +6,9 @@ import {
   evaluations, createDraftInput, validateDemoDraft, saveDemoDraft,
   isEditableDemoEvaluation,
   type DemoDraftInput,
-} from '../demo/demoEvaluationStore'
-import { demoStorageIssue } from '../demo/demoEvaluationPersistence'
+} from '../state/evaluations'
+import { ApiError } from '../api/http'
+import { apiMessage } from '../state/session'
 
 const route = useRoute()
 const router = useRouter()
@@ -16,11 +17,14 @@ const original = requestedId ? evaluations.value.find(item => item.id === reques
 const unavailable = Boolean(requestedId && !isEditableDemoEvaluation(original))
 const form = reactive<DemoDraftInput>(createDraftInput(!unavailable ? original : undefined))
 const savedId = ref<string | undefined>(!unavailable ? original?.id : undefined)
+// Retained only while this form is open; retrying an uncertain creation keeps the same intent.
+const creationIntent = crypto.randomUUID()
 const baseline = ref(JSON.stringify(form))
 const errors = ref<Partial<Record<keyof DemoDraftInput, string>>>({})
 const message = ref('')
 const saveError = ref('')
 const saving = ref(false)
+let navigatingAfterSave = false
 const sideChangedSinceSave = ref(false)
 const confirmationDialog = ref<HTMLDialogElement | null>(null)
 const confirmationMode = ref<'leave' | 'clear'>('leave')
@@ -100,20 +104,23 @@ async function validate(requireComplete: boolean): Promise<boolean> {
   return false
 }
 
-function saveCurrent(): boolean {
+async function saveCurrent(): Promise<boolean> {
   try {
-    const result = saveDemoDraft(form, savedId.value, { invalidateImageSide: sideChangedSinceSave.value })
+    const result = await saveDemoDraft(form, savedId.value, { invalidateImageSide: sideChangedSinceSave.value, idempotencyKey: creationIntent })
     savedId.value = result.id
+    Object.assign(form, createDraftInput(result))
     sideChangedSinceSave.value = false
     baseline.value = JSON.stringify(form)
     return true
   } catch (error) {
-    const code = error instanceof Error ? error.message : ''
-    saveError.value = demoStorageIssue.value?.message ?? (code === 'editable_demo_draft_required'
-      ? 'Este borrador ya no está disponible para editar. Vuelve a Mis evaluaciones.'
-      : code === 'unique_demo_code_required'
-        ? 'El código ya pertenece a otro ejemplo. Vuelve al listado e inicia una nueva evaluación.'
-        : 'No pudimos conservar el borrador de ejemplo. Revisa los campos e inténtalo otra vez.')
+    saveError.value = apiMessage(error)
+    if (error instanceof ApiError) {
+      for (const field of error.fields) {
+        const name = field.path.split(/[./]/).filter(Boolean).pop()
+        const key = name === 'side' ? 'knee' : name
+        if (key === 'age' || key === 'sex' || key === 'bmi' || key === 'knee') errors.value[key] = field.message
+      }
+    }
     return false
   }
 }
@@ -122,17 +129,20 @@ async function saveDraft() {
   if (saving.value || !await validate(false)) return
   saving.value = true
   try {
-    if (saveCurrent()) await router.push('/evaluaciones')
-  } finally { saving.value = false }
+    if (!await saveCurrent()) return
+    navigatingAfterSave = true
+    await router.push('/evaluaciones')
+  } finally { navigatingAfterSave = false; saving.value = false }
 }
 
 async function continueToImage() {
   if (saving.value || !await validate(true)) return
   saving.value = true
   try {
-    if (!saveCurrent()) return
+    if (!await saveCurrent()) return
+    navigatingAfterSave = true
     await router.push({ name: 'radiograph', params: { id: savedId.value } })
-  } finally { saving.value = false }
+  } finally { navigatingAfterSave = false; saving.value = false }
 }
 
 function beforeUnload(event: BeforeUnloadEvent) {
@@ -141,7 +151,10 @@ function beforeUnload(event: BeforeUnloadEvent) {
   event.returnValue = ''
 }
 
-onBeforeRouteLeave(async () => !dirty.value || await askConfirmation('leave'))
+onBeforeRouteLeave(async () => {
+  if (navigatingAfterSave && !dirty.value) return true
+  return !saving.value && (!dirty.value || await askConfirmation('leave'))
+})
 onMounted(() => window.addEventListener('beforeunload', beforeUnload))
 onBeforeUnmount(() => {
   window.removeEventListener('beforeunload', beforeUnload)
@@ -174,23 +187,23 @@ onBeforeUnmount(() => {
       </ol>
 
       <div class="new-layout">
-        <form class="new-form-panel" novalidate @submit.prevent="continueToImage">
-          <div class="new-panel-heading"><div class="new-panel-title"><span class="new-section-icon"><AppIcon name="file" /></span><div><h2>Datos basales</h2><p>Una evaluación corresponde a una rodilla.</p></div></div><button type="button" class="text-button" @click="fillExample">Completar ejemplo<AppIcon name="arrow-up-right" :size="15" /></button></div>
+        <form class="new-form-panel" :aria-busy="saving" novalidate @submit.prevent="continueToImage">
+          <div class="new-panel-heading"><div class="new-panel-title"><span class="new-section-icon"><AppIcon name="file" /></span><div><h2>Datos basales</h2><p>Una evaluación corresponde a una rodilla.</p></div></div><button type="button" class="text-button"  :disabled="saving" @click="fillExample">Completar ejemplo<AppIcon name="arrow-up-right" :size="15" /></button></div>
 
           <div class="new-fields">
-            <div class="field new-code-field"><label for="draft-code">Código de evaluación</label><div class="new-code-input"><input id="draft-code" :value="form.code" readonly :aria-invalid="Boolean(errors.code)" :aria-describedby="errors.code ? 'draft-code-error' : 'draft-code-hint'" /><AppIcon name="lock" :size="16" /></div><p id="draft-code-hint" class="new-field-hint">Se asigna automáticamente para identificar el caso ficticio.</p><p v-if="errors.code" id="draft-code-error" class="field-error" role="alert">{{ errors.code }}</p></div>
+            <div class="field new-code-field"><label for="draft-code">Código de evaluación</label><div class="new-code-input"><input id="draft-code" :value="form.code" readonly :aria-invalid="Boolean(errors.code)" :aria-describedby="errors.code ? 'draft-code-error' : 'draft-code-hint'" /><AppIcon name="lock" :size="16" /></div><p id="draft-code-hint" class="new-field-hint">Lo asigna el servidor cuando confirma el primer guardado.</p><p v-if="errors.code" id="draft-code-error" class="field-error" role="alert">{{ errors.code }}</p></div>
 
             <div class="new-field-grid">
-              <div class="field"><label for="draft-age">Edad en la radiografía <span>(años)</span></label><input id="draft-age" v-model="form.age" type="text" inputmode="numeric" autocomplete="off" placeholder="Ejemplo: 62" :aria-invalid="Boolean(errors.age)" :aria-describedby="errors.age ? 'draft-age-error' : undefined" @input="fieldChanged('age')" /><p v-if="errors.age" id="draft-age-error" class="field-error" role="alert">{{ errors.age }}</p></div>
-              <div class="field"><label for="draft-sex">Sexo registrado</label><select id="draft-sex" v-model="form.sex" :aria-invalid="Boolean(errors.sex)" :aria-describedby="errors.sex ? 'draft-sex-error' : undefined" @change="fieldChanged('sex')"><option value="">Seleccionar</option><option value="F">Femenino</option><option value="M">Masculino</option></select><p v-if="errors.sex" id="draft-sex-error" class="field-error" role="alert">{{ errors.sex }}</p></div>
+              <div class="field"><label for="draft-age">Edad en la radiografía <span>(años)</span></label><input id="draft-age" :disabled="saving" v-model="form.age" type="text" inputmode="numeric" autocomplete="off" placeholder="Ejemplo: 62" :aria-invalid="Boolean(errors.age)" :aria-describedby="errors.age ? 'draft-age-error' : undefined" @input="fieldChanged('age')" /><p v-if="errors.age" id="draft-age-error" class="field-error" role="alert">{{ errors.age }}</p></div>
+              <div class="field"><label for="draft-sex">Sexo registrado</label><select id="draft-sex" :disabled="saving" v-model="form.sex" :aria-invalid="Boolean(errors.sex)" :aria-describedby="errors.sex ? 'draft-sex-error' : undefined" @change="fieldChanged('sex')"><option value="">Seleccionar</option><option value="F">Femenino</option><option value="M">Masculino</option></select><p v-if="errors.sex" id="draft-sex-error" class="field-error" role="alert">{{ errors.sex }}</p></div>
             </div>
 
-            <div class="field new-bmi-field"><label for="draft-bmi">IMC en la radiografía <span>(kg/m²)</span></label><input id="draft-bmi" v-model="form.bmi" type="text" inputmode="decimal" autocomplete="off" placeholder="Ejemplo: 28,4" :aria-invalid="Boolean(errors.bmi)" :aria-describedby="errors.bmi ? 'draft-bmi-error' : 'draft-bmi-hint'" @input="fieldChanged('bmi')" /><p id="draft-bmi-hint" class="new-field-hint">Usa el valor basal. Puedes escribir coma o punto decimal.</p><p v-if="errors.bmi" id="draft-bmi-error" class="field-error" role="alert">{{ errors.bmi }}</p></div>
+            <div class="field new-bmi-field"><label for="draft-bmi">IMC en la radiografía <span>(kg/m²)</span></label><input id="draft-bmi" :disabled="saving" v-model="form.bmi" type="text" inputmode="decimal" autocomplete="off" placeholder="Ejemplo: 28,4" :aria-invalid="Boolean(errors.bmi)" :aria-describedby="errors.bmi ? 'draft-bmi-error' : 'draft-bmi-hint'" @input="fieldChanged('bmi')" /><p id="draft-bmi-hint" class="new-field-hint">Usa el valor basal. Puedes escribir coma o punto decimal.</p><p v-if="errors.bmi" id="draft-bmi-error" class="field-error" role="alert">{{ errors.bmi }}</p></div>
 
-            <fieldset class="new-knee-field" :aria-describedby="errors.knee ? 'draft-knee-error' : 'draft-knee-hint'"><legend>Rodilla a evaluar</legend><div class="new-knee-choices"><label :class="['new-knee-option', { 'new-knee-selected': form.knee === 'right' }]"><input id="draft-knee-right" v-model="form.knee" type="radio" name="evaluation-knee" value="right" :aria-invalid="Boolean(errors.knee)" @change="fieldChanged('knee')" /><span>Derecha</span></label><label :class="['new-knee-option', { 'new-knee-selected': form.knee === 'left' }]"><input id="draft-knee-left" v-model="form.knee" type="radio" name="evaluation-knee" value="left" :aria-invalid="Boolean(errors.knee)" @change="fieldChanged('knee')" /><span>Izquierda</span></label></div><p id="draft-knee-hint" class="new-field-hint">El lado se confirmará nuevamente al revisar la imagen.</p><p v-if="errors.knee" id="draft-knee-error" class="field-error" role="alert">{{ errors.knee }}</p></fieldset>
+            <fieldset class="new-knee-field" :aria-describedby="errors.knee ? 'draft-knee-error' : 'draft-knee-hint'"><legend>Rodilla a evaluar</legend><div class="new-knee-choices"><label :class="['new-knee-option', { 'new-knee-selected': form.knee === 'right' }]"><input id="draft-knee-right" :disabled="saving" v-model="form.knee" type="radio" name="evaluation-knee" value="right" :aria-invalid="Boolean(errors.knee)" @change="fieldChanged('knee')" /><span>Derecha</span></label><label :class="['new-knee-option', { 'new-knee-selected': form.knee === 'left' }]"><input id="draft-knee-left" :disabled="saving" v-model="form.knee" type="radio" name="evaluation-knee" value="left" :aria-invalid="Boolean(errors.knee)" @change="fieldChanged('knee')" /><span>Izquierda</span></label></div><p id="draft-knee-hint" class="new-field-hint">El lado se confirmará nuevamente al revisar la imagen.</p><p v-if="errors.knee" id="draft-knee-error" class="field-error" role="alert">{{ errors.knee }}</p></fieldset>
           </div>
 
-          <div class="new-form-note"><AppIcon name="clock" :size="17" /><p>Edad e IMC deben corresponder a la fecha de la radiografía inicial.</p></div>
+          <div class="new-form-note"><AppIcon name="clock" :size="17" /><p>Usa solo valores ficticios. Deja vacíos los datos ausentes; no se inventan valores ni se excluye el caso por IMC ausente.</p></div>
           <div v-if="saveError" class="new-save-error" role="alert">{{ saveError }}</div>
           <div class="new-form-actions"><button type="button" class="text-button new-clear" :disabled="!hasFields || saving" @click="clearForm">Limpiar campos</button><div class="new-main-actions"><button type="button" class="button button-secondary" :disabled="saving" @click="saveDraft">Guardar y salir</button><button type="submit" class="button button-primary" :disabled="saving">Guardar y continuar<AppIcon name="arrow-right" :size="17" /></button></div></div>
           <p class="new-feedback" role="status" aria-live="polite">{{ message }}</p>
@@ -198,12 +211,12 @@ onBeforeUnmount(() => {
 
         <aside class="new-context" aria-label="Guía para preparar el caso">
           <div class="new-context-intro"><span class="new-context-icon"><AppIcon name="evaluations" :size="25" /></span><h2>Primero, prepara los datos</h2><p>Revisa la información de una rodilla antes de continuar con su imagen.</p></div>
-          <div class="new-context-section"><h3>Puedes guardar y retomar</h3><p>Un borrador puede tener campos pendientes. Para continuar, completa los datos solicitados.</p></div>
+          <div class="new-context-section"><h3>Puedes guardar y retomar</h3><p>Los datos basales se guardan en el servidor. Para explorar la imagen sintética, solo necesitas indicar la rodilla.</p></div>
           <div class="new-context-section"><h3>Solo datos de ejemplo</h3><p>Utiliza valores ficticios. El siguiente paso permite seleccionar una imagen sintética para explorar la interfaz.</p></div>
-          <div class="new-session-note"><AppIcon name="help" :size="17" /><p>Lo que guardes se conserva en este navegador. Los cambios sin guardar pueden perderse.</p></div>
+          <div class="new-session-note"><AppIcon name="help" :size="17" /><p>El guardado se confirma solo cuando responde el servidor. Si hay un error, tus campos permanecen aquí sin confirmar. Los cambios sin guardar pueden perderse al recargar.</p></div>
         </aside>
       </div>
-      <p class="new-bottom-note"><span :class="['new-draft-dot', { 'new-draft-dirty': dirty }]" aria-hidden="true"></span>{{ dirty ? 'Tienes cambios sin guardar.' : savedId ? 'Borrador guardado en este navegador.' : 'Los campos se guardan al pulsar Guardar y salir o Guardar y continuar.' }}</p>
+      <p class="new-bottom-note"><span :class="['new-draft-dot', { 'new-draft-dirty': dirty }]" aria-hidden="true"></span>{{ dirty ? 'Tienes cambios sin guardar.' : savedId ? 'Datos basales confirmados en el servidor.' : 'Los campos se guardan al pulsar Guardar y salir o Guardar y continuar.' }}</p>
     </template>
 
     <dialog ref="confirmationDialog" class="app-dialog" aria-labelledby="new-confirmation-title" @cancel.prevent="answerConfirmation(false)" @close="confirmationClosed"><div class="dialog-heading"><span class="dialog-symbol"><AppIcon name="file" :size="24" /></span><button type="button" class="icon-button" aria-label="Cancelar y seguir editando" autofocus @click="answerConfirmation(false)"><AppIcon name="x" /></button></div><h2 id="new-confirmation-title">{{ confirmationMode === 'leave' ? 'Tienes cambios sin guardar' : '¿Limpiar los campos?' }}</h2><p>{{ confirmationMode === 'leave' ? 'Puedes seguir editando para conservarlos o salir descartando los cambios de esta pantalla.' : 'Se vaciarán los datos del formulario. El código del caso se conservará y el borrador guardado solo cambiará cuando vuelvas a guardarlo.' }}</p><div class="new-summary-actions"><button type="button" class="button button-secondary" @click="answerConfirmation(false)">Seguir editando</button><button type="button" class="button button-primary" @click="answerConfirmation(true)">{{ confirmationMode === 'leave' ? 'Salir sin guardar' : 'Limpiar campos' }}</button></div></dialog>

@@ -19,7 +19,8 @@ async function request(page: Page, path: string, options: Omit<ApiRequestOptions
 test.beforeEach(async ({ page }) => {
   // These tests exercise only intercepted fictional responses, never a backend or model.
   await page.route('**/api/v1/**', route => route.abort())
-  await page.goto('/acceso')
+  // A static synthetic SVG supplies the origin without bootstrapping Vue/auth requests.
+  await page.goto('/demo/radiografia-demo-a.svg')
 })
 
 test('GET receives direct JSON and metadata without mutation headers', async ({ page }) => {

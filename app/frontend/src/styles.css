@@ -97,3 +97,5 @@ svg { flex-shrink: 0; }
 }
 @media(pointer:coarse) { .button,.icon-button,.nav-item { min-height: 44px; } .text-button { min-height: 40px; } input,select { font-size: 16px; } }
 @media(prefers-reduced-motion:reduce) { *,*::before,*::after { transition: none !important; scroll-behavior: auto !important; } }
+
+.simulation-notice { max-width: 1240px; margin: 0 auto 22px; padding: 14px 17px; border: 1px solid #d7e3eb; border-radius: 9px; background: #f2f7fb; color: #365d75; font-size: 13px; line-height: 1.7; }

@@ -8,8 +8,7 @@ import {
   createDemoImageInput, validateDemoImage, saveDemoImage,
   type DemoImageInput,
   isEditableDemoEvaluation,
-} from '../demo/demoEvaluationStore'
-import { demoStorageIssue } from '../demo/demoEvaluationPersistence'
+} from '../state/evaluations'
 import { demoImages } from '../demo/demoImages'
 
 const route = useRoute()
@@ -120,7 +119,7 @@ function saveCurrent(): boolean {
     baseline.value = JSON.stringify(form)
     return true
   } catch {
-    saveError.value = demoStorageIssue.value?.message ?? 'No pudimos conservar la selección del ejemplo. Revisa la imagen y el lado o vuelve al listado.'
+    saveError.value = 'No pudimos conservar la selección del ejemplo. Revisa la imagen y el lado o vuelve al listado.'
     return false
   }
 }
@@ -153,15 +152,16 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="rad-page">
+    <p class="simulation-notice" role="status">Las imágenes y la revisión siguen siendo una simulación; sus cambios no se guardan en el servidor. Se reinician al recargar, cerrar sesión o cambiar la revisión basal.</p>
     <RouterLink to="/evaluaciones" class="rad-back"><AppIcon name="chevron-left" :size="16" />Volver a Mis evaluaciones</RouterLink>
 
     <section v-if="unavailable" class="rad-unavailable">
       <span class="rad-section-icon"><AppIcon name="image" :size="25" /></span><h1 tabindex="-1">Borrador no disponible</h1>
-      <p>El caso solicitado no existe en esta demostración o no es un borrador editable.</p><RouterLink to="/evaluaciones" class="button button-primary">Volver al listado</RouterLink>
+      <p>No pudimos recuperar este caso del servidor o no tienes acceso.</p><RouterLink to="/evaluaciones" class="button button-primary">Volver al listado</RouterLink>
     </section>
     <section v-else-if="baselineIncomplete" class="rad-unavailable">
       <span class="rad-section-icon"><AppIcon name="file" :size="25" /></span><h1 tabindex="-1">Datos basales pendientes</h1>
-      <p>Completa los datos de la evaluación antes de seleccionar su imagen y confirmar el lado.</p><RouterLink :to="editRoute" class="button button-primary">Completar datos basales</RouterLink>
+      <p>Guarda la rodilla a explorar en los datos basales. Los otros datos ausentes pueden permanecer vacíos.</p><RouterLink :to="editRoute" class="button button-primary">Completar datos basales</RouterLink>
     </section>
     <template v-else>
       <header class="rad-heading"><div><span class="section-eyebrow">PREPARAR LA IMAGEN</span><h1 tabindex="-1">Radiografía y lado</h1><p>Selecciona un ejemplo y confirma la rodilla que se evaluará.</p></div><span class="rad-code"><AppIcon name="file" :size="15" />{{ existing?.code }}</span></header>
@@ -192,15 +192,15 @@ onBeforeUnmount(() => {
           <label :class="['rad-confirmation', { 'rad-confirmation-disabled': !canConfirm }]"><input id="radiograph-confirmation" v-model="form.sideConfirmed" type="checkbox" :disabled="!canConfirm" :aria-invalid="Boolean(errors.sideConfirmed)" :aria-describedby="errors.sideConfirmed ? 'radiograph-confirmation-error' : 'radiograph-confirmation-hint'" @change="errors.sideConfirmed = undefined; message = ''" /><span>Confirmo el lado de este ejemplo</span></label>
           <p v-if="errors.sideConfirmed" id="radiograph-confirmation-error" class="field-error" role="alert">{{ errors.sideConfirmed }}</p>
           <p id="radiograph-confirmation-hint" class="rad-hint">Esta confirmación identifica el lado. La revisión de calidad del recorte corresponde al siguiente paso.</p>
-          <div class="rad-session-note"><AppIcon name="clock" :size="17" /><p>Lo que guardes se conserva en este navegador. Los cambios sin guardar pueden perderse.</p></div>
+          <div class="rad-session-note"><AppIcon name="clock" :size="17" /><p>Datos basales: guardados en el servidor. Imagen y revisión: simulación temporal que se reinicia al recargar o cerrar sesión.</p></div>
         </aside>
 
-        <div class="rad-actions-area"><p v-if="saveError" class="rad-save-error" role="alert">{{ saveError }}</p><div class="rad-actions"><RouterLink :to="editRoute" class="button button-secondary"><AppIcon name="chevron-left" :size="16" />Volver a datos basales</RouterLink><div class="rad-main-actions"><button type="button" class="button button-secondary" :disabled="saving" @click="saveDraft">Guardar y salir</button><button type="submit" class="button button-primary" :disabled="saving || Boolean(selectedImage && !previewLoaded)">Guardar y continuar<AppIcon name="arrow-right" :size="17" /></button></div></div><p class="rad-feedback" role="status" aria-live="polite">{{ message }}</p><p class="rad-draft-state">{{ dirty ? 'Tienes cambios sin guardar.' : 'Las selecciones guardadas se conservan en este navegador.' }}</p></div>
+        <div class="rad-actions-area"><p v-if="saveError" class="rad-save-error" role="alert">{{ saveError }}</p><div class="rad-actions"><RouterLink :to="editRoute" class="button button-secondary"><AppIcon name="chevron-left" :size="16" />Volver a datos basales</RouterLink><div class="rad-main-actions"><button type="button" class="button button-secondary" :disabled="saving" @click="saveDraft">Volver a evaluaciones</button><button type="submit" class="button button-primary" :disabled="saving || Boolean(selectedImage && !previewLoaded)">Continuar con el ejemplo<AppIcon name="arrow-right" :size="17" /></button></div></div><p class="rad-feedback" role="status" aria-live="polite">{{ message }}</p><p class="rad-draft-state">{{ dirty ? 'Tienes cambios sin guardar.' : 'Selecciones aplicadas solo a este recorrido temporal.' }}</p></div>
       </form>
     </template>
 
     <dialog ref="enlarged" class="app-dialog rad-enlarged" aria-labelledby="rad-enlarged-title" @click="closeOnBackdrop($event, enlarged)"><div class="dialog-heading"><h2 id="rad-enlarged-title">Vista ampliada de la imagen</h2><button type="button" class="icon-button" aria-label="Cerrar vista ampliada" @click="enlarged?.close()"><AppIcon name="x" /></button></div><img v-if="selectedImage" :src="selectedImage.src" :alt="`${selectedImage.label}: ilustración sintética`" :width="selectedImage.width" :height="selectedImage.height" /><p>Imagen ficticia para explorar el recorrido de la aplicación.</p><button type="button" class="button button-primary" @click="enlarged?.close()">Volver a la selección</button></dialog>
-    <dialog ref="confirmation" class="app-dialog" aria-labelledby="rad-confirmation-title" @cancel.prevent="answer(false)" @close="confirmationClosed"><div class="dialog-heading"><span class="dialog-symbol"><AppIcon name="image" :size="24" /></span><button type="button" class="icon-button" aria-label="Cancelar y seguir editando" autofocus @click="answer(false)"><AppIcon name="x" /></button></div><h2 id="rad-confirmation-title">{{ confirmationMode === 'leave' ? 'Tienes cambios sin guardar' : '¿Quitar la imagen seleccionada?' }}</h2><p>{{ confirmationMode === 'leave' ? 'Puedes seguir editando o salir descartando los cambios de esta pantalla.' : 'Se retirará el ejemplo de esta pantalla y tendrás que confirmar el lado de nuevo al elegir otra imagen. El borrador guardado solo cambiará cuando vuelvas a guardarlo.' }}</p><div class="rad-summary-actions"><button type="button" class="button button-secondary" @click="answer(false)">Seguir editando</button><button type="button" class="button button-primary" @click="answer(true)">{{ confirmationMode === 'leave' ? 'Salir sin guardar' : 'Quitar imagen' }}</button></div></dialog>
+    <dialog ref="confirmation" class="app-dialog" aria-labelledby="rad-confirmation-title" @cancel.prevent="answer(false)" @close="confirmationClosed"><div class="dialog-heading"><span class="dialog-symbol"><AppIcon name="image" :size="24" /></span><button type="button" class="icon-button" aria-label="Cancelar y seguir editando" autofocus @click="answer(false)"><AppIcon name="x" /></button></div><h2 id="rad-confirmation-title">{{ confirmationMode === 'leave' ? 'Tienes cambios sin guardar' : '¿Quitar la imagen seleccionada?' }}</h2><p>{{ confirmationMode === 'leave' ? 'Puedes seguir editando o salir descartando los cambios de esta pantalla.' : 'Se retirará el ejemplo de esta pantalla y tendrás que confirmar el lado de nuevo al elegir otra imagen. Esto solo cambia el recorrido temporal; no modifica el servidor.' }}</p><div class="rad-summary-actions"><button type="button" class="button button-secondary" @click="answer(false)">Seguir editando</button><button type="button" class="button button-primary" @click="answer(true)">{{ confirmationMode === 'leave' ? 'Salir sin guardar' : 'Quitar imagen' }}</button></div></dialog>
   </div>
 </template>
 

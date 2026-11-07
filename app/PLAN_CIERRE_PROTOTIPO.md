@@ -1,6 +1,6 @@
 # Plan de cierre del prototipo KneeOAI para la sustentación
 
-Fecha: 7 de noviembre de 2026. Estado: plan de implementación; fase 1 completada en la entrega v0.8. Las fases 2 a 7 conservan sus condiciones de cierre. El registro técnico está en `FASE_1_ENTREGA.md`.
+Fecha: 7 de noviembre de 2026. Estado: fases 1 y 2 completadas en v0.8 y v0.9 respectivamente. Las fases 3 a 7 conservan sus condiciones de cierre. Los registros técnicos son `FASE_1_ENTREGA.md` y `FASE_2_ENTREGA.md`.
 
 El objetivo es terminar la aplicación mientras se completa el trabajo científico, de modo que la última etapa consista en conectar y verificar el paquete predictivo aprobado. Habrá dos cierres: **aplicación preparada para integración** y **prototipo predictivo listo para sustentación**. El segundo requiere evidencia de funcionamiento con el paquete final; finalizar un entrenamiento no basta para declararlo alcanzado.
 
@@ -35,7 +35,7 @@ Se supone una demostración con cuentas controladas y pocas sesiones simultánea
 | Fase | Entrega concreta | Evidencia de cierre | Dependencia |
 | --- | --- | --- | --- |
 | 1. Base reproducible | Completada en v0.8: fuente completo, exclusiones resueltas, dependencias fijadas, contrato y ejecución documentada. | Copia limpia instalada y compilada; 57 pruebas aprobadas, OpenAPI y 98 ejemplos ficticios validados. Ver `FASE_1_ENTREGA.md`. | Cerrada técnicamente para su alcance. |
-| 2. Acceso y guardado reales | FastAPI, usuarios, sesiones, permisos, base de datos y evaluaciones persistentes. | Dos cuentas no acceden a casos ajenos; los borradores sobreviven al reinicio y los fallos no aparentan un guardado correcto. | Fase 1. |
+| 2. Acceso y guardado reales | Completada en v0.9: FastAPI, usuarios, sesiones, permisos y datos basales persistentes en SQLite. | Copia limpia: 62 pruebas de backend y 29 de navegador, incluidos aislamiento, reinicio, conflicto, respuesta perdida y recuperación. Ver `FASE_2_ENTREGA.md`. | Cerrada para acceso y basales; imagen/QC reales siguen en fase 3. |
 | 3. Recorrido funcional completo | Carga de archivos, preparación, revisión, resumen, estados del motor y diseño de resultado. | Recorrido integrado comprobado con entradas sintéticas y respuestas controladas, incluidos rechazos y errores. | Fase 2; predictor final todavía no requerido. |
 | 4. PWA y ejecución local | Instalación, iconos, actualizaciones, estado sin conexión y arranque local sencillo. | Instalar, cerrar, reabrir y actualizar la versión de producción sin perder una edición silenciosamente. | Recorrido estable; puede avanzar junto a fase 3. |
 | 5. Publicación y recuperación | Dirección gratuita, HTTPS, servicio dentro del límite mensual, almacenamiento persistente, copia de seguridad y procedimiento de restauración. | Acceso desde otro equipo; datos conservados tras reinicio y despliegue; restauración comprobada. | Selección del proveedor y cuentas de infraestructura; permite publicar primero con motor no disponible. |
@@ -54,7 +54,7 @@ La numeración pertenece al prototipo y no sustituye las fases científicas ni l
 
 **Detalle de la fase 2**
 
-La estructura mínima incluirá usuarios, sesiones, evaluaciones, referencias de imagen, revisiones de calidad, ejecuciones y resultados. Los archivos se guardarán fuera de la base, asociados mediante referencias comprobables. Las actualizaciones tendrán control de versión para detectar dos ediciones del mismo caso.
+La fase 2 ya incluye usuarios, sesiones, evaluaciones basales, sus revisiones y asociaciones idempotentes de creación. Las referencias a imágenes, decisiones QC, ejecuciones y resultados se incorporarán cuando se implementen esas operaciones en las fases siguientes. Los archivos se guardarán fuera de la base, asociados mediante referencias comprobables. Las actualizaciones basales tienen control de versión para detectar dos ediciones del mismo caso.
 
 Las cuentas serán administradas. Se implementarán cambio de contraseña y recuperación mediante el administrador, sin añadir una dependencia de correo a esta primera entrega. Las contraseñas usarán un hash adecuado y las sesiones tendrán vencimiento y revocación en el servidor. La configuración publicada utilizará cookies protegidas y defensa CSRF; los permisos se comprobarán en cada operación de la API. [Contraseñas](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html) y [sesiones](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html) en OWASP.
 
@@ -104,4 +104,4 @@ El ensayo cubrirá ingreso, creación, guardado, recuperación, imagen válida e
 
 Las fases 1 a 5 y la preparación del material de sustentación pueden avanzar ahora con datos ficticios. La fase 6 y el ensayo predictivo definitivo dependen del paquete científico formalizado. El diseño de pantallas, usuarios, persistencia, instalación y dominio podrá mantenerse si cambian artefactos del motor conservando su contrato. Un cambio aprobado en entradas o procedimiento exigirá revisar su impacto; no se promete que cualquier decisión posterior sea intercambiable sin trabajo.
 
-El siguiente entregable es la fase 2: implementar acceso y guardado reales siguiendo el contrato de v0.8. La tesis y las respuestas al jurado se actualizarán por su procedimiento propio, cuando se indiquen; este plan no modifica esos documentos.
+El siguiente entregable es la fase 3: carga y preparación de imagen, revisión y estados del recorrido conectados al servidor, conservando el procedimiento científico autorizado. La tesis y las respuestas al jurado se actualizarán por su procedimiento propio, cuando se indiquen; este plan no modifica esos documentos.
