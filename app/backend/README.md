@@ -1,4 +1,4 @@
-# Backend de aplicación KneeOAI — fase 3
+# Backend de aplicación KneeOAI — fase 4
 
 FastAPI y SQLite conservan usuarios, sesiones, datos basales, DICOM, referencias visuales, recortes y decisiones de calidad. La predicción de progresión sigue bloqueada (`not_configured`; ejecución 503). No se abre la prueba reservada.
 
@@ -17,8 +17,11 @@ Arranque: `.venv/Scripts/python.exe -m uvicorn knee_app.api:create_app --factory
 | `KNEEOAI_ALLOWED_ORIGINS` | Orígenes exactos separados por comas. |
 | `KNEEOAI_FROZEN_PYTHON` | Intérprete del entorno científico aprobado existente. |
 | `KNEEOAI_FROZEN_CHECKOUT` | Checkout científico con sus registros y activos privados congelados. |
+| `KNEEOAI_FRONTEND_DIST` | Ruta absoluta de una distribución pública compilada; ausente, no sirve interfaz ni PWA. |
 
-Si falta configuración científica, acceso y borradores funcionan pero la preparación queda bloqueada. `app/IniciarServidor.ps1` carga opcionalmente ubicaciones desde el archivo ignorado `runtime/frozen_processor.json`, claves `python` y `checkout`. Las rutas reales no pertenecen a Git. Desarrollo admite solo loopback; producción exige HTTPS y cookies Secure. Una sola instancia con disco privado persistente; no sincronizar la base activa por Drive. PWA y despliegue son fases posteriores.
+Si falta configuración científica, acceso y borradores funcionan pero la preparación queda bloqueada. `app/IniciarServidor.ps1` carga opcionalmente ubicaciones desde el archivo ignorado `runtime/frozen_processor.json`, claves `python` y `checkout`. Las rutas reales no pertenecen a Git. Desarrollo admite solo loopback; producción exige HTTPS y cookies Secure. Una sola instancia con disco privado persistente; no sincronizar la base activa por Drive. La PWA se incorpora en fase 4 y el despliegue público sigue pendiente.
+
+El iniciador `app/IniciarKneeOAI.ps1` conserva una distribución verificada en `runtime/frontend_versions/`, activa su ruta y abre la aplicación en el mismo origen que la API. FastAPI entrega solo archivos públicos permitidos y rutas Vue conocidas: nunca usa el HTML para sustituir una respuesta API. El inventario y los bytes son inmutables por instancia; una versión nueva requiere reiniciar el servicio. Índice, manifiesto, iconos y worker exigen revalidación; solo los assets con nombre hash pueden usar caché pública duradera. Las respuestas API mantienen `no-store`.
 
 ## Preparación y calidad
 

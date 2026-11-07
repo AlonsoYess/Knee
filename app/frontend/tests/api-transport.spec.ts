@@ -301,3 +301,64 @@ test('PNG failures preserve the JSON error contract instead of returning a blob'
   })
   expect(result).toEqual({ status: 403, code: 'ACCESS_DENIED', requestId: 'png-forbidden-test' })
 })
+
+test('a mutation remains pending until its response body is consumed', async ({ page }) => {
+  const count = await page.evaluate(async () => {
+    const modulePath = '/src/api/http.ts', connectionPath = '/src/state/connection.ts'
+    const { apiRequest } = await import(/* @vite-ignore */ modulePath)
+    const { pendingMutations } = await import(/* @vite-ignore */ connectionPath)
+    const original = window.fetch
+    const state = window as Window & { finishTransportBody?: () => void; pendingTransportResult?: Promise<unknown> }
+    window.fetch = async () => new Response(new ReadableStream({ start(controller) {
+      state.finishTransportBody = () => { controller.enqueue(new TextEncoder().encode('{"saved":true}')); controller.close() }
+    } }), { status: 200, headers: { 'Content-Type': 'application/json', 'X-Request-Id': 'pending-body-test' } })
+    state.pendingTransportResult = apiRequest('/evaluations/test-only', { method: 'PATCH', csrfToken: 'csrf-test-only', body: { clinical: { age: 62 } } }).finally(() => { window.fetch = original })
+    await Promise.resolve()
+    return pendingMutations.value
+  })
+  expect(count).toBe(1)
+  const result = await page.evaluate(async () => {
+    const state = window as Window & { finishTransportBody?: () => void; pendingTransportResult?: Promise<unknown> }
+    state.finishTransportBody!()
+    await state.pendingTransportResult
+    const modulePath = '/src/state/connection.ts'
+    return (await import(/* @vite-ignore */ modulePath)).pendingMutations.value
+  })
+  expect(result).toBe(0)
+})
+
+test('a failed request clears the pending counter and an actual server response restores connectivity', async ({ page }) => {
+  await page.route('**/api/v1/connection-test', route => route.abort('failed'))
+  const failure = await request(page, '/connection-test', { method: 'POST', csrfToken: 'csrf-test-only', body: {} })
+  expect(failure.error?.code).toBe('NETWORK_ERROR')
+  const state = await page.evaluate(async () => {
+    const modulePath = '/src/state/connection.ts'
+    const { pendingMutations, serverReachability } = await import(/* @vite-ignore */ modulePath)
+    return { pending: pendingMutations.value, server: serverReachability.value }
+  })
+  expect(state).toEqual({ pending: 0, server: 'unavailable' })
+  await page.route('**/api/v1/connection-test', route => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'X-Request-Id': 'connection-restored-test' }, body: '{}' }))
+  expect((await request(page, '/connection-test')).ok).toBe(true)
+  expect(await page.evaluate(async () => {
+    const modulePath = '/src/state/connection.ts'
+    return (await import(/* @vite-ignore */ modulePath)).serverReachability.value
+  })).toBe('available')
+})
+
+test('a browser offline flag does not prevent a working loopback API request', async ({ page }) => {
+  let requests = 0
+  await page.route('**/api/v1/loopback-test', route => { requests += 1; return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'X-Request-Id': 'local-server-test' }, body: '{"local":true}' }) })
+  await page.evaluate(async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false })
+    const modulePath = '/src/state/connection.ts'
+    ;(await import(/* @vite-ignore */ modulePath)).updateBrowserOnline()
+  })
+  const result = await request(page, '/loopback-test', { method: 'POST', csrfToken: 'csrf-test-only', idempotencyKey: 'loopback-intent-test', body: { clinical: { age: null } } })
+  expect(result.ok).toBe(true)
+  expect(requests).toBe(1)
+  expect(await page.evaluate(async () => {
+    const modulePath = '/src/state/connection.ts'
+    const { browserOnline, serverReachability } = await import(/* @vite-ignore */ modulePath)
+    return { browserOnline: browserOnline.value, server: serverReachability.value }
+  })).toEqual({ browserOnline: false, server: 'available' })
+})

@@ -1,0 +1,19 @@
+{
+  "id": "/",
+  "name": "KneeOAI · Prototipo académico",
+  "short_name": "KneeOAI",
+  "description": "Organización y revisión de evaluaciones de rodilla. Requiere conexión con su servidor; predicción todavía no disponible.",
+  "lang": "es",
+  "start_url": "/acceso",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f7f9fb",
+  "theme_color": "#126d78",
+  "prefer_related_applications": false,
+  "icons": [
+    { "src": "/icons/kneeoai-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/kneeoai-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/kneeoai.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/icons/kneeoai-maskable.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

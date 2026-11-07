@@ -16,7 +16,7 @@ const python = process.env.KNEEOAI_TEST_PYTHON ?? fileURLToPath(new URL(
 export default defineConfig({
   testDir: './tests',
   // These historical suites exercise the retired mock login and browser-only persistence.
-  testIgnore: '**/history-v08/**',
+  testIgnore: ['**/history-v08/**', '**/pwa.spec.ts'],
   fullyParallel: false,
   workers: 1,
   reporter: 'list',

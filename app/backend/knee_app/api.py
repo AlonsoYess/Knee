@@ -24,6 +24,7 @@ from .models import Login, CreateEvaluation, UpdateEvaluation
 from .preparations import install_preparation_routes
 from .processor import FrozenProcessor
 from .private_files import ApiBodyLimit
+from .frontend_distribution import FrontendDistribution, FrontendDistributionMiddleware
 from .security import COOKIE_NAME, COOKIE_PATH, csrf_token, load_secret, new_token, password_hash, token_hash, verify_csrf, verify_password
 
 LOGGER = logging.getLogger("knee_app")
@@ -31,16 +32,19 @@ TOKEN_PATTERN = re.compile(r"^[A-Za-z0-9_-]{43}$")
 
 def create_app(settings: Settings | None = None, *, clock: Callable[[], float] = time.time, processor=None) -> FastAPI:
     settings = settings or Settings.from_env()
+    distribution=FrontendDistribution(settings.frontend_dist_path,database_path=settings.database_path,private_files_path=settings.private_files_path) if settings.frontend_dist_path is not None else None
     db = Database(settings.database_path, settings.busy_timeout_ms)
     db.initialize()
     db.interrupt_preparations(float(clock()))
     secret = load_secret(settings.secret_key, settings.database_path)
     dummy_hash = password_hash(new_token())
-    app = FastAPI(title="KneeOAI application API", version="0.3.0", docs_url=None, redoc_url=None, openapi_url=None, redirect_slashes=False)
+    app = FastAPI(title="KneeOAI application API", version="0.4.0", docs_url=None, redoc_url=None, openapi_url=None, redirect_slashes=False)
     app.state.settings, app.state.db, app.state.clock = settings, db, clock
     app.state.processor = processor if processor is not None else FrozenProcessor(settings)
     # Added before the authentication middleware below, so authenticated mutation checks run first.
     app.add_middleware(ApiBodyLimit,max_bytes=settings.max_request_bytes)
+    if distribution is not None:
+        app.add_middleware(FrontendDistributionMiddleware,distribution=distribution)
 
     def now():
         return float(app.state.clock())
@@ -69,7 +73,10 @@ def create_app(settings: Settings | None = None, *, clock: Callable[[], float] =
             LOGGER.error("Application failure requestId=%s type=%s", request.state.request_id, type(exc).__name__)
             response = error_response(request, ApiError(500, "INTERNAL_ERROR", "No se pudo completar la operación."))
         response.headers["X-Request-Id"] = request.state.request_id
-        response.headers["Cache-Control"] = "no-store"
+        api_path=request.url.path=='/api' or request.url.path.startswith('/api/')
+        public_response=getattr(request.state,'public_frontend',False) and response.status_code in {200,304}
+        if api_path or not public_response:
+            response.headers["Cache-Control"] = "no-store"
         response.headers["X-Content-Type-Options"] = "nosniff"
         return response
 

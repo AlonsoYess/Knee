@@ -42,6 +42,7 @@ class Settings:
     frozen_python: Path | None = None
     frozen_checkout: Path | None = None
     frozen_timeout_seconds: int = 120
+    frontend_dist_path: Path | None = None
 
     def __post_init__(self):
         object.__setattr__(self, "database_path", Path(self.database_path).resolve())
@@ -49,6 +50,9 @@ class Settings:
         for key in ('frozen_python', 'frozen_checkout'):
             if getattr(self, key) is not None:
                 object.__setattr__(self, key, Path(getattr(self, key)).resolve())
+        if self.frontend_dist_path is not None:
+            # Keep the original path until the distribution validator can reject links/junctions.
+            object.__setattr__(self,'frontend_dist_path',Path(self.frontend_dist_path).absolute())
         object.__setattr__(self, "allowed_origins", tuple(normalized_origin(v) for v in self.allowed_origins))
         if self.environment not in {"development", "production", "test"}:
             raise ValueError("Unsupported environment")
@@ -81,4 +85,5 @@ class Settings:
             private_files_path=Path(os.environ['KNEEOAI_PRIVATE_FILES']) if os.environ.get('KNEEOAI_PRIVATE_FILES') else None,
             frozen_python=Path(os.environ['KNEEOAI_FROZEN_PYTHON']) if os.environ.get('KNEEOAI_FROZEN_PYTHON') else None,
             frozen_checkout=Path(os.environ['KNEEOAI_FROZEN_CHECKOUT']) if os.environ.get('KNEEOAI_FROZEN_CHECKOUT') else None,
+            frontend_dist_path=Path(os.environ['KNEEOAI_FRONTEND_DIST']) if os.environ.get('KNEEOAI_FRONTEND_DIST') else None,
         )

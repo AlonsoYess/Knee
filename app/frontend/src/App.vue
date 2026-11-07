@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { isNavigationFailure, NavigationFailureType, useRoute, useRouter } from 'vue-router'
 import AppIcon from './components/AppIcon.vue'
+import ApplicationStatus from './components/ApplicationStatus.vue'
 import { apiMessage, closeSession, serverSession } from './state/session'
 import { closeOnBackdrop } from './dialog'
 import { resetDemoListPreferences } from './demoListPreferences'
@@ -34,6 +35,7 @@ async function logout() {
 <template>
   <a class="skip-link" href="#main-content">Saltar al contenido</a>
   <div class="demo-ribbon"><span class="demo-ribbon-dot" aria-hidden="true"></span>Prototipo académico · sesión real<span class="demo-ribbon-detail">Solo casos ficticios · predicción bloqueada</span></div>
+  <ApplicationStatus />
   <RouterView v-if="isLogin" />
   <div v-else class="workspace">
     <header class="workspace-header">

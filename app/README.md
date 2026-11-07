@@ -1,10 +1,10 @@
 # Prototipo KneeOAI
 
-## Estado actual de la fase 3
+## Estado actual de la fase 4
 
-La versión 0.10 incorpora carga privada de DICOM, referencia visual sellada, preparación y revisión de calidad persistentes, además del acceso real y los datos basales de la fase 2. Vue se comunica con FastAPI y SQLite. La predicción de progresión sigue bloqueada; no se abre la prueba reservada.
+La versión 0.11 incorpora PWA instalable, actualización explícita, avisos de conexión y arranque local unificado. Conserva el acceso real, los datos basales y la preparación/revisión persistentes de fase 3. Vue se comunica con FastAPI y SQLite. La predicción de progresión sigue bloqueada; no se abre la prueba reservada.
 
-Alcance y comprobaciones: [entrega de fase 3](FASE_3_ENTREGA.md). El plan conserva PWA, publicación e integración predictiva como fases siguientes.
+Alcance y comprobaciones: [entrega de fase 4](FASE_4_ENTREGA.md). Publicación HTTPS e integración predictiva conservan sus fases propias.
 
 ```mermaid
 flowchart LR
@@ -19,15 +19,19 @@ El preparador reutiliza el procedimiento científico congelado en un proceso y e
 
 ## Verlo en esta computadora
 
-La interfaz se abre en `http://127.0.0.1:5173/acceso`. El servidor local escucha en `127.0.0.1:8000`. Se necesitan ambos procesos.
-
-Si el entorno ya está instalado, desde la raíz del repositorio, iniciar el backend en segundo plano con:
+Abrir **`app/IniciarKneeOAI.cmd`** con doble clic, o ejecutar desde la raíz del repositorio:
 
 ```powershell
-.\app\IniciarServidor.ps1
+.\app\IniciarKneeOAI.ps1
 ```
 
-En otra terminal, desde `app/frontend`:
+Se abre **`http://127.0.0.1:8000/acceso`**, servido por un único proceso local con la misma cuenta y base. El primer arranque compila la interfaz y conserva una copia verificada e inmutable; los siguientes reutilizan la distribución si las fuentes no cambiaron. Si el servidor ya está abierto, se reutiliza sin reconstruir ni recargar las ventanas. El iniciador no detiene otro proceso que ocupe el puerto.
+
+En Edge o Chrome se puede usar el botón **Instalar KneeOAI**, cuando el navegador lo ofrezca, o la opción de instalar aplicación del navegador. La ventana instalada sigue necesitando el servidor local. `app/DetenerKneeOAI.cmd` detiene exclusivamente el proceso registrado por este iniciador; los datos guardados se conservan. Guardar el trabajo antes de detenerlo. Para actualizar el código local, cerrar las ventanas, detener el servicio y volver a iniciar; nunca se sustituyen los archivos de una distribución en uso.
+
+La primera instalación de dependencias necesita Internet. Con el entorno y la distribución ya preparados, el servidor local puede funcionar sin Internet. La caché de la PWA contiene solo su interfaz pública: no guarda evaluaciones, sesiones, imágenes ni resultados. Si el servidor no responde, no se pueden confirmar guardados ni leer datos privados. Una actualización no recarga automáticamente ediciones pendientes; se solicita una decisión y se bloquea mientras haya una escritura o varias ventanas abiertas.
+
+Para desarrollo se conserva la vista de Vite en `5173`, con backend separado; no es la dirección recomendada para instalar la PWA. Desde `app/frontend`:
 
 ```powershell
 npm run dev
@@ -52,7 +56,6 @@ python -m venv .venv
 .venv\Scripts\python.exe -m pip install -r requirements.lock
 .venv\Scripts\python.exe -m knee_app.cli init
 .venv\Scripts\python.exe -m knee_app.cli create-user --email medico@example.invalid --name "Médico de demostración"
-.venv\Scripts\python.exe -m uvicorn knee_app.api:create_app --factory --host 127.0.0.1 --port 8000
 ```
 
 La creación solicita la contraseña de forma privada y con confirmación. En Linux se utiliza `.venv/bin/python`. Si Python tiene otro nombre o ruta, usar su ejecutable 3.12 al crear el entorno.
@@ -62,10 +65,13 @@ Desde `app/frontend`:
 ```powershell
 npm ci --ignore-scripts
 npm run test:contracts
-npm run dev
 ```
 
+Después, desde la raíz del repositorio, ejecutar `app/IniciarKneeOAI.ps1`. En otro sistema operativo compilar con `npm run build`, configurar `KNEEOAI_FRONTEND_DIST` con la ruta absoluta de `app/frontend/dist` e iniciar Uvicorn; los iniciadores `.cmd/.ps1` están destinados a Windows.
+
 Vite reenvía `/api` al backend local. `.env.example` permite ajustar ese destino solo para desarrollo. Un despliegue requerirá enrutamiento bajo el mismo origen, HTTPS y almacenamiento persistente; el proxy local no configura un alojamiento.
+
+Las condiciones de instalación se basan en [MDN](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Guides/Making_PWAs_installable). El inicio local usa un origen loopback admitido; no sustituye el HTTPS del despliegue futuro.
 
 ## Qué se guarda y qué sigue pendiente
 
@@ -113,6 +119,8 @@ Pruebas de interfaz, desde `app/frontend`:
 npm run test:contracts
 npm run build
 npm run test:e2e
+npm run test:pwa:unit
+npm run test:pwa
 ```
 
 En Windows local se usa Edge; con `CI=true` se usa Chromium, instalable con `npx playwright install chromium`. Linux CI utiliza `npx playwright install --with-deps chromium`. El backend de pruebas tiene base nueva y cuentas exclusivamente de prueba. Por defecto escucha en 8011 y la interfaz de pruebas en 5174; no se reutiliza el servidor del usuario. `E2E_API_PORT`, `E2E_PORT` y `KNEEOAI_TEST_PYTHON` permiten cambiar puertos o intérprete de prueba.
