@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="720" viewBox="0 0 960 720" role="img" aria-labelledby="title desc">
+  <title id="title">Imagen B: esquema bilateral sintético</title>
+  <desc id="desc">Segunda ilustración vectorial ficticia para probar la sustitución de imagen. No contiene una radiografía ni datos de pacientes. No representa calidad o gravedad clínica.</desc>
+  <defs>
+    <radialGradient id="bg"><stop stop-color="#2a3843"/><stop offset="1" stop-color="#101923"/></radialGradient>
+    <linearGradient id="bone" x1="0" x2="1"><stop stop-color="#6f7d85" stop-opacity=".5"/><stop offset=".6" stop-color="#c5d2d8" stop-opacity=".83"/><stop offset="1" stop-color="#75838b" stop-opacity=".6"/></linearGradient>
+    <g id="knee">
+      <path d="M92 0 C101 69 99 127 86 184 C81 211 50 233 48 263 C45 283 54 298 75 300 C99 302 117 291 126 278 C137 297 161 303 182 294 C199 286 200 266 188 244 C174 221 151 213 150 181 C148 121 159 61 165 0Z" fill="url(#bone)" stroke="#d4dce1" stroke-opacity=".55" stroke-width="3"/>
+      <path d="M54 325 C77 316 104 321 126 327 C152 315 179 320 196 333 L187 362 C166 382 162 423 167 489 L173 550 L92 550 C93 481 94 418 85 385 C79 367 61 357 54 325Z" fill="url(#bone)" stroke="#d4dce1" stroke-opacity=".55" stroke-width="3"/>
+      <path d="M204 352 C225 345 234 357 229 381 L213 550 L191 550 L199 411Z" fill="#8c9ca6" fill-opacity=".38" stroke="#c5d0d6" stroke-opacity=".4" stroke-width="2"/>
+      <path d="M84 248 Q101 263 92 282 M153 247 Q168 264 163 282 M87 338 Q131 347 178 337" fill="none" stroke="#e1e8eb" stroke-opacity=".35" stroke-width="3"/>
+    </g>
+  </defs>
+  <rect width="960" height="720" rx="12" fill="url(#bg)"/>
+  <g font-family="Segoe UI,Arial,sans-serif" fill="#b9cbd2"><text x="38" y="42" font-size="17" letter-spacing="2">KNEEOAI · IMAGEN B</text><text x="922" y="42" text-anchor="end" font-size="14">DEMO</text></g>
+  <g transform="translate(200 75)"><use href="#knee"/></g>
+  <g transform="translate(523 75)"><use href="#knee"/></g>
+  <g font-family="Segoe UI,Arial,sans-serif" text-anchor="middle"><text x="327" y="666" fill="#d6e6e9" font-size="17">Derecha del paciente</text><text x="650" y="666" fill="#d6e6e9" font-size="17">Izquierda del paciente</text></g>
+  <rect x="246" y="356" width="468" height="46" rx="8" fill="#14242d" fill-opacity=".88"/>
+  <text x="480" y="385" fill="#c5dade" font-family="Segoe UI,Arial,sans-serif" text-anchor="middle" font-size="19" letter-spacing="2">SINTÉTICA · NO CLÍNICA</text>
+  <text x="480" y="702" fill="#9db4bd" font-family="Segoe UI,Arial,sans-serif" text-anchor="middle" font-size="13">Ilustración de interfaz · no representa un estudio DICOM</text>
+</svg>

@@ -1,0 +1,2879 @@
+{
+  "openapi": "3.1.0",
+  "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
+  "info": {
+    "title": "KneeOAI — contrato propuesto Vue/FastAPI",
+    "version": "1.0.0-proposed",
+    "summary": "Fase 1: comunicación, sin backend implementado.",
+    "description": "Propuesta; no acredita servidor, acceso real, lectura DICOM, QC o inferencia implementados. Todos los ejemplos son ficticios, sin porcentajes predictivos. No altera transformaciones, cohortes, entrenamiento o prueba reservada. JSON directo sin wrapper data; errores uniformes. No permite seleccionar modelos, entrenar ni acceder a reserva."
+  },
+  "servers": [
+    {
+      "url": "/api/v1",
+      "description": "Mismo origen de la SPA; no es un servidor disponible."
+    }
+  ],
+  "security": [
+    {
+      "SessionCookie": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Session",
+      "description": "Sesiones futuras de servidor."
+    },
+    {
+      "name": "Evaluations",
+      "description": "Borradores y revisiones del caso."
+    },
+    {
+      "name": "Preparation",
+      "description": "Preparación y QC versionados."
+    },
+    {
+      "name": "Inference",
+      "description": "Ejecución con paquete formalizado."
+    }
+  ],
+  "paths": {
+    "/session": {
+      "get": {
+        "operationId": "readSession",
+        "tags": [
+          "Session"
+        ],
+        "summary": "Obtener sesión y token CSRF.",
+        "description": "Bootstrap público: crea o recupera contexto anónimo antes del login. Una sesión caducada pasa a anónima sin recuperar privilegios. Nunca acepta la marca client-side como autorización.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Sesión anónima o autenticada.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/NoStore"
+              },
+              "Set-Cookie": {
+                "$ref": "#/components/headers/SessionCookie"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Session"
+                },
+                "example": {
+                  "authenticated": false,
+                  "user": null,
+                  "expiresAt": null,
+                  "csrfToken": "csrf-fixture-not-a-secret"
+                }
+              }
+            }
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          },
+          "default": {
+            "$ref": "#/components/responses/UnexpectedError"
+          }
+        }
+      },
+      "post": {
+        "operationId": "login",
+        "tags": [
+          "Session"
+        ],
+        "summary": "Autenticar una cuenta administrada.",
+        "description": "Requiere contexto anónimo y CSRF de GET /session. Verifica credenciales y rota sesión y token. Las credenciales ficticias del frontend no son acceso real.",
+        "responses": {
+          "200": {
+            "description": "Autenticación correcta.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/NoStore"
+              },
+              "Set-Cookie": {
+                "$ref": "#/components/headers/SessionCookie"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Session"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "default": {
+            "$ref": "#/components/responses/UnexpectedError"
+          }
+        },
+        "security": [
+          {
+            "SessionCookie": [],
+            "CsrfToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Login"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "logout",
+        "tags": [
+          "Session"
+        ],
+        "summary": "Cerrar y revocar la sesión.",
+        "description": "Requiere sesión autenticada y CSRF. Revoca en servidor y expira cookie; borrar sessionStorage no sustituye esta operación.",
+        "responses": {
+          "204": {
+            "description": "Sesión revocada; cuerpo vacío y cookie expirada.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/NoStore"
+              },
+              "Set-Cookie": {
+                "$ref": "#/components/headers/SessionCookie"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "default": {
+            "$ref": "#/components/responses/UnexpectedError"
+          }
+        },
+        "security": [
+          {
+            "SessionCookie": [],
+            "CsrfToken": []
+          }
+        ]
+      }
+    },
+    "/evaluations": {
+      "get": {
+        "operationId": "listEvaluations",
+        "tags": [
+          "Evaluations"
+        ],
+        "summary": "Listar evaluaciones accesibles.",
+        "description": "Filtrar por usuario autenticado; el administrador no obtiene acceso transversal implícito.",
+        "responses": {
+          "200": {
+            "description": "Página de casos.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/NoStore"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvaluationPage"
+                },
+                "example": {
+                  "items": [
+                    {
+                      "id": "evaluation-fixture-001",
+                      "code": "FIXTURE-001",
+                      "currentRevisionId": "revision-fixture-001",
+                      "clinical": {
+                        "age": 60,
+                        "sex": "F",
+                        "bmi": null,
+                        "side": "right"
+                      },
+                      "preparationId": null,
+                      "reviewId": null,
+                      "currentExecutionId": null,
+                      "updatedAt": "2026-11-07T15:00:00Z"
+                    }
+                  ],
+                  "nextCursor": null
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "default": {
+            "$ref": "#/components/responses/UnexpectedError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            }
+          }
+        ]
+      },
+      "post": {
+        "operationId": "createEvaluation",
+        "tags": [
+          "Evaluations"
+        ],
+        "summary": "Crear un borrador.",
+        "description": "El servidor asigna propietario, código e identificadores. Admite campos ausentes null; no prepara imágenes ni ejecuta modelos.",
+        "responses": {
+          "201": {
+            "description": "Borrador creado.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/NoStore"
+              },
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Location": {
+                "$ref": "#/components/headers/Location"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Evaluation"
+                },
+                "example": {
+                  "id": "evaluation-fixture-001",
+                  "code": "FIXTURE-001",
+                  "currentRevisionId": "revision-fixture-001",
+                  "clinical": {
+                    "age": 60,
+                    "sex": "F",
+                    "bmi": null,
+                    "side": "right"
+                  },
+                  "preparationId": null,
+                  "reviewId": null,
+                  "currentExecutionId": null,
+                  "updatedAt": "2026-11-07T15:00:00Z"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "default": {
+            "$ref": "#/components/responses/UnexpectedError"
+          }
+        },
+        "security": [
+          {
+            "SessionCookie": [],
+            "CsrfToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEvaluation"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/evaluations/{evaluationId}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/EvaluationId"
+        }
+      ],
+      "get": {
+        "operationId": "getEvaluation",
+        "tags": [
+          "Evaluations"
+        ],
+        "summary": "Leer la versión actual del caso.",
+        "description": "Devuelve ETag para modificaciones posteriores.",
+        "responses": {
+          "200": {
+            "description": "Caso actual.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/NoStore"
+              },
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Evaluation"
+                },
+                "example": {
+                  "id": "evaluation-fixture-001",
+                  "code": "FIXTURE-001",
+                  "currentRevisionId": "revision-fixture-001",
+                  "clinical": {
+                    "age": 60,
+                    "sex": "F",
+                    "bmi": null,
+                    "side": "right"
+                  },
+                  "preparationId": null,
+                  "reviewId": null,
+                  "currentExecutionId": null,
+                  "updatedAt": "2026-11-07T15:00:00Z"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "default": {
+            "$ref": "#/components/responses/UnexpectedError"
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateEvaluation",
+        "tags": [
+          "Evaluations"
+        ],
+        "summary": "Guardar cambios basales.",
+        "description": "Guardado atómico. Un cambio clínico crea nueva revisión y deja sin vigencia resultados anteriores. Cambiar lado invalida además preparación y QC ligados al lado. Cambiar solo edad, sexo o IMC no inventa defectos radiográficos ni borra evidencia histórica.",
+        "responses": {
+          "200": {
+            "description": "Caso actualizado.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/NoStore"
+              },
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Evaluation"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "412": {
+            "$ref": "#/components/responses/PreconditionFailed"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "428": {
+            "$ref": "#/components/responses/PreconditionRequired"
+          },
+          "default": {
+            "$ref": "#/components/responses/UnexpectedError"
+          }
+        },
+        "security": [
+          {
+            "SessionCookie": [],
+            "CsrfToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateEvaluation"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/evaluations/{evaluationId}/preparations": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/EvaluationId"
+        }
+      ],
+      "post": {
+        "operationId": "createPreparation",
+        "tags": [
+          "Preparation"
+        ],
+        "summary": "Cargar DICOM e iniciar preparación.",
+        "description": "If-Match de evaluación. Requiere lado guardado, identidad de archivo nueva y trabajo persistido del flujo compartido. Sustituir imagen invalida revisión activa y resultado, preservando historial. 202 no acredita QC ni predicción.",
+        "responses": {
+          "202": {
+            "description": "Carga y trabajo registrados.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/NoStore"
+              },
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Location": {
+                "$ref": "#/components/headers/Location"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Preparation"
+                },
+                "example": {
+                  "id": "preparation-fixture-001",
+                  "evaluationId": "evaluation-fixture-001",
+                  "sourceEvaluationRevisionId": "revision-fixture-001",
+                  "preparationRevisionId": "preparation-revision-fixture-001",
+                  "image": {
+                    "imageId": "image-fixture-001",
+                    "imageVersion": "image-version-fixture-001"
+                  },
+                  "side": "right",
+                  "status": "queued",
+                  "pipelineVersion": null,
+                  "reviewContext": null,
+                  "error": null,
+                  "createdAt": "2026-11-07T15:01:00Z",
+                  "updatedAt": "2026-11-07T15:01:00Z",
+                  "activeReview": null
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "412": {
+            "$ref": "#/components/responses/PreconditionFailed"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "428": {
+            "$ref": "#/components/responses/PreconditionRequired"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          },
+          "default": {
+            "$ref": "#/components/responses/UnexpectedError"
+          }
+        },
+        "security": [
+          {
+            "SessionCookie": [],
+            "CsrfToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/UploadPreparation"
+              },
+              "encoding": {
+                "file": {
+                  "contentType": "application/dicom, application/octet-stream"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/preparations/{preparationId}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/PreparationId"
+        }
+      ],
+      "get": {
+        "operationId": "getPreparation",
+        "tags": [
+          "Preparation"
+        ],
+        "summary": "Consultar preparación y contexto QC.",
+        "description": "Acceso por propietario del caso. Su ETag se usa para registrar la decisión exacta.",
+        "responses": {
+          "200": {
+            "description": "Preparación.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/NoStore"
+              },
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Preparation"
+                },
+                "example": {
+                  "id": "preparation-fixture-001",
+                  "evaluationId": "evaluation-fixture-001",
+                  "sourceEvaluationRevisionId": "revision-fixture-001",
+                  "preparationRevisionId": "preparation-revision-fixture-001",
+                  "image": {
+                    "imageId": "image-fixture-001",
+                    "imageVersion": "image-version-fixture-001"
+                  },
+                  "side": "right",
+                  "status": "queued",
+                  "pipelineVersion": null,
+                  "reviewContext": null,
+                  "error": null,
+                  "createdAt": "2026-11-07T15:01:00Z",
+                  "updatedAt": "2026-11-07T15:01:00Z",
+                  "activeReview": null
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "default": {
+            "$ref": "#/components/responses/UnexpectedError"
+          }
+        }
+      }
+    },
+    "/preparations/{preparationId}/views/{view}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/PreparationId"
+        },
+        {
+          "name": "view",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "enum": [
+              "original",
+              "crop"
+            ]
+          }
+        }
+      ],
+      "get": {
+        "operationId": "getPreparationView",
+        "tags": [
+          "Preparation"
+        ],
+        "summary": "Obtener vista autenticada de revisión.",
+        "description": "Representación PNG para la revisión solicitada; no publica el DICOM ni crea enlaces públicos. revision identifica la preparación que se está revisando.",
+        "responses": {
+          "200": {
+            "description": "PNG sin caché.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/NoStore"
+              }
+            },
+            "content": {
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "default": {
+            "$ref": "#/components/responses/UnexpectedError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "revision",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/OpaqueId"
+            }
+          }
+        ]
+      }
+    },
+    "/preparations/{preparationId}/reviews": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/PreparationId"
+        }
+      ],
+      "post": {
+        "operationId": "recordQualityReview",
+        "tags": [
+          "Preparation"
+        ],
+        "summary": "Registrar decisión del recorte presentado.",
+        "description": "If-Match de preparación. Verificar ready, identidad imagen/lado/versión, controles del QC vigente, permisos e impedimentos. accepted no omite el flujo científico. Crear decisión inmutable y actualizar referencia activa del caso, invalidando resultados. Después consultar caso y preparación para obtener sus versiones.",
+        "responses": {
+          "201": {
+            "description": "Decisión persistida.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/NoStore"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QualityReview"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "412": {
+            "$ref": "#/components/responses/PreconditionFailed"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "428": {
+            "$ref": "#/components/responses/PreconditionRequired"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          },
+          "default": {
+            "$ref": "#/components/responses/UnexpectedError"
+          }
+        },
+        "security": [
+          {
+            "SessionCookie": [],
+            "CsrfToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewSubmission"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/evaluations/{evaluationId}/executions": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/EvaluationId"
+        }
+      ],
+      "post": {
+        "operationId": "requestPrediction",
+        "tags": [
+          "Inference"
+        ],
+        "summary": "Solicitar cálculo sobre revisión inmutable.",
+        "description": "If-Match de evaluación e Idempotency-Key obligatorios. Validar política de entradas y ausencias del paquete, revisión, preparación y QC aceptados vigentes. No imponer exclusión de casos por BMI null si el flujo congelado lo imputa. Fijar instantánea y paquete, registrar trabajo atómicamente. Motor ausente: 503 sin cálculo. Repetición exacta ya aceptada: misma ejecución, incluso si luego cambió ETag, tras volver a verificar acceso/CSRF. Misma clave con otro cuerpo: 409.",
+        "responses": {
+          "200": {
+            "description": "Repetición idempotente: mismo trabajo, sin otro cálculo.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/NoStore"
+              },
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Execution"
+                },
+                "example": {
+                  "id": "execution-fixture-001",
+                  "evaluationId": "evaluation-fixture-001",
+                  "status": "queued",
+                  "inputSnapshot": {
+                    "evaluationRevisionId": "revision-fixture-003",
+                    "clinical": {
+                      "age": 60,
+                      "sex": "F",
+                      "bmi": null,
+                      "side": "right"
+                    },
+                    "preparationId": "preparation-fixture-001",
+                    "preparationRevisionId": "preparation-revision-fixture-002",
+                    "image": {
+                      "imageId": "image-fixture-001",
+                      "imageVersion": "image-version-fixture-001"
+                    },
+                    "reviewId": "review-fixture-001",
+                    "qcPolicyVersion": "fixture-not-a-qc-policy"
+                  },
+                  "engine": {
+                    "packageId": "package-fixture-only",
+                    "packageVersion": "fixture-not-a-model",
+                    "pipelineVersion": "fixture-pipeline",
+                    "clinicalTransformVersion": "fixture-transform",
+                    "calibratorVersion": "fixture-not-a-calibrator",
+                    "thresholdVersion": "fixture-not-a-threshold"
+                  },
+                  "isCurrentInput": true,
+                  "submittedAt": "2026-11-07T15:05:00Z",
+                  "finishedAt": null,
+                  "result": null,
+                  "error": null
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Trabajo registrado.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/NoStore"
+              },
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Location": {
+                "$ref": "#/components/headers/Location"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Execution"
+                },
+                "example": {
+                  "id": "execution-fixture-001",
+                  "evaluationId": "evaluation-fixture-001",
+                  "status": "queued",
+                  "inputSnapshot": {
+                    "evaluationRevisionId": "revision-fixture-003",
+                    "clinical": {
+                      "age": 60,
+                      "sex": "F",
+                      "bmi": null,
+                      "side": "right"
+                    },
+                    "preparationId": "preparation-fixture-001",
+                    "preparationRevisionId": "preparation-revision-fixture-002",
+                    "image": {
+                      "imageId": "image-fixture-001",
+                      "imageVersion": "image-version-fixture-001"
+                    },
+                    "reviewId": "review-fixture-001",
+                    "qcPolicyVersion": "fixture-not-a-qc-policy"
+                  },
+                  "engine": {
+                    "packageId": "package-fixture-only",
+                    "packageVersion": "fixture-not-a-model",
+                    "pipelineVersion": "fixture-pipeline",
+                    "clinicalTransformVersion": "fixture-transform",
+                    "calibratorVersion": "fixture-not-a-calibrator",
+                    "thresholdVersion": "fixture-not-a-threshold"
+                  },
+                  "isCurrentInput": true,
+                  "submittedAt": "2026-11-07T15:05:00Z",
+                  "finishedAt": null,
+                  "result": null,
+                  "error": null
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "412": {
+            "$ref": "#/components/responses/PreconditionFailed"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "428": {
+            "$ref": "#/components/responses/PreconditionRequired"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          },
+          "default": {
+            "$ref": "#/components/responses/UnexpectedError"
+          }
+        },
+        "security": [
+          {
+            "SessionCookie": [],
+            "CsrfToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PredictionRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/executions/{executionId}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ExecutionId"
+        }
+      ],
+      "get": {
+        "operationId": "getExecution",
+        "tags": [
+          "Inference"
+        ],
+        "summary": "Consultar estado y resultado versionado.",
+        "description": "GET no ejecuta ni repite. El trabajo conserva instantánea y paquete aunque cambie el caso. Solo succeeded contiene resultado. failed/interrupted contienen error y cierre; un reintento explícito usa otra clave y referencias vigentes. isCurrentInput=false identifica un resultado histórico.",
+        "responses": {
+          "200": {
+            "description": "Ejecución actualizada.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/NoStore"
+              },
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Execution"
+                },
+                "example": {
+                  "id": "execution-fixture-001",
+                  "evaluationId": "evaluation-fixture-001",
+                  "status": "queued",
+                  "inputSnapshot": {
+                    "evaluationRevisionId": "revision-fixture-003",
+                    "clinical": {
+                      "age": 60,
+                      "sex": "F",
+                      "bmi": null,
+                      "side": "right"
+                    },
+                    "preparationId": "preparation-fixture-001",
+                    "preparationRevisionId": "preparation-revision-fixture-002",
+                    "image": {
+                      "imageId": "image-fixture-001",
+                      "imageVersion": "image-version-fixture-001"
+                    },
+                    "reviewId": "review-fixture-001",
+                    "qcPolicyVersion": "fixture-not-a-qc-policy"
+                  },
+                  "engine": {
+                    "packageId": "package-fixture-only",
+                    "packageVersion": "fixture-not-a-model",
+                    "pipelineVersion": "fixture-pipeline",
+                    "clinicalTransformVersion": "fixture-transform",
+                    "calibratorVersion": "fixture-not-a-calibrator",
+                    "thresholdVersion": "fixture-not-a-threshold"
+                  },
+                  "isCurrentInput": true,
+                  "submittedAt": "2026-11-07T15:05:00Z",
+                  "finishedAt": null,
+                  "result": null,
+                  "error": null
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "default": {
+            "$ref": "#/components/responses/UnexpectedError"
+          }
+        }
+      }
+    },
+    "/engine-status": {
+      "get": {
+        "operationId": "getEngineStatus",
+        "tags": [
+          "Inference"
+        ],
+        "summary": "Consultar disponibilidad técnica.",
+        "description": "Permite mantener deshabilitado el cálculo sin paquete formalizado. ready no demuestra utilidad clínica. El POST vuelve a comprobar disponibilidad.",
+        "responses": {
+          "200": {
+            "description": "Estado técnico.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/NoStore"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EngineStatus"
+                },
+                "example": {
+                  "status": "not_configured",
+                  "package": null,
+                  "message": "Motor predictivo pendiente de formalización."
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "default": {
+            "$ref": "#/components/responses/UnexpectedError"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "SessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "kneeoai_session",
+        "description": "Sesión opaca del servidor. Protegidos requieren usuario; POST /session usa contexto anónimo emitido por GET."
+      },
+      "CsrfToken": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-CSRF-Token",
+        "description": "Token ligado a sesión, emitido por GET /session, rotado al autenticar. Obligatorio para mutaciones, login y logout."
+      }
+    },
+    "parameters": {
+      "EvaluationId": {
+        "name": "evaluationId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/OpaqueId"
+        }
+      },
+      "PreparationId": {
+        "name": "preparationId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/OpaqueId"
+        }
+      },
+      "ExecutionId": {
+        "name": "executionId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/OpaqueId"
+        }
+      },
+      "IfMatch": {
+        "name": "If-Match",
+        "in": "header",
+        "required": true,
+        "description": "Un ETag fuerte de evaluación; para QC, el de preparación. No listas, comodín ni valores débiles.",
+        "schema": {
+          "type": "string",
+          "pattern": "^\"[^\"\\r\\n]+\"$"
+        },
+        "example": "\"fixture-evaluation-v1\""
+      },
+      "IdempotencyKey": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "description": "Clave nueva por intención de cálculo, reutilizada solo para repetir idéntica solicitud; no incluye datos privados.",
+        "schema": {
+          "type": "string",
+          "minLength": 16,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9_-]+$"
+        },
+        "example": "fixture-inference-request-0001"
+      }
+    },
+    "headers": {
+      "RequestId": {
+        "description": "Identificador seguro que coincide con error.requestId.",
+        "schema": {
+          "$ref": "#/components/schemas/OpaqueId"
+        }
+      },
+      "NoStore": {
+        "description": "Evitar caché de todas las respuestas de la aplicación.",
+        "schema": {
+          "type": "string",
+          "const": "no-store"
+        }
+      },
+      "ETag": {
+        "description": "ETag fuerte y opaco de esta representación. Preservar comillas en If-Match; no sustituye una revisión científica.",
+        "schema": {
+          "type": "string",
+          "pattern": "^\"[^\"\\r\\n]+\"$"
+        },
+        "example": "\"fixture-evaluation-v1\""
+      },
+      "Location": {
+        "description": "Ruta relativa creada dentro de /api/v1.",
+        "schema": {
+          "type": "string",
+          "format": "uri-reference"
+        }
+      },
+      "SessionCookie": {
+        "description": "Cookie opaca del servidor, rotada al autenticar y revocada al salir. HTTPS: HttpOnly; Secure; SameSite=Lax; Path=/api/v1. Sin credenciales ni datos clínicos.",
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    "responses": {
+      "Unauthorized": {
+        "description": "Sesión ausente, caducada o credenciales incorrectas.",
+        "headers": {
+          "X-Request-Id": {
+            "$ref": "#/components/headers/RequestId"
+          },
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "error": {
+                "code": "AUTHENTICATION_REQUIRED",
+                "message": "Inicia sesión para continuar.",
+                "requestId": "req-fixture-001",
+                "fields": [],
+                "retryable": false
+              }
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "CSRF inválido o permiso insuficiente.",
+        "headers": {
+          "X-Request-Id": {
+            "$ref": "#/components/headers/RequestId"
+          },
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "error": {
+                "code": "ACCESS_DENIED",
+                "message": "No se pudo autorizar esta operación.",
+                "requestId": "req-fixture-001",
+                "fields": [],
+                "retryable": false
+              }
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Recurso inexistente o ajeno: no distinguir cuál.",
+        "headers": {
+          "X-Request-Id": {
+            "$ref": "#/components/headers/RequestId"
+          },
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "error": {
+                "code": "RESOURCE_NOT_FOUND",
+                "message": "No se encontró el recurso solicitado.",
+                "requestId": "req-fixture-001",
+                "fields": [],
+                "retryable": false
+              }
+            }
+          }
+        }
+      },
+      "Conflict": {
+        "description": "Estado no listo, revisión incompatible o conflicto idempotente.",
+        "headers": {
+          "X-Request-Id": {
+            "$ref": "#/components/headers/RequestId"
+          },
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "error": {
+                "code": "INPUT_NOT_READY",
+                "message": "Revisa la entrada actual antes de continuar.",
+                "requestId": "req-fixture-001",
+                "fields": [],
+                "retryable": false
+              }
+            }
+          }
+        }
+      },
+      "PreconditionFailed": {
+        "description": "If-Match no coincide: no escribir.",
+        "headers": {
+          "X-Request-Id": {
+            "$ref": "#/components/headers/RequestId"
+          },
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "error": {
+                "code": "VERSION_CONFLICT",
+                "message": "El caso cambió. Recupera su versión actual antes de guardar.",
+                "requestId": "req-fixture-001",
+                "fields": [],
+                "retryable": false
+              }
+            }
+          }
+        }
+      },
+      "PreconditionRequired": {
+        "description": "Falta If-Match obligatorio.",
+        "headers": {
+          "X-Request-Id": {
+            "$ref": "#/components/headers/RequestId"
+          },
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "error": {
+                "code": "VERSION_REQUIRED",
+                "message": "Recupera la versión actual antes de realizar esta operación.",
+                "requestId": "req-fixture-001",
+                "fields": [],
+                "retryable": false
+              }
+            }
+          }
+        }
+      },
+      "ValidationError": {
+        "description": "Formato de entrada o referencias no válidos.",
+        "headers": {
+          "X-Request-Id": {
+            "$ref": "#/components/headers/RequestId"
+          },
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "error": {
+                "code": "VALIDATION_FAILED",
+                "message": "Revisa los datos indicados.",
+                "requestId": "req-fixture-001",
+                "fields": [],
+                "retryable": false
+              }
+            }
+          }
+        }
+      },
+      "PayloadTooLarge": {
+        "description": "Archivo supera el límite técnico configurado.",
+        "headers": {
+          "X-Request-Id": {
+            "$ref": "#/components/headers/RequestId"
+          },
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "error": {
+                "code": "FILE_TOO_LARGE",
+                "message": "El archivo supera el tamaño permitido.",
+                "requestId": "req-fixture-001",
+                "fields": [],
+                "retryable": false
+              }
+            }
+          }
+        }
+      },
+      "UnsupportedMediaType": {
+        "description": "Tipo de contenido de solicitud no admitido.",
+        "headers": {
+          "X-Request-Id": {
+            "$ref": "#/components/headers/RequestId"
+          },
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "error": {
+                "code": "UNSUPPORTED_MEDIA_TYPE",
+                "message": "El formato de la solicitud no está admitido.",
+                "requestId": "req-fixture-001",
+                "fields": [],
+                "retryable": false
+              }
+            }
+          }
+        }
+      },
+      "Unavailable": {
+        "description": "Componente necesario no disponible. En inferencia no se crea cálculo ni riesgo sustituto.",
+        "headers": {
+          "X-Request-Id": {
+            "$ref": "#/components/headers/RequestId"
+          },
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "error": {
+                "code": "ENGINE_NOT_AVAILABLE",
+                "message": "El motor predictivo todavía no está disponible.",
+                "requestId": "req-fixture-001",
+                "fields": [],
+                "retryable": true
+              }
+            }
+          }
+        }
+      },
+      "UnexpectedError": {
+        "description": "Error no previsto, sin detalles privados.",
+        "headers": {
+          "X-Request-Id": {
+            "$ref": "#/components/headers/RequestId"
+          },
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "error": {
+                "code": "INTERNAL_ERROR",
+                "message": "No se pudo completar la operación.",
+                "requestId": "req-fixture-001",
+                "fields": [],
+                "retryable": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "OpaqueId": {
+        "type": "string",
+        "description": "Identificador opaco asignado por el servidor, sin identificadores del estudio.",
+        "minLength": 1,
+        "maxLength": 128,
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+      },
+      "VersionId": {
+        "type": "string",
+        "description": "Versión opaca, no calculada por el cliente.",
+        "minLength": 1,
+        "maxLength": 160
+      },
+      "Timestamp": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "Side": {
+        "type": "string",
+        "enum": [
+          "right",
+          "left"
+        ],
+        "description": "Lado anatómico del paciente, no de la pantalla."
+      },
+      "Sex": {
+        "type": "string",
+        "enum": [
+          "F",
+          "M"
+        ],
+        "description": "Codificación basal admitida por el contrato vigente."
+      },
+      "Age": {
+        "type": "integer",
+        "minimum": 1,
+        "description": "Edad basal en años; validación de formato, no rango clínico de elegibilidad."
+      },
+      "Bmi": {
+        "type": "number",
+        "exclusiveMinimum": 0,
+        "description": "IMC basal en kg/m²; no introduce un límite clínico ni excluye ausencias."
+      },
+      "ClinicalDraft": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "age": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Age"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sex": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Sex"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "bmi": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Bmi"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "side": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Side"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "age",
+          "sex",
+          "bmi",
+          "side"
+        ],
+        "description": "Los ausentes se conservan como null. El tratamiento de ausencias pertenece al paquete científico vigente; no se inventa una regla de casos completos."
+      },
+      "ClinicalInference": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "age": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Age"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sex": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Sex"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "bmi": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Bmi"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "side": {
+            "$ref": "#/components/schemas/Side"
+          }
+        },
+        "required": [
+          "age",
+          "sex",
+          "bmi",
+          "side"
+        ],
+        "description": "Entrada basal capturada. Las ausencias admitidas se transforman o imputan exclusivamente con el estado congelado del paquete. La API no excluye automáticamente por BMI null ni ajusta imputaciones."
+      },
+      "ClinicalPatch": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "age": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Age"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sex": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Sex"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "bmi": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Bmi"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "side": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Side"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [],
+        "minProperties": 1
+      },
+      "CreateEvaluation": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "clinical": {
+            "$ref": "#/components/schemas/ClinicalDraft"
+          }
+        },
+        "required": [
+          "clinical"
+        ]
+      },
+      "UpdateEvaluation": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "clinical": {
+            "$ref": "#/components/schemas/ClinicalPatch"
+          }
+        },
+        "required": [
+          "clinical"
+        ],
+        "description": "Solo campos indicados; null conserva la ausencia. No recibe estado, propietario, QC o resultado del cliente."
+      },
+      "FieldError": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "code": {
+            "type": "string",
+            "minLength": 1
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "path",
+          "code",
+          "message"
+        ]
+      },
+      "ErrorDetail": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          },
+          "requestId": {
+            "$ref": "#/components/schemas/OpaqueId"
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldError"
+            }
+          },
+          "retryable": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "requestId",
+          "fields",
+          "retryable"
+        ],
+        "description": "Sin trazas internas, rutas, credenciales o datos completos del caso. retryable no autoriza reintentos automáticos."
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorDetail"
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "User": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/OpaqueId"
+          },
+          "displayName": {
+            "type": "string",
+            "minLength": 1
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "doctor",
+              "administrator"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "displayName",
+          "role"
+        ]
+      },
+      "Session": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "authenticated": {
+            "type": "boolean"
+          },
+          "user": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/User"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "expiresAt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "csrfToken": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "authenticated",
+          "user",
+          "expiresAt",
+          "csrfToken"
+        ],
+        "description": "CSRF permanece en memoria. El identificador de sesión solo viaja en cookie HttpOnly. GET admite contexto anónimo previo al login.",
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "authenticated": {
+                  "const": false
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "user": {
+                  "type": "null"
+                },
+                "expiresAt": {
+                  "type": "null"
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "user": {
+                  "$ref": "#/components/schemas/User"
+                },
+                "expiresAt": {
+                  "$ref": "#/components/schemas/Timestamp"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "Login": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "minLength": 1
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1,
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ],
+        "description": "Credenciales de cuenta administrada. No convierte credenciales ficticias de Vue en acceso real."
+      },
+      "Evaluation": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/OpaqueId"
+          },
+          "code": {
+            "type": "string",
+            "minLength": 1
+          },
+          "currentRevisionId": {
+            "$ref": "#/components/schemas/OpaqueId"
+          },
+          "clinical": {
+            "$ref": "#/components/schemas/ClinicalDraft"
+          },
+          "preparationId": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OpaqueId"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reviewId": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OpaqueId"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "currentExecutionId": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OpaqueId"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "updatedAt": {
+            "$ref": "#/components/schemas/Timestamp"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "currentRevisionId",
+          "clinical",
+          "preparationId",
+          "reviewId",
+          "currentExecutionId",
+          "updatedAt"
+        ],
+        "description": "currentRevisionId identifica una revisión persistida e inmutable de las entradas. Los campos derivados los asigna el servidor. El progreso de un trabajo no cambia por sí mismo la revisión de entrada."
+      },
+      "EvaluationPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Evaluation"
+            }
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ]
+      },
+      "UploadPreparation": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "description": "Un DICOM basal; el servidor verifica contenido y límite técnico. Los SVG ficticios no son DICOM."
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "description": "El lado se obtiene de la evaluación guardada. Una sustitución crea nueva preparación y conserva historial."
+      },
+      "ImageIdentity": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "imageId": {
+            "$ref": "#/components/schemas/OpaqueId"
+          },
+          "imageVersion": {
+            "$ref": "#/components/schemas/VersionId"
+          }
+        },
+        "required": [
+          "imageId",
+          "imageVersion"
+        ]
+      },
+      "ReviewCheck": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/OpaqueId"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1
+          },
+          "required": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "required"
+        ],
+        "description": "Elemento generado por el procedimiento QC vigente; no un criterio inventado por Vue."
+      },
+      "ReviewContext": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "qcPolicyVersion": {
+            "$ref": "#/components/schemas/VersionId"
+          },
+          "canReview": {
+            "type": "boolean"
+          },
+          "blockerCodes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "checks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewCheck"
+            }
+          },
+          "originalPreviewUrl": {
+            "type": "string",
+            "format": "uri-reference"
+          },
+          "cropPreviewUrl": {
+            "type": "string",
+            "format": "uri-reference"
+          }
+        },
+        "required": [
+          "qcPolicyVersion",
+          "canReview",
+          "blockerCodes",
+          "checks",
+          "originalPreviewUrl",
+          "cropPreviewUrl"
+        ],
+        "description": "Vistas relativas del mismo origen, autenticadas y sin caché. canReview no significa QC aprobado."
+      },
+      "Preparation": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/OpaqueId"
+          },
+          "evaluationId": {
+            "$ref": "#/components/schemas/OpaqueId"
+          },
+          "sourceEvaluationRevisionId": {
+            "$ref": "#/components/schemas/OpaqueId"
+          },
+          "preparationRevisionId": {
+            "$ref": "#/components/schemas/OpaqueId"
+          },
+          "image": {
+            "$ref": "#/components/schemas/ImageIdentity"
+          },
+          "side": {
+            "$ref": "#/components/schemas/Side"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "processing",
+              "ready",
+              "failed"
+            ]
+          },
+          "pipelineVersion": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VersionId"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reviewContext": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReviewContext"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErrorDetail"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "createdAt": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "updatedAt": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "activeReview": {
+            "anyOf": [
+              { "$ref": "#/components/schemas/QualityReview" },
+              { "type": "null" }
+            ],
+            "description": "Decisión guardada vigente para esta preparación; null si no existe o quedó desactualizada."
+          }
+        },
+        "required": [
+          "id",
+          "evaluationId",
+          "sourceEvaluationRevisionId",
+          "preparationRevisionId",
+          "image",
+          "side",
+          "status",
+          "pipelineVersion",
+          "reviewContext",
+          "error",
+          "createdAt",
+          "updatedAt",
+          "activeReview"
+        ],
+        "description": "Preparación del flujo compartido. ready no significa QC aceptado. Una corrección autorizada cambia la revisión de preparación y deja sin vigencia las decisiones anteriores.",
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "ready"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "pipelineVersion": {
+                  "$ref": "#/components/schemas/VersionId"
+                },
+                "reviewContext": {
+                  "$ref": "#/components/schemas/ReviewContext"
+                },
+                "error": {
+                  "type": "null"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "failed"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "error": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                },
+                "reviewContext": {
+                  "type": "null"
+                },
+                "activeReview": {
+                  "type": "null"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "enum": [
+                    "queued",
+                    "processing"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "reviewContext": {
+                  "type": "null"
+                },
+                "error": {
+                  "type": "null"
+                },
+                "activeReview": {
+                  "type": "null"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "ReviewSubmission": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "preparationRevisionId": {
+            "$ref": "#/components/schemas/OpaqueId"
+          },
+          "confirmedSide": {
+            "$ref": "#/components/schemas/Side"
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "accepted",
+              "rejected"
+            ]
+          },
+          "confirmedCheckIds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OpaqueId"
+            },
+            "uniqueItems": true
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "preparationRevisionId",
+          "confirmedSide",
+          "decision",
+          "confirmedCheckIds",
+          "reason"
+        ],
+        "description": "Decisión sobre la revisión exacta. El servidor verifica permisos, identidad, controles requeridos y bloqueos del QC vigente. Enviar accepted no permite saltarse el procedimiento.",
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "decision": {
+                  "const": "rejected"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "reason": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 2000
+                }
+              }
+            }
+          }
+        ]
+      },
+      "QualityReview": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/OpaqueId"
+          },
+          "evaluationId": {
+            "$ref": "#/components/schemas/OpaqueId"
+          },
+          "preparationId": {
+            "$ref": "#/components/schemas/OpaqueId"
+          },
+          "preparationRevisionId": {
+            "$ref": "#/components/schemas/OpaqueId"
+          },
+          "image": {
+            "$ref": "#/components/schemas/ImageIdentity"
+          },
+          "side": {
+            "$ref": "#/components/schemas/Side"
+          },
+          "qcPolicyVersion": {
+            "$ref": "#/components/schemas/VersionId"
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "accepted",
+              "rejected"
+            ]
+          },
+          "confirmedCheckIds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OpaqueId"
+            },
+            "uniqueItems": true
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reviewerId": {
+            "$ref": "#/components/schemas/OpaqueId"
+          },
+          "createdAt": {
+            "$ref": "#/components/schemas/Timestamp"
+          }
+        },
+        "required": [
+          "id",
+          "evaluationId",
+          "preparationId",
+          "preparationRevisionId",
+          "image",
+          "side",
+          "qcPolicyVersion",
+          "decision",
+          "confirmedCheckIds",
+          "reason",
+          "reviewerId",
+          "createdAt"
+        ],
+        "description": "Registro inmutable generado por servidor. Identidad, revisor y fecha no provienen de afirmaciones del cliente. Otra decisión crea otro registro.",
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "decision": {
+                  "const": "rejected"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "reason": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 2000
+                }
+              }
+            }
+          }
+        ]
+      },
+      "PredictionRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "evaluationRevisionId": {
+            "$ref": "#/components/schemas/OpaqueId"
+          },
+          "preparationId": {
+            "$ref": "#/components/schemas/OpaqueId"
+          },
+          "preparationRevisionId": {
+            "$ref": "#/components/schemas/OpaqueId"
+          },
+          "reviewId": {
+            "$ref": "#/components/schemas/OpaqueId"
+          }
+        },
+        "required": [
+          "evaluationRevisionId",
+          "preparationId",
+          "preparationRevisionId",
+          "reviewId"
+        ],
+        "description": "Solo referencias inmutables vigentes del mismo caso. No recibe probabilidades, modelo, pesos, calibrador, umbral o parámetros científicos."
+      },
+      "InputSnapshot": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "evaluationRevisionId": {
+            "$ref": "#/components/schemas/OpaqueId"
+          },
+          "clinical": {
+            "$ref": "#/components/schemas/ClinicalInference"
+          },
+          "preparationId": {
+            "$ref": "#/components/schemas/OpaqueId"
+          },
+          "preparationRevisionId": {
+            "$ref": "#/components/schemas/OpaqueId"
+          },
+          "image": {
+            "$ref": "#/components/schemas/ImageIdentity"
+          },
+          "reviewId": {
+            "$ref": "#/components/schemas/OpaqueId"
+          },
+          "qcPolicyVersion": {
+            "$ref": "#/components/schemas/VersionId"
+          }
+        },
+        "required": [
+          "evaluationRevisionId",
+          "clinical",
+          "preparationId",
+          "preparationRevisionId",
+          "image",
+          "reviewId",
+          "qcPolicyVersion"
+        ],
+        "description": "Instantánea construida por servidor al aceptar la solicitud; el cálculo no vuelve a leer el borrador editable."
+      },
+      "EngineVersion": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "packageId": {
+            "$ref": "#/components/schemas/OpaqueId"
+          },
+          "packageVersion": {
+            "$ref": "#/components/schemas/VersionId"
+          },
+          "pipelineVersion": {
+            "$ref": "#/components/schemas/VersionId"
+          },
+          "clinicalTransformVersion": {
+            "$ref": "#/components/schemas/VersionId"
+          },
+          "calibratorVersion": {
+            "$ref": "#/components/schemas/VersionId"
+          },
+          "thresholdVersion": {
+            "$ref": "#/components/schemas/VersionId"
+          }
+        },
+        "required": [
+          "packageId",
+          "packageVersion",
+          "pipelineVersion",
+          "clinicalTransformVersion",
+          "calibratorVersion",
+          "thresholdVersion"
+        ],
+        "description": "Paquete final formalizado seleccionado por servidor; no revela pesos/rutas ni concede aprobación científica."
+      },
+      "PredictionResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/OpaqueId"
+          },
+          "resultSchemaVersion": {
+            "type": "string",
+            "const": "1"
+          },
+          "executionId": {
+            "$ref": "#/components/schemas/OpaqueId"
+          },
+          "evaluationRevisionId": {
+            "$ref": "#/components/schemas/OpaqueId"
+          },
+          "horizonMonths": {
+            "type": "integer",
+            "const": 48
+          },
+          "probability": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "classification": {
+            "type": "string",
+            "enum": [
+              "progression",
+              "no_progression"
+            ]
+          },
+          "threshold": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "engine": {
+            "$ref": "#/components/schemas/EngineVersion"
+          },
+          "createdAt": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "limitations": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 1
+          }
+        },
+        "required": [
+          "id",
+          "resultSchemaVersion",
+          "executionId",
+          "evaluationRevisionId",
+          "horizonMonths",
+          "probability",
+          "classification",
+          "threshold",
+          "engine",
+          "createdAt",
+          "limitations"
+        ],
+        "description": "Solo una ejecución satisfactoria produce este resultado. Probabilidad calibrada, umbral y clasificación provienen del paquete aprobado. No se fija un umbral aquí ni se ofrecen ejemplos de porcentaje predictivo."
+      },
+      "Execution": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/OpaqueId"
+          },
+          "evaluationId": {
+            "$ref": "#/components/schemas/OpaqueId"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "succeeded",
+              "failed",
+              "interrupted"
+            ]
+          },
+          "inputSnapshot": {
+            "$ref": "#/components/schemas/InputSnapshot"
+          },
+          "engine": {
+            "$ref": "#/components/schemas/EngineVersion"
+          },
+          "isCurrentInput": {
+            "type": "boolean"
+          },
+          "submittedAt": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "finishedAt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PredictionResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErrorDetail"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "evaluationId",
+          "status",
+          "inputSnapshot",
+          "engine",
+          "isCurrentInput",
+          "submittedAt",
+          "finishedAt",
+          "result",
+          "error"
+        ],
+        "description": "Instantánea y paquete inmutables; estado persistido. isCurrentInput se calcula al leer y evita mostrar un resultado histórico como actual. Consultar no ejecuta inferencia.",
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "enum": [
+                    "queued",
+                    "running"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "finishedAt": {
+                  "type": "null"
+                },
+                "result": {
+                  "type": "null"
+                },
+                "error": {
+                  "type": "null"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "succeeded"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "finishedAt": {
+                  "$ref": "#/components/schemas/Timestamp"
+                },
+                "result": {
+                  "$ref": "#/components/schemas/PredictionResult"
+                },
+                "error": {
+                  "type": "null"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "enum": [
+                    "failed",
+                    "interrupted"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "finishedAt": {
+                  "$ref": "#/components/schemas/Timestamp"
+                },
+                "result": {
+                  "type": "null"
+                },
+                "error": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "EngineStatus": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "not_configured",
+              "unavailable",
+              "ready"
+            ]
+          },
+          "package": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EngineVersion"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "status",
+          "package",
+          "message"
+        ],
+        "description": "Disponibilidad técnica, no demostración de utilidad clínica ni autorización para entrenar.",
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "ready"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "package": {
+                  "$ref": "#/components/schemas/EngineVersion"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "not_configured"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "package": {
+                  "type": "null"
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "x-implementation-status": "proposed_contract_only_backend_not_implemented",
+  "x-example-data": "fictional_only_no_predictive_probability_examples"
+}

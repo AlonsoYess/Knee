@@ -1,0 +1,107 @@
+# Plan de cierre del prototipo KneeOAI para la sustentación
+
+Fecha: 7 de noviembre de 2026. Estado: plan de implementación; fase 1 completada en la entrega v0.8. Las fases 2 a 7 conservan sus condiciones de cierre. El registro técnico está en `FASE_1_ENTREGA.md`.
+
+El objetivo es terminar la aplicación mientras se completa el trabajo científico, de modo que la última etapa consista en conectar y verificar el paquete predictivo aprobado. Habrá dos cierres: **aplicación preparada para integración** y **prototipo predictivo listo para sustentación**. El segundo requiere evidencia de funcionamiento con el paquete final; finalizar un entrenamiento no basta para declararlo alcanzado.
+
+El trabajo de producto conserva las reglas científicas vigentes, los entrenamientos existentes y la prueba reservada. La revisión o aceptación del asesor se mantiene separada del cierre técnico de la aplicación.
+
+**Punto de partida al definir el plan**
+
+La interfaz v0.7 contiene acceso, listado, datos basales, radiografía y lado, revisión del recorte y resumen. Usa Vue, TypeScript y Vite. El guardado conserva evaluaciones ficticias en el navegador. La última entrega documentada registra compilación correcta y 43 pruebas de interacción aprobadas; no se volvieron a ejecutar para redactar este plan.
+
+El acceso actual es simulado. No existe todavía una API de aplicación, autenticación de servidor, base de datos central, carga real de DICOM, PWA instalable, despliegue ni conexión predictiva. El botón de predicción permanece bloqueado.
+
+Al iniciar la fase 1, el frontend estaba presente localmente y la regla general `data/` ocultaba `app/frontend/src/data/`. En v0.8 se resolvió moviendo esos módulos ficticios a `app/frontend/src/demo/`, conservando sus claves y versiones de almacenamiento. La entrega incorpora el frontend completo y su contrato de API, sin relajar las exclusiones de datos privados.
+
+**Arquitectura propuesta para la primera entrega**
+
+| Componente | Decisión propuesta | Responsabilidad |
+| --- | --- | --- |
+| Pantallas | Vue 3 y TypeScript actuales | Interacción del médico, validaciones de presentación y estados del recorrido. |
+| Servidor | FastAPI modular, en el mismo repositorio | Sesiones, permisos, evaluaciones, archivos y coordinación de inferencia. |
+| Datos | SQLite, detrás de FastAPI | Usuarios, sesiones, evaluaciones, revisiones y referencias a resultados. |
+| Archivos | Almacenamiento privado persistente | Imágenes autorizadas, recortes y artefactos necesarios, fuera del directorio público. |
+| Motor científico | Adaptador que importa `src/knee` | Reutilizar el procedimiento y paquete congelados, sin duplicarlos en Vue. |
+| Distribución | Configuración reproducible y contenedor Docker | Ejecutar la misma versión en local y en un alojamiento compatible. |
+| Acceso publicado | Dirección gratuita del proveedor con HTTPS; interfaz y API bajo el mismo origen | Empezar sin comprar un dominio y conservar una estructura sencilla. |
+
+SQLite es adecuado para esta demostración acotada con un servidor y disco persistente. El navegador se comunica con FastAPI, nunca abre el archivo de base de datos. Tener dominio no exige PostgreSQL. Si se requieren varias instancias del servidor o muchas escrituras simultáneas, se resolverá PostgreSQL antes de implementar la persistencia; una migración posterior requeriría trabajo y pruebas propios. La base activa no se alojará en una carpeta sincronizada de Drive. [Criterios oficiales de SQLite](https://sqlite.org/whentouse.html).
+
+Se supone una demostración con cuentas controladas y pocas sesiones simultáneas. El investigador eligió una dirección gratuita inicialmente y un presupuesto máximo de US$15 al mes para alojamiento. Quedan pendientes el proveedor y la dirección disponible; no se contempla comprar un dominio en esta primera entrega. El límite se aplicará al costo total de la infraestructura contratada, considerando servidor, almacenamiento, copias y cargos aplicables. La arquitectura no presupone un sistema hospitalario ni incorpora registro público de cuentas.
+
+**Fases y condiciones para declararlas terminadas**
+
+| Fase | Entrega concreta | Evidencia de cierre | Dependencia |
+| --- | --- | --- | --- |
+| 1. Base reproducible | Completada en v0.8: fuente completo, exclusiones resueltas, dependencias fijadas, contrato y ejecución documentada. | Copia limpia instalada y compilada; 57 pruebas aprobadas, OpenAPI y 98 ejemplos ficticios validados. Ver `FASE_1_ENTREGA.md`. | Cerrada técnicamente para su alcance. |
+| 2. Acceso y guardado reales | FastAPI, usuarios, sesiones, permisos, base de datos y evaluaciones persistentes. | Dos cuentas no acceden a casos ajenos; los borradores sobreviven al reinicio y los fallos no aparentan un guardado correcto. | Fase 1. |
+| 3. Recorrido funcional completo | Carga de archivos, preparación, revisión, resumen, estados del motor y diseño de resultado. | Recorrido integrado comprobado con entradas sintéticas y respuestas controladas, incluidos rechazos y errores. | Fase 2; predictor final todavía no requerido. |
+| 4. PWA y ejecución local | Instalación, iconos, actualizaciones, estado sin conexión y arranque local sencillo. | Instalar, cerrar, reabrir y actualizar la versión de producción sin perder una edición silenciosamente. | Recorrido estable; puede avanzar junto a fase 3. |
+| 5. Publicación y recuperación | Dirección gratuita, HTTPS, servicio dentro del límite mensual, almacenamiento persistente, copia de seguridad y procedimiento de restauración. | Acceso desde otro equipo; datos conservados tras reinicio y despliegue; restauración comprobada. | Selección del proveedor y cuentas de infraestructura; permite publicar primero con motor no disponible. |
+| 6. Integración científica | Paquete final conectado y verificado, QC vigente y resultados trazables. | Paridad con el pipeline, clasificación concordante y recursos medidos con casos autorizados fuera de prueba. | Paquete científico aprobado y fases de aplicación necesarias. |
+| 7. Entrega al jurado | Versión congelada, manuales, ensayo con el médico, guion y alternativa local. | Demostración completa repetida en las condiciones de la sustentación y registro de incidencias resueltas. | Fases anteriores y disponibilidad del paquete final. |
+
+La numeración pertenece al prototipo y no sustituye las fases científicas ni las observaciones del jurado. Cada fase se cierra con su versión, pruebas pertinentes, pendientes explícitos y una demostración breve. Solo se reabre por un cambio o un fallo que afecte su aceptación.
+
+**Detalle de la fase 1**
+
+- Incorporar únicamente los cambios de aplicación; mantener separados los cambios científicos que ya existan en el repositorio.
+- Corregir la exclusión de código ficticio mediante una regla específica o un nombre de carpeta inequívoco.
+- Documentar configuración de ejemplo, instalación, arranque, pruebas y versión entregada. Mantener credenciales, bases de datos, imágenes y pesos fuera de Git.
+- Definir cuatro contratos: entrada del caso; preparación y QC versionados; solicitud de predicción sobre una revisión vigente; resultado o error con versión del motor.
+- Preparar verificaciones automáticas de la aplicación con datos sintéticos. La publicación de la versión se realiza después de comprobar el conjunto concreto de archivos.
+
+**Detalle de la fase 2**
+
+La estructura mínima incluirá usuarios, sesiones, evaluaciones, referencias de imagen, revisiones de calidad, ejecuciones y resultados. Los archivos se guardarán fuera de la base, asociados mediante referencias comprobables. Las actualizaciones tendrán control de versión para detectar dos ediciones del mismo caso.
+
+Las cuentas serán administradas. Se implementarán cambio de contraseña y recuperación mediante el administrador, sin añadir una dependencia de correo a esta primera entrega. Las contraseñas usarán un hash adecuado y las sesiones tendrán vencimiento y revocación en el servidor. La configuración publicada utilizará cookies protegidas y defensa CSRF; los permisos se comprobarán en cada operación de la API. [Contraseñas](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html) y [sesiones](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html) en OWASP.
+
+El cierre exige probar aislamiento entre dos usuarios, sesión expirada, cierre de sesión, edición concurrente, pérdida de conexión y reinicio. Se definirá expresamente cómo conservar o importar los borradores ficticios del navegador antes de sustituir su almacenamiento; no se borrarán silenciosamente.
+
+**Detalle de la fase 3**
+
+El recorrido será: acceso → evaluaciones → datos basales → radiografía y lado → revisión de calidad → resumen → cálculo → resultado. Se conservarán los estados de borrador y la siguiente acción clara para el médico.
+
+La carga comprobará el formato DICOM previsto, límites de archivo y lectura válida con fixtures sintéticos. La API preparará la conexión al procesamiento compartido. El catálogo SVG actual seguirá identificado como demostración; no sustituirá una validación de lectura o QC real.
+
+Los estados necesarios son carga en curso, archivo inválido, preparación pendiente, revisión pendiente, rechazo con motivo, revisión desactualizada, motor no disponible, cálculo en curso, error recuperable y resultado disponible. Cambiar una entrada relevante invalidará la revisión o el resultado que corresponda; nunca se mostrará un resultado antiguo como si perteneciera a la edición nueva. Los cálculos llevarán un identificador y un estado persistido; reintentar no debe duplicar resultados. Una interrupción del servidor debe dejar un estado recuperable, no un cálculo eterno.
+
+La pantalla de resultado y su vista imprimible pueden prepararse con marcadores claramente ficticios en el entorno de desarrollo. La versión demostrable sin paquete final mantendrá la predicción bloqueada. El resultado definitivo incluirá probabilidad calibrada de progresión estructural a 48 meses, clasificación con umbral congelado, versión y limitaciones. Las entradas clínicas seguirán siendo las autorizadas; la aplicación no añadirá un estimador KL, nuevas reglas clínicas ni recomendaciones terapéuticas.
+
+**Detalle de las fases 4 y 5**
+
+La PWA tendrá manifiesto, nombre, iconos, navegación y actualización verificadas. Se probará instalación y reapertura en Edge o Chrome en Windows y el recorrido adaptable en móvil. La instalación requiere HTTPS en la web o un origen local admitido; el comportamiento sin conexión se implementa y comprueba por separado. [Instalación de PWA en MDN](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Guides/Making_PWAs_installable).
+
+La caché se limitará inicialmente a recursos estáticos públicos. No almacenará respuestas autenticadas, imágenes ni resultados. Si no hay conexión con el servidor se mostrará la limitación y se impedirá confirmar operaciones no realizadas. Una actualización pendiente no recargará automáticamente una edición sin guardar.
+
+La PWA publicada seguirá necesitando acceso a su servidor. La alternativa local incluirá también el backend y, cuando esté autorizado, el paquete científico y sus dependencias. Su funcionamiento sin Internet deberá ensayarse: instalar un icono no lo garantiza. Las bases local y publicada serán independientes; esta entrega no incorpora sincronización entre ambas.
+
+El dominio es la dirección de acceso; el alojamiento ejecuta la aplicación; el disco persistente conserva sus archivos. Render es un candidato a evaluar por su soporte de dominios y certificados HTTPS, no una contratación decidida. Su almacenamiento de servicio es efímero por defecto y requiere disco persistente de pago para conservar archivos locales entre reinicios y despliegues. [Dominios en Render](https://render.com/docs/custom-domains) y [discos persistentes](https://render.com/docs/disks).
+
+Antes de contratar se presentarán la dirección gratuita disponible, la cuenta a cargo del investigador y el costo mensual total, dentro de US$15. La dirección gratuita no implica alojamiento gratuito. El tamaño final se elegirá midiendo memoria, tiempo de carga y latencia del paquete necesario. Si el predictor no cabe en ese presupuesto, se conservará el límite y se planteará la demostración predictiva local; la publicación con motor no disponible no acreditará el cierre predictivo en línea. Un aumento de presupuesto o un cambio de alcance requerirá una decisión expresa. Multiplicar procesos puede multiplicar la memoria de los modelos. [Memoria por proceso en FastAPI](https://fastapi.tiangolo.com/deployment/concepts/#memory-per-process).
+
+El despliegue incluirá configuración privada de secretos, límites de carga, permisos de archivos, comprobación de disponibilidad, registro de errores sin contenido privado, versión identificable y retorno a una versión anterior. No se expondrá el servidor de desarrollo de Vite. Se respaldarán de forma coherente base y archivos, con copia fuera del servidor y restauración ensayada; para SQLite se empleará un mecanismo de copia consistente. [API de respaldo de SQLite](https://sqlite.org/backup.html).
+
+La revisión previa al despliegue verificará que la distribución y sus capas no incluyan datos restringidos ni artefactos científicos privados. La demostración publicada empezará con ejemplos ficticios. El alojamiento de pesos o imágenes de investigación requiere la autorización correspondiente y conservación de los controles de acceso existentes.
+
+**Detalle de la fase 6**
+
+El paquete necesario debe identificar selección final, transformaciones clínicas y radiográficas, procesamiento y QC, pesos, calibrador, umbral y versiones compatibles. No se elegirá un pliegue ni se combinarán pesos desde la aplicación por conveniencia. La aplicación consumirá la regla final ya aprobada.
+
+El servidor llamará a `src/knee`. El mismo caso y la misma preparación deberán dar la misma clasificación y una diferencia absoluta de probabilidad no mayor que `1e-5`, conforme al alcance vigente. También se comprobará que un QC ausente o desactualizado bloquee la probabilidad. Estas pruebas de equivalencia utilizarán casos de desarrollo autorizados; no requieren abrir la prueba reservada.
+
+Se medirá el funcionamiento en el equipo y alojamiento previstos. El criterio operativo de duración aceptable se acordará antes del ensayo con el médico y se registrará junto con memoria máxima, arranque y errores. No se alterarán resolución, precisión numérica, combinación de modelos o transformaciones para abaratar el servidor sin evaluar y autorizar su impacto científico.
+
+**Detalle de la fase 7**
+
+La entrega contendrá versión identificable del código, configuración reproducible, guía de instalación y recuperación, manual breve del médico, diagrama de arquitectura, pruebas pertinentes, guion de demostración y grabación de respaldo. Se prepararán ejemplos ficticios o expresamente autorizados; no se usará la prueba reservada como catálogo de demostración.
+
+El ensayo cubrirá ingreso, creación, guardado, recuperación, imagen válida e inválida, revisión, rechazo, cálculo, resultado y recuperación ante una interrupción. Se solicitará al médico una valoración descriptiva de comprensión y facilidad de uso; esa valoración no se presentará como validación clínica del predictor.
+
+**Qué puede cerrarse mientras termina el entrenamiento**
+
+Las fases 1 a 5 y la preparación del material de sustentación pueden avanzar ahora con datos ficticios. La fase 6 y el ensayo predictivo definitivo dependen del paquete científico formalizado. El diseño de pantallas, usuarios, persistencia, instalación y dominio podrá mantenerse si cambian artefactos del motor conservando su contrato. Un cambio aprobado en entradas o procedimiento exigirá revisar su impacto; no se promete que cualquier decisión posterior sea intercambiable sin trabajo.
+
+El siguiente entregable es la fase 2: implementar acceso y guardado reales siguiendo el contrato de v0.8. La tesis y las respuestas al jurado se actualizarán por su procedimiento propio, cuando se indiquen; este plan no modifica esos documentos.

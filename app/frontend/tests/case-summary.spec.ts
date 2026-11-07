@@ -1,0 +1,182 @@
+import { test, expect, type Page } from '@playwright/test'
+
+async function enter(page: Page) {
+  await page.goto('/acceso')
+  await page.getByRole('button', { name: 'Completar datos de ejemplo' }).click()
+  await page.getByRole('button', { name: 'Entrar a la demostración' }).click()
+}
+
+async function prepareReview(page: Page) {
+  await enter(page)
+  await page.getByRole('button', { name: 'Nueva evaluación', exact: true }).click()
+  await page.getByRole('button', { name: 'Completar ejemplo', exact: true }).click()
+  await page.getByRole('button', { name: 'Guardar y continuar', exact: true }).click()
+  await page.getByRole('button', { name: 'Seleccionar imagen A', exact: true }).click()
+  await page.locator('#radiograph-confirmation').check()
+  await page.getByRole('button', { name: 'Guardar y continuar', exact: true }).click()
+  await expect(page.locator('#crop-reviewed')).toBeEnabled()
+}
+
+async function acceptedSummary(page: Page) {
+  await prepareReview(page)
+  await page.locator('#crop-reviewed').check()
+  await page.getByRole('button', { name: 'Aceptar recorte de ejemplo', exact: true }).click()
+  await page.getByRole('button', { name: 'Guardar y ver resumen', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Resumen del caso', exact: true })).toBeVisible()
+}
+
+test('accepted preparation reaches the summary with exact case data and prediction disabled', async ({ page, baseURL }) => {
+  const localOrigin = new URL(baseURL!).origin
+  const errors: string[] = []
+  const external: string[] = []
+  const writes: string[] = []
+  page.on('pageerror', error => errors.push(error.message))
+  page.on('request', request => {
+    if (!request.url().startsWith(`${localOrigin}/`) && !request.url().startsWith('data:')) external.push(request.url())
+    if (!['GET', 'HEAD'].includes(request.method())) writes.push(request.url())
+  })
+  await acceptedSummary(page)
+  await expect(page.locator('.summary-data-grid')).toContainText('DEMO-008')
+  await expect(page.locator('.summary-data-grid')).toContainText('62 años')
+  await expect(page.locator('.summary-data-grid')).toContainText('28.4 kg/m²')
+  await expect(page.locator('.summary-data-grid')).toContainText('Derecha del paciente')
+  await expect(page.locator('#summary-review-status')).toHaveText('Aceptado en demostración')
+  await expect(page.locator('.summary-review-details')).toContainText('ui-crop-v1')
+  await expect(page.locator('#summary-prediction-block')).toContainText('Predicción bloqueada')
+  await expect(page.locator('#summary-prediction-block')).toContainText('Modelos sin conectar')
+  const calculate = page.getByRole('button', { name: 'Calcular predicción', exact: true })
+  await expect(calculate).toBeDisabled()
+  await calculate.evaluate(button => (button as HTMLButtonElement).click())
+  expect(await page.locator('body').innerText()).not.toMatch(/\b\d+(?:[.,]\d+)?\s*%/)
+  await page.screenshot({ path: 'test-results/case-summary-desktop.png', fullPage: true })
+  await page.getByRole('link', { name: 'Mis evaluaciones', exact: true }).click()
+  const row = page.locator('tbody tr').filter({ hasText: 'DEMO-008' })
+  await expect(row).toContainText('Resumen')
+  await row.getByRole('button', { name: 'Ver resumen DEMO-008', exact: true }).click()
+  await expect(page.locator('#summary-review-status')).toHaveText('Aceptado en demostración')
+  expect(errors).toEqual([])
+  expect(external).toEqual([])
+  expect(writes).toEqual([])
+})
+
+test('partial and legacy cases expose missing information without inventing images or reviews', async ({ page }) => {
+  await enter(page)
+  await page.getByRole('link', { name: 'Ver resumen del caso DEMO-003', exact: true }).click()
+  await expect(page.locator('#summary-review-status')).toHaveText('Sin revisión asociada')
+  await expect(page.locator('.summary-empty-image')).toContainText('Sin imagen asociada')
+  await expect(page.getByRole('link', { name: 'Revisar recorte', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Calcular predicción', exact: true })).toBeDisabled()
+  await page.getByRole('link', { name: 'Mis evaluaciones', exact: true }).click()
+  await page.getByRole('button', { name: 'Nueva evaluación', exact: true }).click()
+  await page.getByRole('button', { name: 'Guardar y salir', exact: true }).click()
+  await page.getByRole('link', { name: 'Ver resumen del caso DEMO-008', exact: true }).click()
+  await expect(page.locator('.summary-data-grid')).toContainText('Pendiente')
+  await expect(page.locator('.summary-data-grid')).toContainText('Datos pendientes')
+  await expect(page.locator('#summary-review-status')).toHaveText('Sin revisión asociada')
+  await expect(page.getByRole('button', { name: 'Calcular predicción', exact: true })).toBeDisabled()
+  await expect(page.locator('#summary-next-step')).toHaveText('Completar datos basales')
+  await expect(page.getByRole('link', { name: 'Revisar imagen y lado', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('link', { name: 'Revisar recorte', exact: true })).toHaveCount(0)
+  await page.getByRole('link', { name: 'Revisar datos basales', exact: true }).click()
+  await expect(page.locator('#draft-age')).toBeEmpty()
+})
+
+test('rejected preparation remains visible with its reason and prediction stays blocked', async ({ page }) => {
+  await prepareReview(page)
+  await page.locator('#crop-reason').selectOption('incomplete-example')
+  await page.getByRole('button', { name: 'Rechazar recorte de ejemplo', exact: true }).click()
+  await page.getByRole('button', { name: 'Guardar y salir', exact: true }).click()
+  await page.getByRole('link', { name: 'Ver resumen del caso DEMO-008', exact: true }).click()
+  await expect(page.locator('#summary-review-status')).toHaveText('Rechazado en demostración')
+  await expect(page.locator('.summary-rejection')).toContainText('Región incompleta en el ejemplo')
+  await expect(page.getByRole('button', { name: 'Calcular predicción', exact: true })).toBeDisabled()
+  await page.getByRole('link', { name: 'Revisar recorte', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Guardar y ver resumen', exact: true })).toBeDisabled()
+})
+
+test('editing baseline data and replacing the image are reflected in the current summary', async ({ page }) => {
+  await acceptedSummary(page)
+  await page.getByRole('link', { name: 'Revisar datos basales', exact: true }).click()
+  await page.locator('#draft-age').fill('64')
+  await page.getByRole('button', { name: 'Guardar y salir', exact: true }).click()
+  await page.getByRole('link', { name: 'Ver resumen del caso DEMO-008', exact: true }).click()
+  await expect(page.locator('.summary-data-grid')).toContainText('64 años')
+  await expect(page.locator('#summary-review-status')).toHaveText('Aceptado en demostración')
+  await page.getByRole('link', { name: 'Revisar imagen y lado', exact: true }).click()
+  await page.getByRole('button', { name: 'Seleccionar imagen B', exact: true }).click()
+  await page.locator('#radiograph-confirmation').check()
+  await page.getByRole('button', { name: 'Guardar y salir', exact: true }).click()
+  await page.getByRole('link', { name: 'Ver resumen del caso DEMO-008', exact: true }).click()
+  await expect(page.locator('.summary-image-identity')).toContainText('radiografia-demo-b.svg')
+  await expect(page.locator('#summary-review-status')).toHaveText('Sin revisión asociada')
+  await expect(page.getByRole('button', { name: 'Calcular predicción', exact: true })).toBeDisabled()
+})
+
+test('a stored review with an outdated source identity is never presented as accepted', async ({ page }) => {
+  await acceptedSummary(page)
+  // Restore an older fictional crop version through the same path used by a real reload.
+  await page.evaluate(async () => {
+    const key = 'kneeoai:demo-evaluations:v1'
+    const snapshot = JSON.parse(localStorage.getItem(key)!)
+    const example = snapshot.evaluations.find((item: { code: string }) => item.code === 'DEMO-008')
+    example.review.sourceKey = 'bilateral-a:right:ui-crop-v0'
+    localStorage.setItem(key, JSON.stringify(snapshot))
+  })
+  await page.reload()
+  await expect(page.locator('#demo-storage-alert')).toHaveCount(0)
+  await expect(page.locator('#summary-review-status')).toHaveText('Revisión no vigente')
+  await expect(page.locator('#summary-next-step')).toHaveText('Completar revisión del recorte')
+  await expect(page.getByRole('button', { name: 'Calcular predicción', exact: true })).toBeDisabled()
+})
+
+test('summary directs each incomplete case to its next step and preserves a saved decision after a view error', async ({ page }) => {
+  await enter(page)
+  await page.getByRole('link', { name: 'Ver resumen del caso DEMO-001', exact: true }).click()
+  await expect(page.locator('#summary-next-step')).toHaveText('Preparar imagen y lado')
+  await expect(page.getByRole('link', { name: 'Revisar recorte', exact: true })).toHaveCount(0)
+  await page.locator('#summary-next-step').click()
+  await page.getByRole('button', { name: 'Seleccionar imagen A', exact: true }).click()
+  await page.locator('#radiograph-confirmation').check()
+  await page.getByRole('button', { name: 'Guardar y salir', exact: true }).click()
+  await page.getByRole('link', { name: 'Ver resumen del caso DEMO-001', exact: true }).click()
+  await expect(page.locator('#summary-next-step')).toHaveText('Completar revisión del recorte')
+  await page.locator('#summary-next-step').click()
+  await page.locator('#crop-reviewed').check()
+  await page.getByRole('button', { name: 'Aceptar recorte de ejemplo', exact: true }).click()
+  await page.getByRole('button', { name: 'Guardar y ver resumen', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Ampliar original', exact: true })).toBeEnabled()
+  await expect(page.getByRole('button', { name: 'Ampliar recorte', exact: true })).toBeEnabled()
+  await page.locator('.summary-preview > img').dispatchEvent('error')
+  await expect(page.getByRole('button', { name: 'Ampliar original', exact: true })).toBeDisabled()
+  await expect(page.locator('.summary-preparation h2')).toHaveText('Preparación guardada; hay una vista no disponible')
+  await expect(page.locator('#summary-review-status')).toHaveText('Aceptado en demostración')
+  await expect(page.getByRole('button', { name: 'Calcular predicción', exact: true })).toBeDisabled()
+})
+
+test('saved summaries survive reload and missing cases show a clear unavailable summary', async ({ page }) => {
+  await acceptedSummary(page)
+  const summaryUrl = page.url()
+  await page.reload()
+  await expect(page).toHaveURL(summaryUrl)
+  await expect(page.getByRole('heading', { name: 'Resumen del caso', exact: true })).toBeVisible()
+  await expect(page.locator('.summary-data-grid')).toContainText('DEMO-008')
+  await expect(page.locator('#summary-review-status')).toHaveText('Aceptado en demostración')
+  await expect(page.getByRole('button', { name: 'Calcular predicción', exact: true })).toBeDisabled()
+  await page.goto('/evaluaciones/no-such-case/resumen')
+  await expect(page.getByRole('heading', { name: 'Resumen no disponible', exact: true })).toBeVisible()
+  await expect(page.locator('#summary-prediction-block')).toHaveCount(0)
+  expect(summaryUrl).toContain('/resumen')
+})
+
+test('mobile summary and image enlargement remain usable with prediction blocked', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await acceptedSummary(page)
+  await page.screenshot({ path: 'test-results/case-summary-mobile.png', fullPage: true })
+  await page.getByRole('button', { name: 'Ampliar recorte', exact: true }).click()
+  await expect(page.getByRole('dialog', { name: 'Recorte del caso', exact: true })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('button', { name: 'Ampliar recorte', exact: true })).toBeFocused()
+  await page.setViewportSize({ width: 320, height: 740 })
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  await expect(page.getByRole('button', { name: 'Calcular predicción', exact: true })).toBeDisabled()
+})
