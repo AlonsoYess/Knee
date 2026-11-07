@@ -1,0 +1,34 @@
+# App-only recipe behind an HTTPS ingress. No public port, account, or cloud resource is created here.
+services:
+  app:
+    image: ${KNEEOAI_IMAGE:?Build and select the verified application image first}
+    init: true
+    restart: "no"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 128
+    tmpfs:
+      - /tmp:size=67108864,mode=1777
+    environment:
+      KNEEOAI_ENV: production
+      KNEEOAI_DATA_DIR: /var/lib/kneeoai
+      KNEEOAI_FRONTEND_DIST: /opt/kneeoai/frontend
+      KNEEOAI_ALLOWED_ORIGINS: ${KNEEOAI_ALLOWED_ORIGINS:?Set the exact HTTPS application origin}
+      KNEEOAI_SECRET_KEY_FILE: /run/secrets/session_key
+      KNEEOAI_FORWARDED_ALLOW_IPS: ""
+      PORT: "8080"
+    expose: ["8080"]
+    volumes:
+      - app_data:/var/lib/kneeoai
+    secrets: [session_key]
+    stop_grace_period: 150s
+    logging:
+      options:
+        max-size: 5m
+        max-file: "2"
+secrets:
+  session_key:
+    file: ${KNEEOAI_SESSION_KEY_FILE:?Set the private 64-hex-character secret file}
+volumes:
+  app_data:

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import os
 from pathlib import Path
+import re
 from urllib.parse import urlsplit
 
 DEFAULT_RUNTIME = Path(__file__).resolve().parents[1] / "runtime"
@@ -11,7 +12,45 @@ DEFAULT_ORIGINS = (
     "http://127.0.0.1:8000", "http://localhost:8000",
 )
 
+def production_path(value):
+    path=Path(value)
+    if not path.is_absolute():
+        raise ValueError('Production paths must be explicit absolute paths')
+    if any(candidate.is_symlink() or getattr(candidate,'is_junction',lambda:False)() for candidate in (path,*path.parents)):
+        raise ValueError('Production storage must not follow symbolic links or junctions')
+    return path.resolve()
+
+def env_secret(environment):
+    plain=environment.get('KNEEOAI_SECRET_KEY')
+    filename=environment.get('KNEEOAI_SECRET_KEY_FILE')
+    if plain is not None and filename is not None:
+        raise ValueError('Configure exactly one server secret source')
+    if filename is not None:
+        if not filename:
+            raise ValueError('The server secret file must be explicit')
+        try:
+            path=production_path(filename)
+            if not path.is_file():
+                raise ValueError('The server secret file must be a regular file')
+            with path.open('rb') as stream:
+                value=stream.read(4097)
+        except OSError:
+            raise ValueError('The server secret file could not be read') from None
+        if value.endswith(b'\r\n'):
+            value=value[:-2]
+        elif value.endswith(b'\n'):
+            value=value[:-1]
+        if not re.fullmatch(rb'[0-9a-fA-F]{64}',value):
+            raise ValueError('The secret file must contain one 64-character ASCII hexadecimal token')
+        frontend=environment.get('KNEEOAI_FRONTEND_DIST')
+        if frontend and path.is_relative_to(Path(frontend).resolve()):
+            raise ValueError('The server secret must not be stored in the public distribution')
+        return value
+    return plain.encode('utf-8') if plain is not None else None
+
 def normalized_origin(value: str) -> str:
+    if any(character in value for character in '*\r\n\t'):
+        raise ValueError('An exact HTTP(S) origin is required')
     parsed = urlsplit(value)
     if parsed.scheme not in {"http", "https"} or not parsed.hostname or parsed.username or parsed.password:
         raise ValueError("An exact HTTP(S) origin is required")
@@ -27,7 +66,7 @@ def normalized_origin(value: str) -> str:
 @dataclass(frozen=True)
 class Settings:
     database_path: Path = DEFAULT_RUNTIME / "application.sqlite3"
-    secret_key: bytes | None = None
+    secret_key: bytes | None = field(default=None,repr=False)
     allowed_origins: tuple[str, ...] = DEFAULT_ORIGINS
     secure_cookies: bool = False
     environment: str = "development"
@@ -43,8 +82,18 @@ class Settings:
     frozen_checkout: Path | None = None
     frozen_timeout_seconds: int = 120
     frontend_dist_path: Path | None = None
+    data_dir: Path | None = None
 
     def __post_init__(self):
+        if self.environment=='production':
+            if self.data_dir is None:
+                raise ValueError('Production requires an explicit persistent data directory')
+            for value in (self.data_dir,self.database_path,self.private_files_path or Path(self.database_path).parent/'private_objects'):
+                production_path(value)
+            if self.frontend_dist_path is not None:
+                production_path(self.frontend_dist_path)
+        if self.data_dir is not None:
+            object.__setattr__(self,'data_dir',Path(self.data_dir).resolve())
         object.__setattr__(self, "database_path", Path(self.database_path).resolve())
         object.__setattr__(self, "private_files_path", Path(self.private_files_path or self.database_path.parent / 'private_objects').resolve())
         for key in ('frozen_python', 'frozen_checkout'):
@@ -67,23 +116,37 @@ class Settings:
         if self.environment == "production":
             if not self.secure_cookies or any(not v.startswith("https://") for v in self.allowed_origins):
                 raise ValueError("Production requires Secure cookies and HTTPS origins")
+            if not isinstance(self.secret_key,bytes) or len(self.secret_key)<32 or any(byte<=32 or byte>=127 for byte in self.secret_key):
+                raise ValueError('Production requires an explicit printable server secret of at least 32 bytes')
+            if not self.database_path.is_relative_to(self.data_dir) or self.database_path==self.data_dir or not self.private_files_path.is_relative_to(self.data_dir) or self.private_files_path==self.data_dir:
+                raise ValueError('Application storage must stay inside the persistent data directory')
+            if self.database_path==self.private_files_path or self.database_path.is_relative_to(self.private_files_path):
+                raise ValueError('Database and private objects must use distinct paths')
+            if self.frontend_dist_path is not None:
+                public=self.frontend_dist_path.resolve()
+                if public.is_relative_to(self.data_dir) or self.data_dir.is_relative_to(public):
+                    raise ValueError('Public distribution and persistent data must be separate')
         elif self.environment == "development":
             if any(urlsplit(v).hostname not in {"localhost", "127.0.0.1", "::1"} for v in self.allowed_origins):
                 raise ValueError("Development is restricted to loopback origins")
 
     @classmethod
-    def from_env(cls):
-        environment = os.environ.get("KNEEOAI_ENV", "development")
-        origins = os.environ.get("KNEEOAI_ALLOWED_ORIGINS")
-        secret = os.environ.get("KNEEOAI_SECRET_KEY")
+    def from_env(cls,environ=None):
+        source=os.environ if environ is None else environ
+        environment = source.get("KNEEOAI_ENV", "development")
+        origins = source.get("KNEEOAI_ALLOWED_ORIGINS")
+        data_dir=Path(source['KNEEOAI_DATA_DIR']) if source.get('KNEEOAI_DATA_DIR') else None
+        database=Path(source['KNEEOAI_DB_PATH']) if source.get('KNEEOAI_DB_PATH') else (data_dir/'application.sqlite3' if data_dir is not None else DEFAULT_RUNTIME/'application.sqlite3')
+        private=Path(source['KNEEOAI_PRIVATE_FILES']) if source.get('KNEEOAI_PRIVATE_FILES') else (data_dir/'private_objects' if data_dir is not None else None)
         return cls(
-            database_path=Path(os.environ.get("KNEEOAI_DB_PATH", DEFAULT_RUNTIME / "application.sqlite3")),
-            secret_key=secret.encode("utf-8") if secret else None,
+            database_path=database,
+            secret_key=env_secret(source),
             allowed_origins=tuple(v.strip() for v in origins.split(",") if v.strip()) if origins else DEFAULT_ORIGINS,
             secure_cookies=environment == "production",
             environment=environment,
-            private_files_path=Path(os.environ['KNEEOAI_PRIVATE_FILES']) if os.environ.get('KNEEOAI_PRIVATE_FILES') else None,
-            frozen_python=Path(os.environ['KNEEOAI_FROZEN_PYTHON']) if os.environ.get('KNEEOAI_FROZEN_PYTHON') else None,
-            frozen_checkout=Path(os.environ['KNEEOAI_FROZEN_CHECKOUT']) if os.environ.get('KNEEOAI_FROZEN_CHECKOUT') else None,
-            frontend_dist_path=Path(os.environ['KNEEOAI_FRONTEND_DIST']) if os.environ.get('KNEEOAI_FRONTEND_DIST') else None,
+            private_files_path=private,
+            frozen_python=Path(source['KNEEOAI_FROZEN_PYTHON']) if source.get('KNEEOAI_FROZEN_PYTHON') else None,
+            frozen_checkout=Path(source['KNEEOAI_FROZEN_CHECKOUT']) if source.get('KNEEOAI_FROZEN_CHECKOUT') else None,
+            frontend_dist_path=Path(source['KNEEOAI_FRONTEND_DIST']) if source.get('KNEEOAI_FRONTEND_DIST') else None,
+            data_dir=data_dir,
         )

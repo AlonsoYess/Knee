@@ -1,0 +1,30 @@
+# Combine with compose.yml. Dedicated loopback-only HTTPS rehearsal, using a local test CA.
+services:
+  proxy:
+    image: caddy:2.11.9-alpine@sha256:0bbb055bda6793c999bde78b1b5ce3e89f829fb031af2cf50056ea1246559fee
+    user: "10002:10002"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs:
+      - /tmp:size=16777216,mode=1777
+    environment:
+      XDG_DATA_HOME: /tmp/caddy-data
+      XDG_CONFIG_HOME: /tmp/caddy-config
+    ports:
+      - "127.0.0.1:18443:8443"
+    volumes:
+      - ./Caddyfile.rehearsal:/etc/caddy/Caddyfile:ro
+    secrets: [tls_cert, tls_key]
+    depends_on:
+      app:
+        condition: service_healthy
+    logging:
+      options:
+        max-size: 5m
+        max-file: "2"
+secrets:
+  tls_cert:
+    file: ${KNEEOAI_REHEARSAL_CERT_FILE:?Generate the private rehearsal certificate first}
+  tls_key:
+    file: ${KNEEOAI_REHEARSAL_KEY_FILE:?Generate the private rehearsal certificate first}

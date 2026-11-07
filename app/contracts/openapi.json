@@ -2,15 +2,15 @@
   "openapi": "3.1.0",
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "info": {
-    "title": "KneeOAI — contrato propuesto Vue/FastAPI",
-    "version": "1.0.0-phase3",
-    "summary": "Acceso, basales, preparación DICOM y QC persistidos; predicción no disponible.",
-    "description": "Fase3: servidor FastAPI/SQLite y archivos privados. El preparador reutiliza el localizador anatómico y QC congelados en un proceso separado; no carga modelos de progresión. El motor predictivo sigue bloqueado503. Ejemplos íntegramente ficticios; estados futuros se identifican expresamente."
+    "title": "KneeOAI â€” contrato propuesto Vue/FastAPI",
+    "version": "1.0.0-phase5-preparation",
+    "summary": "Acceso, preparación y QC persistidos; disponibilidad operativa; predicción no disponible.",
+    "description": "Fase3: servidor FastAPI/SQLite y archivos privados. El preparador reutiliza el localizador anatÃ³mico y QC congelados en un proceso separado; no carga modelos de progresiÃ³n. El motor predictivo sigue bloqueado503. Ejemplos Ã­ntegramente ficticios; estados futuros se identifican expresamente."
   },
   "servers": [
     {
       "url": "/api/v1",
-      "description": "API relativa al mismo origen de la SPA. La configuración y el despliegue son externos al contrato."
+      "description": "API relativa al mismo origen de la SPA. La configuraciÃ³n y el despliegue son externos al contrato."
     }
   ],
   "security": [
@@ -29,11 +29,15 @@
     },
     {
       "name": "Preparation",
-      "description": "Preparación y QC versionados."
+      "description": "PreparaciÃ³n y QC versionados."
     },
     {
       "name": "Inference",
-      "description": "Ejecución con paquete formalizado."
+      "description": "EjecuciÃ³n con paquete formalizado."
+    },
+    {
+      "name": "Operations",
+      "description": "Disponibilidad de la aplicación, independiente de la preparación o predicción científica."
     }
   ],
   "paths": {
@@ -43,12 +47,12 @@
         "tags": [
           "Session"
         ],
-        "summary": "Obtener sesión y token CSRF.",
-        "description": "Bootstrap público: crea o recupera contexto anónimo antes del login. Una sesión caducada pasa a anónima sin recuperar privilegios. Nunca acepta la marca client-side como autorización.",
+        "summary": "Obtener sesiÃ³n y token CSRF.",
+        "description": "Bootstrap pÃºblico: crea o recupera contexto anÃ³nimo antes del login. Una sesiÃ³n caducada pasa a anÃ³nima sin recuperar privilegios. Nunca acepta la marca client-side como autorizaciÃ³n.",
         "security": [],
         "responses": {
           "200": {
-            "description": "Sesión anónima o autenticada.",
+            "description": "SesiÃ³n anÃ³nima o autenticada.",
             "headers": {
               "X-Request-Id": {
                 "$ref": "#/components/headers/RequestId"
@@ -89,10 +93,10 @@
           "Session"
         ],
         "summary": "Autenticar una cuenta administrada.",
-        "description": "Requiere contexto anónimo y CSRF de GET /session. Verifica credenciales y rota sesión y token. Las credenciales ficticias del frontend no son acceso real.",
+        "description": "Requiere contexto anÃ³nimo y CSRF de GET /session. Verifica credenciales y rota sesiÃ³n y token. Las credenciales ficticias del frontend no son acceso real.",
         "responses": {
           "200": {
-            "description": "Autenticación correcta.",
+            "description": "AutenticaciÃ³n correcta.",
             "headers": {
               "X-Request-Id": {
                 "$ref": "#/components/headers/RequestId"
@@ -154,11 +158,11 @@
         "tags": [
           "Session"
         ],
-        "summary": "Cerrar y revocar la sesión.",
-        "description": "Requiere sesión autenticada y CSRF. Revoca en servidor y expira cookie; borrar sessionStorage no sustituye esta operación.",
+        "summary": "Cerrar y revocar la sesiÃ³n.",
+        "description": "Requiere sesiÃ³n autenticada y CSRF. Revoca en servidor y expira cookie; borrar sessionStorage no sustituye esta operaciÃ³n.",
         "responses": {
           "204": {
-            "description": "Sesión revocada; cuerpo vacío y cookie expirada.",
+            "description": "SesiÃ³n revocada; cuerpo vacÃ­o y cookie expirada.",
             "headers": {
               "X-Request-Id": {
                 "$ref": "#/components/headers/RequestId"
@@ -206,10 +210,10 @@
           "Evaluations"
         ],
         "summary": "Listar evaluaciones accesibles.",
-        "description": "Filtrar por usuario autenticado; el administrador no obtiene acceso transversal implícito.",
+        "description": "Filtrar por usuario autenticado; el administrador no obtiene acceso transversal implÃ­cito.",
         "responses": {
           "200": {
-            "description": "Página de casos.",
+            "description": "PÃ¡gina de casos.",
             "headers": {
               "X-Request-Id": {
                 "$ref": "#/components/headers/RequestId"
@@ -292,7 +296,7 @@
           "Evaluations"
         ],
         "summary": "Crear un borrador.",
-        "description": "El servidor asigna propietario, código e identificadores. Admite campos ausentes null; no prepara imágenes ni ejecuta modelos. Idempotency-Key opcional: la UI siempre lo envía. Repetición exacta devuelve 200 con la representación actual del caso, sin aplicar de nuevo el cuerpo; otra carga con esa clave produce 409. La asociación se guarda atómicamente y persiste entre reinicios.",
+        "description": "El servidor asigna propietario, cÃ³digo e identificadores. Admite campos ausentes null; no prepara imÃ¡genes ni ejecuta modelos. Idempotency-Key opcional: la UI siempre lo envÃ­a. RepeticiÃ³n exacta devuelve 200 con la representaciÃ³n actual del caso, sin aplicar de nuevo el cuerpo; otra carga con esa clave produce 409. La asociaciÃ³n se guarda atÃ³micamente y persiste entre reinicios.",
         "responses": {
           "201": {
             "description": "Borrador creado.",
@@ -353,7 +357,7 @@
           },
           "200": {
             "$ref": "#/paths/~1evaluations/post/responses/201",
-            "description": "Recuperación de una creación ya aceptada; mismo identificador y estado actual, sin duplicado."
+            "description": "RecuperaciÃ³n de una creaciÃ³n ya aceptada; mismo identificador y estado actual, sin duplicado."
           }
         },
         "security": [
@@ -377,7 +381,7 @@
             "name": "Idempotency-Key",
             "in": "header",
             "required": false,
-            "description": "La interfaz envía una clave por intención de creación y la reutiliza tras una respuesta incierta. El mismo usuario, clave y cuerpo canónico recuperan el caso sin volver a crearlo; otro cuerpo devuelve 409. No contiene datos privados.",
+            "description": "La interfaz envÃ­a una clave por intenciÃ³n de creaciÃ³n y la reutiliza tras una respuesta incierta. El mismo usuario, clave y cuerpo canÃ³nico recuperan el caso sin volver a crearlo; otro cuerpo devuelve 409. No contiene datos privados.",
             "schema": {
               "type": "string",
               "minLength": 16,
@@ -400,7 +404,7 @@
         "tags": [
           "Evaluations"
         ],
-        "summary": "Leer la versión actual del caso.",
+        "summary": "Leer la versiÃ³n actual del caso.",
         "description": "Devuelve ETag para modificaciones posteriores.",
         "responses": {
           "200": {
@@ -463,7 +467,7 @@
           "Evaluations"
         ],
         "summary": "Guardar cambios basales.",
-        "description": "Guardado atómico. Un cambio clínico crea nueva revisión y deja sin vigencia resultados anteriores. Cambiar lado invalida además preparación y QC ligados al lado. Cambiar solo edad, sexo o IMC no inventa defectos radiográficos ni borra evidencia histórica.",
+        "description": "Guardado atÃ³mico. Un cambio clÃ­nico crea nueva revisiÃ³n y deja sin vigencia resultados anteriores. Cambiar lado invalida ademÃ¡s preparaciÃ³n y QC ligados al lado. Cambiar solo edad, sexo o IMC no inventa defectos radiogrÃ¡ficos ni borra evidencia histÃ³rica.",
         "responses": {
           "200": {
             "description": "Caso actualizado.",
@@ -547,10 +551,10 @@
           "Preparation"
         ],
         "summary": "Cargar un DICOM y preparar las vistas de fuente.",
-        "description": "Un único archivo multipart file; sin campos adicionales. Sesión/Origin/CSRF, lado guardado, If-Match del caso e Idempotency-Key. Nueva carga devuelve202 tras preparar fuente, normalmente awaiting_reference; nunca apruebaQC. Repetición de clave devuelve200 del recurso asociado, incluso histórico, sin reactivarlo. Nueva clave con mismos bytes/caso/lado reutiliza y activa la preparación existente con200. Si el procesamiento falla después de guardar, el recurso failed y su asociación idempotente permanecen; Location permite recuperarlo.",
+        "description": "Un Ãºnico archivo multipart file; sin campos adicionales. SesiÃ³n/Origin/CSRF, lado guardado, If-Match del caso e Idempotency-Key. Nueva carga devuelve202 tras preparar fuente, normalmente awaiting_reference; nunca apruebaQC. RepeticiÃ³n de clave devuelve200 del recurso asociado, incluso histÃ³rico, sin reactivarlo. Nueva clave con mismos bytes/caso/lado reutiliza y activa la preparaciÃ³n existente con200. Si el procesamiento falla despuÃ©s de guardar, el recurso failed y su asociaciÃ³n idempotente permanecen; Location permite recuperarlo.",
         "responses": {
           "200": {
-            "description": "Carga repetida o preparación existente reutilizada; consultar isCurrent/reused.",
+            "description": "Carga repetida o preparaciÃ³n existente reutilizada; consultar isCurrent/reused.",
             "headers": {
               "X-Request-Id": {
                 "$ref": "#/components/headers/RequestId"
@@ -626,7 +630,7 @@
                       "marks": [],
                       "mark_effect": "none",
                       "physical_origin_known": false,
-                      "note": "Ejemplo sintético de observación completa; no corresponde a una imagen clínica real.",
+                      "note": "Ejemplo sintÃ©tico de observaciÃ³n completa; no corresponde a una imagen clÃ­nica real.",
                       "original_half_inspected": true,
                       "both_windows_inspected": true,
                       "outcome_blinded": true,
@@ -652,7 +656,7 @@
                         "marks": [],
                         "mark_effect": "none",
                         "physical_origin_known": false,
-                        "note": "Ejemplo sintético de observación completa; no corresponde a una imagen clínica real.",
+                        "note": "Ejemplo sintÃ©tico de observaciÃ³n completa; no corresponde a una imagen clÃ­nica real.",
                         "original_half_inspected": true,
                         "both_windows_inspected": true,
                         "outcome_blinded": true,
@@ -695,7 +699,7 @@
                     ],
                     "originalAndHalfInspected": true,
                     "outcomeBlinded": true,
-                    "note": "Ejemplo ficticio: original y mitad revisados antes de mostrar el recorte automático.",
+                    "note": "Ejemplo ficticio: original y mitad revisados antes de mostrar el recorte automÃ¡tico.",
                     "reviewerId": "user-fixture-001",
                     "createdAt": "2026-11-07T15:02:00Z"
                   },
@@ -724,7 +728,7 @@
             }
           },
           "202": {
-            "description": "Fuente registrada y vistas preparadas; requiere referencia visual explícita.",
+            "description": "Fuente registrada y vistas preparadas; requiere referencia visual explÃ­cita.",
             "headers": {
               "X-Request-Id": {
                 "$ref": "#/components/headers/RequestId"
@@ -862,11 +866,11 @@
         "tags": [
           "Preparation"
         ],
-        "summary": "Consultar preparación y contexto QC.",
-        "description": "Estado persistido del recurso accesible al propietario. ETag pertenece a preparación; el caso tiene otro ETag. isCurrent=false identifica una preparación histórica; no permite nuevas referencias/reintentos/QC. activeReview devuelve solo la revisión vigente y compatible con la política actual.",
+        "summary": "Consultar preparaciÃ³n y contexto QC.",
+        "description": "Estado persistido del recurso accesible al propietario. ETag pertenece a preparaciÃ³n; el caso tiene otro ETag. isCurrent=false identifica una preparaciÃ³n histÃ³rica; no permite nuevas referencias/reintentos/QC. activeReview devuelve solo la revisiÃ³n vigente y compatible con la polÃ­tica actual.",
         "responses": {
           "200": {
-            "description": "Preparación y contexto exacto de fuente/recorte.",
+            "description": "PreparaciÃ³n y contexto exacto de fuente/recorte.",
             "headers": {
               "X-Request-Id": {
                 "$ref": "#/components/headers/RequestId"
@@ -939,7 +943,7 @@
                     ],
                     "originalAndHalfInspected": true,
                     "outcomeBlinded": true,
-                    "note": "Ejemplo ficticio: original y mitad revisados antes de mostrar el recorte automático.",
+                    "note": "Ejemplo ficticio: original y mitad revisados antes de mostrar el recorte automÃ¡tico.",
                     "reviewerId": "user-fixture-001",
                     "createdAt": "2026-11-07T15:02:00Z"
                   },
@@ -1015,11 +1019,11 @@
         "tags": [
           "Preparation"
         ],
-        "summary": "Obtener vista autenticada de revisión.",
-        "description": "PNG privado del mismo origen, autenticado y sin caché. revision debe coincidir con la revisión ACTUAL de esta preparación; una revisión anterior de esa misma preparación devuelve409. Una preparación histórica del caso puede visualizarse usando su propia revisión actual. full=bilateral, half=mitad seleccionada, crop=recorte; a=ventana1–99, b=5–95. original y crop son alias de half_a/crop_a. No se publica DICOM ni se aplican correcciones geométricas.",
+        "summary": "Obtener vista autenticada de revisiÃ³n.",
+        "description": "PNG privado del mismo origen, autenticado y sin cachÃ©. revision debe coincidir con la revisiÃ³n ACTUAL de esta preparaciÃ³n; una revisiÃ³n anterior de esa misma preparaciÃ³n devuelve409. Una preparaciÃ³n histÃ³rica del caso puede visualizarse usando su propia revisiÃ³n actual. full=bilateral, half=mitad seleccionada, crop=recorte; a=ventana1â€“99, b=5â€“95. original y crop son alias de half_a/crop_a. No se publica DICOM ni se aplican correcciones geomÃ©tricas.",
         "responses": {
           "200": {
-            "description": "PNG sin caché.",
+            "description": "PNG sin cachÃ©.",
             "headers": {
               "X-Request-Id": {
                 "$ref": "#/components/headers/RequestId"
@@ -1083,11 +1087,11 @@
         "tags": [
           "Preparation"
         ],
-        "summary": "Registrar una decisión vinculada al recorte exacto.",
-        "description": "If-Match de preparación e Idempotency-Key. Requiere ready, recurso actual, fuente/referencia/candidato y revisión/lado coincidentes. confirmedCheckIds debe estar vacío. El cliente no envía knee_alias. Aceptar exige observación completa y resultado favorable de qc.assess; si no pasa,409 QC_NOT_ACCEPTABLE sin guardar aceptación. Rechazar exige motivo y admite observation=null/assessment=null, sin fabricar QC. Nuevas decisiones201, replay200; preservan historial y actualizan activeReview y ETags. Reconsultar caso/preparación.",
+        "summary": "Registrar una decisiÃ³n vinculada al recorte exacto.",
+        "description": "If-Match de preparaciÃ³n e Idempotency-Key. Requiere ready, recurso actual, fuente/referencia/candidato y revisiÃ³n/lado coincidentes. confirmedCheckIds debe estar vacÃ­o. El cliente no envÃ­a knee_alias. Aceptar exige observaciÃ³n completa y resultado favorable de qc.assess; si no pasa,409 QC_NOT_ACCEPTABLE sin guardar aceptaciÃ³n. Rechazar exige motivo y admite observation=null/assessment=null, sin fabricar QC. Nuevas decisiones201, replay200; preservan historial y actualizan activeReview y ETags. Reconsultar caso/preparaciÃ³n.",
         "responses": {
           "200": {
-            "description": "Repetición idempotente de la decisión guardada.",
+            "description": "RepeticiÃ³n idempotente de la decisiÃ³n guardada.",
             "headers": {
               "X-Request-Id": {
                 "$ref": "#/components/headers/RequestId"
@@ -1130,7 +1134,7 @@
                     "marks": [],
                     "mark_effect": "none",
                     "physical_origin_known": false,
-                    "note": "Ejemplo sintético de observación completa; no corresponde a una imagen clínica real.",
+                    "note": "Ejemplo sintÃ©tico de observaciÃ³n completa; no corresponde a una imagen clÃ­nica real.",
                     "original_half_inspected": true,
                     "both_windows_inspected": true,
                     "outcome_blinded": true,
@@ -1156,7 +1160,7 @@
                       "marks": [],
                       "mark_effect": "none",
                       "physical_origin_known": false,
-                      "note": "Ejemplo sintético de observación completa; no corresponde a una imagen clínica real.",
+                      "note": "Ejemplo sintÃ©tico de observaciÃ³n completa; no corresponde a una imagen clÃ­nica real.",
                       "original_half_inspected": true,
                       "both_windows_inspected": true,
                       "outcome_blinded": true,
@@ -1175,7 +1179,7 @@
             }
           },
           "201": {
-            "description": "Decisión persistida y vinculada al caso.",
+            "description": "DecisiÃ³n persistida y vinculada al caso.",
             "headers": {
               "X-Request-Id": {
                 "$ref": "#/components/headers/RequestId"
@@ -1218,7 +1222,7 @@
                     "marks": [],
                     "mark_effect": "none",
                     "physical_origin_known": false,
-                    "note": "Ejemplo sintético de observación completa; no corresponde a una imagen clínica real.",
+                    "note": "Ejemplo sintÃ©tico de observaciÃ³n completa; no corresponde a una imagen clÃ­nica real.",
                     "original_half_inspected": true,
                     "both_windows_inspected": true,
                     "outcome_blinded": true,
@@ -1244,7 +1248,7 @@
                       "marks": [],
                       "mark_effect": "none",
                       "physical_origin_known": false,
-                      "note": "Ejemplo sintético de observación completa; no corresponde a una imagen clínica real.",
+                      "note": "Ejemplo sintÃ©tico de observaciÃ³n completa; no corresponde a una imagen clÃ­nica real.",
                       "original_half_inspected": true,
                       "both_windows_inspected": true,
                       "outcome_blinded": true,
@@ -1332,7 +1336,7 @@
                       "marks": [],
                       "mark_effect": "none",
                       "physical_origin_known": false,
-                      "note": "Ejemplo sintético de observación completa; no corresponde a una imagen clínica real.",
+                      "note": "Ejemplo sintÃ©tico de observaciÃ³n completa; no corresponde a una imagen clÃ­nica real.",
                       "original_half_inspected": true,
                       "both_windows_inspected": true,
                       "outcome_blinded": true,
@@ -1371,8 +1375,8 @@
         "tags": [
           "Inference"
         ],
-        "summary": "Rechazar cálculo mientras el motor predictivo no esté disponible.",
-        "description": "IMPLEMENTACIÓN FASE3: después de comprobar sesión, Origin/CSRF y propiedad devuelve503 ENGINE_NOT_AVAILABLE; no carga modelos de progresión, valida un paquete, registra ejecuciones ni ajusta calibración. Los parámetros y cuerpo del contrato predictivo futuro se conservan como metadatos x-future-*; todavía no los procesa este endpoint.",
+        "summary": "Rechazar cÃ¡lculo mientras el motor predictivo no estÃ© disponible.",
+        "description": "IMPLEMENTACIÃ“N FASE3: despuÃ©s de comprobar sesiÃ³n, Origin/CSRF y propiedad devuelve503 ENGINE_NOT_AVAILABLE; no carga modelos de progresiÃ³n, valida un paquete, registra ejecuciones ni ajusta calibraciÃ³n. Los parÃ¡metros y cuerpo del contrato predictivo futuro se conservan como metadatos x-future-*; todavÃ­a no los procesa este endpoint.",
         "responses": {
           "401": {
             "$ref": "#/components/responses/Unauthorized"
@@ -1417,7 +1421,7 @@
         },
         "x-future-responses": {
           "200": {
-            "description": "Repetición idempotente: mismo trabajo, sin otro cálculo.",
+            "description": "RepeticiÃ³n idempotente: mismo trabajo, sin otro cÃ¡lculo.",
             "headers": {
               "X-Request-Id": {
                 "$ref": "#/components/headers/RequestId"
@@ -1546,10 +1550,10 @@
           "Inference"
         ],
         "summary": "Consultar estado y resultado versionado.",
-        "description": "GET no ejecuta ni repite. El trabajo conserva instantánea y paquete aunque cambie el caso. Solo succeeded contiene resultado. failed/interrupted contienen error y cierre; un reintento explícito usa otra clave y referencias vigentes. isCurrentInput=false identifica un resultado histórico.",
+        "description": "GET no ejecuta ni repite. El trabajo conserva instantÃ¡nea y paquete aunque cambie el caso. Solo succeeded contiene resultado. failed/interrupted contienen error y cierre; un reintento explÃ­cito usa otra clave y referencias vigentes. isCurrentInput=false identifica un resultado histÃ³rico.",
         "responses": {
           "200": {
-            "description": "Ejecución actualizada.",
+            "description": "EjecuciÃ³n actualizada.",
             "headers": {
               "X-Request-Id": {
                 "$ref": "#/components/headers/RequestId"
@@ -1629,11 +1633,11 @@
         "tags": [
           "Inference"
         ],
-        "summary": "Consultar disponibilidad técnica.",
-        "description": "Permite mantener deshabilitado el cálculo sin paquete formalizado. ready no demuestra utilidad clínica. El POST vuelve a comprobar disponibilidad.",
+        "summary": "Consultar disponibilidad tÃ©cnica.",
+        "description": "Permite mantener deshabilitado el cÃ¡lculo sin paquete formalizado. ready no demuestra utilidad clÃ­nica. El POST vuelve a comprobar disponibilidad.",
         "responses": {
           "200": {
-            "description": "Estado técnico.",
+            "description": "Estado tÃ©cnico.",
             "headers": {
               "X-Request-Id": {
                 "$ref": "#/components/headers/RequestId"
@@ -1650,7 +1654,7 @@
                 "example": {
                   "status": "not_configured",
                   "package": null,
-                  "message": "Motor predictivo pendiente de formalización."
+                  "message": "Motor predictivo pendiente de formalizaciÃ³n."
                 }
               }
             }
@@ -1686,7 +1690,7 @@
           "Preparation"
         ],
         "summary": "Sellar referencia visual antes de preparar el recorte.",
-        "description": "If-Match de preparación. Solo recurso actual awaiting_reference, misma revisión/lado y sin referencia previa. Validar inspección, cegamiento, nota y coordenadas nativas. Guardar referencia inmutable antes del localizador; centro no entra a geometría. centerResolved=false con centerXY=null queda sellado sin cálculo ni aprobación. Una referencia resuelta inicia el candidato. Respuesta devuelve SourceReference; volver a consultar preparación y caso. Si el candidato falla, la referencia ya guardada no se revierte; recuperar estado y usar retry explícito. Repetición de clave/cuerpo devuelve200 del mismo registro sin repetir cálculo.",
+        "description": "If-Match de preparaciÃ³n. Solo recurso actual awaiting_reference, misma revisiÃ³n/lado y sin referencia previa. Validar inspecciÃ³n, cegamiento, nota y coordenadas nativas. Guardar referencia inmutable antes del localizador; centro no entra a geometrÃ­a. centerResolved=false con centerXY=null queda sellado sin cÃ¡lculo ni aprobaciÃ³n. Una referencia resuelta inicia el candidato. Respuesta devuelve SourceReference; volver a consultar preparaciÃ³n y caso. Si el candidato falla, la referencia ya guardada no se revierte; recuperar estado y usar retry explÃ­cito. RepeticiÃ³n de clave/cuerpo devuelve200 del mismo registro sin repetir cÃ¡lculo.",
         "security": [
           {
             "SessionCookie": [],
@@ -1720,7 +1724,7 @@
                     ],
                     "originalAndHalfInspected": true,
                     "outcomeBlinded": true,
-                    "note": "Ejemplo ficticio: original y mitad revisados antes de mostrar el recorte automático."
+                    "note": "Ejemplo ficticio: original y mitad revisados antes de mostrar el recorte automÃ¡tico."
                   }
                 },
                 "unresolved": {
@@ -1731,7 +1735,7 @@
                     "centerXY": null,
                     "originalAndHalfInspected": true,
                     "outcomeBlinded": true,
-                    "note": "Ejemplo ficticio: no se pudo resolver el centro; la referencia queda sellada sin aprobación."
+                    "note": "Ejemplo ficticio: no se pudo resolver el centro; la referencia queda sellada sin aprobaciÃ³n."
                   }
                 }
               }
@@ -1766,7 +1770,7 @@
                   ],
                   "originalAndHalfInspected": true,
                   "outcomeBlinded": true,
-                  "note": "Ejemplo ficticio: original y mitad revisados antes de mostrar el recorte automático.",
+                  "note": "Ejemplo ficticio: original y mitad revisados antes de mostrar el recorte automÃ¡tico.",
                   "reviewerId": "user-fixture-001",
                   "createdAt": "2026-11-07T15:02:00Z"
                 }
@@ -1774,7 +1778,7 @@
             }
           },
           "201": {
-            "description": "Referencia sellada. Consultar preparación para estado posterior del candidato.",
+            "description": "Referencia sellada. Consultar preparaciÃ³n para estado posterior del candidato.",
             "headers": {
               "X-Request-Id": {
                 "$ref": "#/components/headers/RequestId"
@@ -1800,7 +1804,7 @@
                   ],
                   "originalAndHalfInspected": true,
                   "outcomeBlinded": true,
-                  "note": "Ejemplo ficticio: original y mitad revisados antes de mostrar el recorte automático.",
+                  "note": "Ejemplo ficticio: original y mitad revisados antes de mostrar el recorte automÃ¡tico.",
                   "reviewerId": "user-fixture-001",
                   "createdAt": "2026-11-07T15:02:00Z"
                 }
@@ -1849,8 +1853,8 @@
         "tags": [
           "Preparation"
         ],
-        "summary": "Reintentar una preparación fallida conservando fuente y referencia.",
-        "description": "Cuerpo vacío, If-Match de preparación e intención idempotente nueva. Solo recurso actual failed. Reutiliza la misma fuente y referencia sellada; no permite editar centro, parámetros o método. Una referencia no resuelta bloquea el recorte. Nueva intención202; repetir clave devuelve200 del estado existente sin relanzar. Si falla otra vez, recuperar estado antes de decidir un nuevo reintento explícito.",
+        "summary": "Reintentar una preparaciÃ³n fallida conservando fuente y referencia.",
+        "description": "Cuerpo vacÃ­o, If-Match de preparaciÃ³n e intenciÃ³n idempotente nueva. Solo recurso actual failed. Reutiliza la misma fuente y referencia sellada; no permite editar centro, parÃ¡metros o mÃ©todo. Una referencia no resuelta bloquea el recorte. Nueva intenciÃ³n202; repetir clave devuelve200 del estado existente sin relanzar. Si falla otra vez, recuperar estado antes de decidir un nuevo reintento explÃ­cito.",
         "security": [
           {
             "SessionCookie": [],
@@ -1878,7 +1882,7 @@
         },
         "responses": {
           "200": {
-            "description": "Repetición idempotente: estado existente, sin volver a ejecutar.",
+            "description": "RepeticiÃ³n idempotente: estado existente, sin volver a ejecutar.",
             "headers": {
               "X-Request-Id": {
                 "$ref": "#/components/headers/RequestId"
@@ -1910,7 +1914,7 @@
                   "reviewContext": null,
                   "error": {
                     "code": "PROCESSOR_UNAVAILABLE",
-                    "message": "Ejemplo ficticio: no se pudo completar esta preparación.",
+                    "message": "Ejemplo ficticio: no se pudo completar esta preparaciÃ³n.",
                     "requestId": "preparation-fixture-001",
                     "fields": [],
                     "retryable": true
@@ -1943,7 +1947,7 @@
             }
           },
           "202": {
-            "description": "Reintento realizado; consultar estado y revisión resultantes.",
+            "description": "Reintento realizado; consultar estado y revisiÃ³n resultantes.",
             "headers": {
               "X-Request-Id": {
                 "$ref": "#/components/headers/RequestId"
@@ -2016,7 +2020,7 @@
                     ],
                     "originalAndHalfInspected": true,
                     "outcomeBlinded": true,
-                    "note": "Ejemplo ficticio: original y mitad revisados antes de mostrar el recorte automático.",
+                    "note": "Ejemplo ficticio: original y mitad revisados antes de mostrar el recorte automÃ¡tico.",
                     "reviewerId": "user-fixture-001",
                     "createdAt": "2026-11-07T15:02:00Z"
                   },
@@ -2074,6 +2078,40 @@
         },
         "x-implementation-status": "implemented-phase3"
       }
+    },
+    "/health": {
+      "get": {
+        "operationId": "getApplicationHealth",
+        "tags": [
+          "Operations"
+        ],
+        "summary": "Comprobar disponibilidad de la aplicación sin iniciar una sesión.",
+        "description": "Verifica acceso a la base existente mediante una consulta constante. No lee casos ni carga activos científicos. No declara disponible el motor de progresión.",
+        "x-implementation-status": "implemented",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Aplicación disponible; Cache-Control: no-store y sin Set-Cookie.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthStatus"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Almacenamiento no disponible; sin rutas ni datos privados.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2082,13 +2120,13 @@
         "type": "apiKey",
         "in": "cookie",
         "name": "kneeoai_session",
-        "description": "Sesión opaca del servidor. Protegidos requieren usuario; POST /session usa contexto anónimo emitido por GET."
+        "description": "SesiÃ³n opaca del servidor. Protegidos requieren usuario; POST /session usa contexto anÃ³nimo emitido por GET."
       },
       "CsrfToken": {
         "type": "apiKey",
         "in": "header",
         "name": "X-CSRF-Token",
-        "description": "Token ligado a sesión, emitido por GET /session, rotado al autenticar. Obligatorio para mutaciones, login y logout."
+        "description": "Token ligado a sesiÃ³n, emitido por GET /session, rotado al autenticar. Obligatorio para mutaciones, login y logout."
       }
     },
     "parameters": {
@@ -2120,7 +2158,7 @@
         "name": "If-Match",
         "in": "header",
         "required": true,
-        "description": "ETag fuerte del caso para PATCH/carga; ETag de preparación para referencia/reintento/QC. Sin listas, comodín o prefijo débil. En repeticiones idempotentes aceptadas se recupera el recurso antes de exigir la versión nueva.",
+        "description": "ETag fuerte del caso para PATCH/carga; ETag de preparaciÃ³n para referencia/reintento/QC. Sin listas, comodÃ­n o prefijo dÃ©bil. En repeticiones idempotentes aceptadas se recupera el recurso antes de exigir la versiÃ³n nueva.",
         "schema": {
           "type": "string",
           "pattern": "^\"[^\"\\r\\n]+\"$"
@@ -2131,7 +2169,7 @@
         "name": "Idempotency-Key",
         "in": "header",
         "required": true,
-        "description": "Clave nueva por intención de creación/carga/referencia/reintento/QC o cálculo futuro, conservada para repetir exactamente la misma solicitud. No contiene información clínica.",
+        "description": "Clave nueva por intenciÃ³n de creaciÃ³n/carga/referencia/reintento/QC o cÃ¡lculo futuro, conservada para repetir exactamente la misma solicitud. No contiene informaciÃ³n clÃ­nica.",
         "schema": {
           "type": "string",
           "minLength": 16,
@@ -2149,14 +2187,14 @@
         }
       },
       "NoStore": {
-        "description": "Evitar caché de todas las respuestas de la aplicación.",
+        "description": "Evitar cachÃ© de todas las respuestas de la aplicaciÃ³n.",
         "schema": {
           "type": "string",
           "const": "no-store"
         }
       },
       "ETag": {
-        "description": "ETag fuerte y opaco de esta representación. Preservar comillas en If-Match; no sustituye una revisión científica.",
+        "description": "ETag fuerte y opaco de esta representaciÃ³n. Preservar comillas en If-Match; no sustituye una revisiÃ³n cientÃ­fica.",
         "schema": {
           "type": "string",
           "pattern": "^\"[^\"\\r\\n]+\"$"
@@ -2171,7 +2209,7 @@
         }
       },
       "SessionCookie": {
-        "description": "Cookie opaca del servidor, rotada al autenticar y revocada al salir. HTTPS: HttpOnly; Secure; SameSite=Lax; Path=/api/v1. Sin credenciales ni datos clínicos.",
+        "description": "Cookie opaca del servidor, rotada al autenticar y revocada al salir. HTTPS: HttpOnly; Secure; SameSite=Lax; Path=/api/v1. Sin credenciales ni datos clÃ­nicos.",
         "schema": {
           "type": "string"
         }
@@ -2179,7 +2217,7 @@
     },
     "responses": {
       "Unauthorized": {
-        "description": "Sesión ausente, caducada o credenciales incorrectas.",
+        "description": "SesiÃ³n ausente, caducada o credenciales incorrectas.",
         "headers": {
           "X-Request-Id": {
             "$ref": "#/components/headers/RequestId"
@@ -2196,7 +2234,7 @@
             "example": {
               "error": {
                 "code": "AUTHENTICATION_REQUIRED",
-                "message": "Inicia sesión para continuar.",
+                "message": "Inicia sesiÃ³n para continuar.",
                 "requestId": "req-fixture-001",
                 "fields": [],
                 "retryable": false
@@ -2206,7 +2244,7 @@
         }
       },
       "Forbidden": {
-        "description": "CSRF inválido o permiso insuficiente.",
+        "description": "CSRF invÃ¡lido o permiso insuficiente.",
         "headers": {
           "X-Request-Id": {
             "$ref": "#/components/headers/RequestId"
@@ -2223,7 +2261,7 @@
             "example": {
               "error": {
                 "code": "ACCESS_DENIED",
-                "message": "No se pudo autorizar esta operación.",
+                "message": "No se pudo autorizar esta operaciÃ³n.",
                 "requestId": "req-fixture-001",
                 "fields": [],
                 "retryable": false
@@ -2233,7 +2271,7 @@
         }
       },
       "NotFound": {
-        "description": "Recurso inexistente o ajeno: no distinguir cuál.",
+        "description": "Recurso inexistente o ajeno: no distinguir cuÃ¡l.",
         "headers": {
           "X-Request-Id": {
             "$ref": "#/components/headers/RequestId"
@@ -2250,7 +2288,7 @@
             "example": {
               "error": {
                 "code": "RESOURCE_NOT_FOUND",
-                "message": "No se encontró el recurso solicitado.",
+                "message": "No se encontrÃ³ el recurso solicitado.",
                 "requestId": "req-fixture-001",
                 "fields": [],
                 "retryable": false
@@ -2260,7 +2298,7 @@
         }
       },
       "Conflict": {
-        "description": "Estado no listo, revisión incompatible o conflicto idempotente.",
+        "description": "Estado no listo, revisiÃ³n incompatible o conflicto idempotente.",
         "headers": {
           "X-Request-Id": {
             "$ref": "#/components/headers/RequestId"
@@ -2304,7 +2342,7 @@
             "example": {
               "error": {
                 "code": "VERSION_CONFLICT",
-                "message": "El caso cambió. Recupera su versión actual antes de guardar.",
+                "message": "El caso cambiÃ³. Recupera su versiÃ³n actual antes de guardar.",
                 "requestId": "req-fixture-001",
                 "fields": [],
                 "retryable": false
@@ -2331,7 +2369,7 @@
             "example": {
               "error": {
                 "code": "VERSION_REQUIRED",
-                "message": "Recupera la versión actual antes de realizar esta operación.",
+                "message": "Recupera la versiÃ³n actual antes de realizar esta operaciÃ³n.",
                 "requestId": "req-fixture-001",
                 "fields": [],
                 "retryable": false
@@ -2341,7 +2379,7 @@
         }
       },
       "ValidationError": {
-        "description": "Formato de entrada o referencias no válidos.",
+        "description": "Formato de entrada o referencias no vÃ¡lidos.",
         "headers": {
           "X-Request-Id": {
             "$ref": "#/components/headers/RequestId"
@@ -2368,7 +2406,7 @@
         }
       },
       "PayloadTooLarge": {
-        "description": "Archivo supera el límite técnico configurado.",
+        "description": "Archivo supera el lÃ­mite tÃ©cnico configurado.",
         "headers": {
           "X-Request-Id": {
             "$ref": "#/components/headers/RequestId"
@@ -2385,7 +2423,7 @@
             "example": {
               "error": {
                 "code": "FILE_TOO_LARGE",
-                "message": "El archivo supera el tamaño permitido.",
+                "message": "El archivo supera el tamaÃ±o permitido.",
                 "requestId": "req-fixture-001",
                 "fields": [],
                 "retryable": false
@@ -2412,7 +2450,7 @@
             "example": {
               "error": {
                 "code": "UNSUPPORTED_MEDIA_TYPE",
-                "message": "El formato de la solicitud no está admitido.",
+                "message": "El formato de la solicitud no estÃ¡ admitido.",
                 "requestId": "req-fixture-001",
                 "fields": [],
                 "retryable": false
@@ -2422,7 +2460,7 @@
         }
       },
       "Unavailable": {
-        "description": "Componente necesario no disponible. En inferencia no se crea cálculo ni riesgo sustituto.",
+        "description": "Componente necesario no disponible. En inferencia no se crea cÃ¡lculo ni riesgo sustituto.",
         "headers": {
           "X-Request-Id": {
             "$ref": "#/components/headers/RequestId"
@@ -2439,7 +2477,7 @@
             "example": {
               "error": {
                 "code": "ENGINE_NOT_AVAILABLE",
-                "message": "El motor predictivo todavía no está disponible.",
+                "message": "El motor predictivo todavÃ­a no estÃ¡ disponible.",
                 "requestId": "req-fixture-001",
                 "fields": [],
                 "retryable": true
@@ -2466,7 +2504,7 @@
             "example": {
               "error": {
                 "code": "INTERNAL_ERROR",
-                "message": "No se pudo completar la operación.",
+                "message": "No se pudo completar la operaciÃ³n.",
                 "requestId": "req-fixture-001",
                 "fields": [],
                 "retryable": false
@@ -2486,7 +2524,7 @@
       },
       "VersionId": {
         "type": "string",
-        "description": "Versión opaca, no calculada por el cliente.",
+        "description": "VersiÃ³n opaca, no calculada por el cliente.",
         "minLength": 1,
         "maxLength": 160
       },
@@ -2500,7 +2538,7 @@
           "right",
           "left"
         ],
-        "description": "Lado anatómico del paciente, no de la pantalla."
+        "description": "Lado anatÃ³mico del paciente, no de la pantalla."
       },
       "Sex": {
         "type": "string",
@@ -2508,17 +2546,17 @@
           "F",
           "M"
         ],
-        "description": "Codificación basal admitida por el contrato vigente."
+        "description": "CodificaciÃ³n basal admitida por el contrato vigente."
       },
       "Age": {
         "type": "integer",
         "minimum": 1,
-        "description": "Edad basal en años; validación de formato, no rango clínico de elegibilidad."
+        "description": "Edad basal en aÃ±os; validaciÃ³n de formato, no rango clÃ­nico de elegibilidad."
       },
       "Bmi": {
         "type": "number",
         "exclusiveMinimum": 0,
-        "description": "IMC basal en kg/m²; no introduce un límite clínico ni excluye ausencias."
+        "description": "IMC basal en kg/mÂ²; no introduce un lÃ­mite clÃ­nico ni excluye ausencias."
       },
       "ClinicalDraft": {
         "type": "object",
@@ -2571,7 +2609,7 @@
           "bmi",
           "side"
         ],
-        "description": "Los ausentes se conservan como null. El tratamiento de ausencias pertenece al paquete científico vigente; no se inventa una regla de casos completos."
+        "description": "Los ausentes se conservan como null. El tratamiento de ausencias pertenece al paquete cientÃ­fico vigente; no se inventa una regla de casos completos."
       },
       "ClinicalInference": {
         "type": "object",
@@ -2617,7 +2655,7 @@
           "bmi",
           "side"
         ],
-        "description": "Entrada basal capturada. Las ausencias admitidas se transforman o imputan exclusivamente con el estado congelado del paquete. La API no excluye automáticamente por BMI null ni ajusta imputaciones."
+        "description": "Entrada basal capturada. Las ausencias admitidas se transforman o imputan exclusivamente con el estado congelado del paquete. La API no excluye automÃ¡ticamente por BMI null ni ajusta imputaciones."
       },
       "ClinicalPatch": {
         "type": "object",
@@ -2747,7 +2785,7 @@
           "fields",
           "retryable"
         ],
-        "description": "Sin trazas internas, rutas, credenciales o datos completos del caso. retryable no autoriza reintentos automáticos."
+        "description": "Sin trazas internas, rutas, credenciales o datos completos del caso. retryable no autoriza reintentos automÃ¡ticos."
       },
       "ErrorResponse": {
         "type": "object",
@@ -2824,7 +2862,7 @@
           "expiresAt",
           "csrfToken"
         ],
-        "description": "CSRF permanece en memoria. El identificador de sesión solo viaja en cookie HttpOnly. GET admite contexto anónimo previo al login.",
+        "description": "CSRF permanece en memoria. El identificador de sesiÃ³n solo viaja en cookie HttpOnly. GET admite contexto anÃ³nimo previo al login.",
         "allOf": [
           {
             "if": {
@@ -2939,7 +2977,7 @@
           "currentExecutionId",
           "updatedAt"
         ],
-        "description": "currentRevisionId identifica una revisión persistida e inmutable de las entradas. Los campos derivados los asigna el servidor. El progreso de un trabajo no cambia por sí mismo la revisión de entrada."
+        "description": "currentRevisionId identifica una revisiÃ³n persistida e inmutable de las entradas. Los campos derivados los asigna el servidor. El progreso de un trabajo no cambia por sÃ­ mismo la revisiÃ³n de entrada."
       },
       "EvaluationPage": {
         "type": "object",
@@ -2975,13 +3013,13 @@
           "file": {
             "type": "string",
             "format": "binary",
-            "description": "Un DICOM basal; el servidor verifica contenido y límite técnico. Los SVG ficticios no son DICOM."
+            "description": "Un DICOM basal; el servidor verifica contenido y lÃ­mite tÃ©cnico. Los SVG ficticios no son DICOM."
           }
         },
         "required": [
           "file"
         ],
-        "description": "Exactamente un campo file, sin campos de texto ni otro archivo. El lado proviene del caso guardado. Límites por defecto: archivo60MiB, multipart64MiB. Se inspecciona contenido; el nombre o MIME no prueban compatibilidad. Mismos bytes/caso/lado reutilizan una preparación."
+        "description": "Exactamente un campo file, sin campos de texto ni otro archivo. El lado proviene del caso guardado. LÃ­mites por defecto: archivo60MiB, multipart64MiB. Se inspecciona contenido; el nombre o MIME no prueban compatibilidad. Mismos bytes/caso/lado reutilizan una preparaciÃ³n."
       },
       "ImageIdentity": {
         "type": "object",
@@ -3066,7 +3104,7 @@
           "cropPreviewUrl",
           "views"
         ],
-        "description": "Contexto del recorte disponible; canReview y ready no significan QC aceptado. checks está vacío y la observación completa aplica las reglas congeladas."
+        "description": "Contexto del recorte disponible; canReview y ready no significan QC aceptado. checks estÃ¡ vacÃ­o y la observaciÃ³n completa aplica las reglas congeladas."
       },
       "Preparation": {
         "type": "object",
@@ -3144,7 +3182,7 @@
                 "type": "null"
               }
             ],
-            "description": "Decisión guardada vigente para esta preparación; null si no existe o quedó desactualizada."
+            "description": "DecisiÃ³n guardada vigente para esta preparaciÃ³n; null si no existe o quedÃ³ desactualizada."
           },
           "sourceContext": {
             "anyOf": [
@@ -3214,7 +3252,7 @@
           "isCurrent",
           "reused"
         ],
-        "description": "Preparación persistida. awaiting_reference permite inspeccionar original y mitad; una referencia resuelta precede al candidato ready. isCurrent vincula la preparación con la imagen/lado activos. reused indica recuperación o reutilización en esa respuesta, no aprobación.",
+        "description": "PreparaciÃ³n persistida. awaiting_reference permite inspeccionar original y mitad; una referencia resuelta precede al candidato ready. isCurrent vincula la preparaciÃ³n con la imagen/lado activos. reused indica recuperaciÃ³n o reutilizaciÃ³n en esa respuesta, no aprobaciÃ³n.",
         "allOf": [
           {
             "if": {
@@ -3424,7 +3462,7 @@
               ],
               "originalAndHalfInspected": true,
               "outcomeBlinded": true,
-              "note": "Ejemplo ficticio: original y mitad revisados antes de mostrar el recorte automático.",
+              "note": "Ejemplo ficticio: original y mitad revisados antes de mostrar el recorte automÃ¡tico.",
               "reviewerId": "user-fixture-001",
               "createdAt": "2026-11-07T15:02:00Z"
             },
@@ -3505,7 +3543,7 @@
                 "marks": [],
                 "mark_effect": "none",
                 "physical_origin_known": false,
-                "note": "Ejemplo sintético de observación completa; no corresponde a una imagen clínica real.",
+                "note": "Ejemplo sintÃ©tico de observaciÃ³n completa; no corresponde a una imagen clÃ­nica real.",
                 "original_half_inspected": true,
                 "both_windows_inspected": true,
                 "outcome_blinded": true,
@@ -3531,7 +3569,7 @@
                   "marks": [],
                   "mark_effect": "none",
                   "physical_origin_known": false,
-                  "note": "Ejemplo sintético de observación completa; no corresponde a una imagen clínica real.",
+                  "note": "Ejemplo sintÃ©tico de observaciÃ³n completa; no corresponde a una imagen clÃ­nica real.",
                   "original_half_inspected": true,
                   "both_windows_inspected": true,
                   "outcome_blinded": true,
@@ -3574,7 +3612,7 @@
               ],
               "originalAndHalfInspected": true,
               "outcomeBlinded": true,
-              "note": "Ejemplo ficticio: original y mitad revisados antes de mostrar el recorte automático.",
+              "note": "Ejemplo ficticio: original y mitad revisados antes de mostrar el recorte automÃ¡tico.",
               "reviewerId": "user-fixture-001",
               "createdAt": "2026-11-07T15:02:00Z"
             },
@@ -3641,7 +3679,7 @@
               "centerXY": null,
               "originalAndHalfInspected": true,
               "outcomeBlinded": true,
-              "note": "Ejemplo ficticio: no se pudo resolver el centro; la referencia queda sellada sin aprobación.",
+              "note": "Ejemplo ficticio: no se pudo resolver el centro; la referencia queda sellada sin aprobaciÃ³n.",
               "reviewerId": "user-fixture-001",
               "createdAt": "2026-11-07T15:02:00Z"
             },
@@ -3664,7 +3702,7 @@
             "reviewContext": null,
             "error": {
               "code": "PROCESSOR_UNAVAILABLE",
-              "message": "Ejemplo ficticio: no se pudo completar esta preparación.",
+              "message": "Ejemplo ficticio: no se pudo completar esta preparaciÃ³n.",
               "requestId": "preparation-fixture-001",
               "fields": [],
               "retryable": true
@@ -3718,7 +3756,7 @@
               "$ref": "#/components/schemas/OpaqueId"
             },
             "maxItems": 0,
-            "description": "Vacío en fase3. Los controles reales son la observación completa; no se aceptan identificadores de checks inventados."
+            "description": "VacÃ­o en fase3. Los controles reales son la observaciÃ³n completa; no se aceptan identificadores de checks inventados."
           },
           "reason": {
             "anyOf": [
@@ -3751,7 +3789,7 @@
           "reason",
           "observation"
         ],
-        "description": "Aceptar exige observación completa y accepted=true del evaluador del servidor. Rechazar exige motivo y puede conservar observation=null; ese rechazo administrativo no fabrica un resultado científico.",
+        "description": "Aceptar exige observaciÃ³n completa y accepted=true del evaluador del servidor. Rechazar exige motivo y puede conservar observation=null; ese rechazo administrativo no fabrica un resultado cientÃ­fico.",
         "allOf": [
           {
             "if": {
@@ -3808,7 +3846,7 @@
               "marks": [],
               "mark_effect": "none",
               "physical_origin_known": false,
-              "note": "Ejemplo sintético de observación completa; no corresponde a una imagen clínica real.",
+              "note": "Ejemplo sintÃ©tico de observaciÃ³n completa; no corresponde a una imagen clÃ­nica real.",
               "original_half_inspected": true,
               "both_windows_inspected": true,
               "outcome_blinded": true,
@@ -3866,7 +3904,7 @@
               "$ref": "#/components/schemas/OpaqueId"
             },
             "maxItems": 0,
-            "description": "Vacío en fase3. Los controles reales son la observación completa; no se aceptan identificadores de checks inventados."
+            "description": "VacÃ­o en fase3. Los controles reales son la observaciÃ³n completa; no se aceptan identificadores de checks inventados."
           },
           "reason": {
             "anyOf": [
@@ -3923,7 +3961,7 @@
           "observation",
           "assessment"
         ],
-        "description": "Decisión inmutable emitida por servidor para imagen/lado/revisión exactos. El revisor y fecha son del servidor. Rechazo administrativo permite observation/assessment null; aceptación exige evaluación favorable.",
+        "description": "DecisiÃ³n inmutable emitida por servidor para imagen/lado/revisiÃ³n exactos. El revisor y fecha son del servidor. Rechazo administrativo permite observation/assessment null; aceptaciÃ³n exige evaluaciÃ³n favorable.",
         "allOf": [
           {
             "if": {
@@ -4017,7 +4055,7 @@
               "marks": [],
               "mark_effect": "none",
               "physical_origin_known": false,
-              "note": "Ejemplo sintético de observación completa; no corresponde a una imagen clínica real.",
+              "note": "Ejemplo sintÃ©tico de observaciÃ³n completa; no corresponde a una imagen clÃ­nica real.",
               "original_half_inspected": true,
               "both_windows_inspected": true,
               "outcome_blinded": true,
@@ -4043,7 +4081,7 @@
                 "marks": [],
                 "mark_effect": "none",
                 "physical_origin_known": false,
-                "note": "Ejemplo sintético de observación completa; no corresponde a una imagen clínica real.",
+                "note": "Ejemplo sintÃ©tico de observaciÃ³n completa; no corresponde a una imagen clÃ­nica real.",
                 "original_half_inspected": true,
                 "both_windows_inspected": true,
                 "outcome_blinded": true,
@@ -4071,7 +4109,7 @@
             "qcPolicyVersion": "mcr008_confirmation_v1.0",
             "decision": "rejected",
             "confirmedCheckIds": [],
-            "reason": "Rechazo administrativo ficticio; no se atribuye una evaluación científica.",
+            "reason": "Rechazo administrativo ficticio; no se atribuye una evaluaciÃ³n cientÃ­fica.",
             "reviewerId": "user-fixture-001",
             "createdAt": "2026-11-07T15:05:00Z",
             "observation": null,
@@ -4102,7 +4140,7 @@
           "preparationRevisionId",
           "reviewId"
         ],
-        "description": "Solo referencias inmutables vigentes del mismo caso. No recibe probabilidades, modelo, pesos, calibrador, umbral o parámetros científicos."
+        "description": "Solo referencias inmutables vigentes del mismo caso. No recibe probabilidades, modelo, pesos, calibrador, umbral o parÃ¡metros cientÃ­ficos."
       },
       "InputSnapshot": {
         "type": "object",
@@ -4139,7 +4177,7 @@
           "reviewId",
           "qcPolicyVersion"
         ],
-        "description": "Instantánea construida por servidor al aceptar la solicitud; el cálculo no vuelve a leer el borrador editable."
+        "description": "InstantÃ¡nea construida por servidor al aceptar la solicitud; el cÃ¡lculo no vuelve a leer el borrador editable."
       },
       "EngineVersion": {
         "type": "object",
@@ -4172,7 +4210,7 @@
           "calibratorVersion",
           "thresholdVersion"
         ],
-        "description": "Paquete final formalizado seleccionado por servidor; no revela pesos/rutas ni concede aprobación científica."
+        "description": "Paquete final formalizado seleccionado por servidor; no revela pesos/rutas ni concede aprobaciÃ³n cientÃ­fica."
       },
       "PredictionResult": {
         "type": "object",
@@ -4240,7 +4278,7 @@
           "createdAt",
           "limitations"
         ],
-        "description": "Solo una ejecución satisfactoria produce este resultado. Probabilidad calibrada, umbral y clasificación provienen del paquete aprobado. No se fija un umbral aquí ni se ofrecen ejemplos de porcentaje predictivo."
+        "description": "Solo una ejecuciÃ³n satisfactoria produce este resultado. Probabilidad calibrada, umbral y clasificaciÃ³n provienen del paquete aprobado. No se fija un umbral aquÃ­ ni se ofrecen ejemplos de porcentaje predictivo."
       },
       "Execution": {
         "type": "object",
@@ -4317,7 +4355,7 @@
           "result",
           "error"
         ],
-        "description": "Contrato FUTURO, no implementado en fase3. Instantánea y paquete inmutables; estado persistido. isCurrentInput se calcula al leer y evita mostrar un resultado histórico como actual. Consultar no ejecuta inferencia.",
+        "description": "Contrato FUTURO, no implementado en fase3. InstantÃ¡nea y paquete inmutables; estado persistido. isCurrentInput se calcula al leer y evita mostrar un resultado histÃ³rico como actual. Consultar no ejecuta inferencia.",
         "allOf": [
           {
             "if": {
@@ -4425,7 +4463,7 @@
           "package",
           "message"
         ],
-        "description": "Disponibilidad técnica, no demostración de utilidad clínica ni autorización para entrenar.",
+        "description": "Disponibilidad tÃ©cnica, no demostraciÃ³n de utilidad clÃ­nica ni autorizaciÃ³n para entrenar.",
         "allOf": [
           {
             "if": {
@@ -4469,7 +4507,7 @@
         },
         "minItems": 2,
         "maxItems": 2,
-        "description": "[alto, ancho] en píxeles nativos. No es una dimensión fija del tensor predictivo."
+        "description": "[alto, ancho] en pÃ­xeles nativos. No es una dimensiÃ³n fija del tensor predictivo."
       },
       "NativePoint": {
         "type": "array",
@@ -4479,7 +4517,7 @@
         },
         "minItems": 2,
         "maxItems": 2,
-        "description": "[x,y] enteros en coordenadas de la mitad nativa seleccionada; el servidor comprueba límites."
+        "description": "[x,y] enteros en coordenadas de la mitad nativa seleccionada; el servidor comprueba lÃ­mites."
       },
       "SourceViews": {
         "type": "object",
@@ -4508,7 +4546,7 @@
           "half_a",
           "half_b"
         ],
-        "description": "PNG privados: full=bilateral original, half=mitad seleccionada; a=percentiles1–99, b=5–95; dimensiones nativas conservadas."
+        "description": "PNG privados: full=bilateral original, half=mitad seleccionada; a=percentiles1â€“99, b=5â€“95; dimensiones nativas conservadas."
       },
       "CropViews": {
         "type": "object",
@@ -4527,7 +4565,7 @@
           "crop_a",
           "crop_b"
         ],
-        "description": "Dos ventanas del mismo recorte nativo: a=1–99 y b=5–95."
+        "description": "Dos ventanas del mismo recorte nativo: a=1â€“99 y b=5â€“95."
       },
       "SourceContext": {
         "type": "object",
@@ -4544,7 +4582,7 @@
           "views",
           "fullNativeShape"
         ],
-        "description": "La referencia se registra sobre half_a/half_b después de inspeccionar original y mitad, antes de mostrar el recorte."
+        "description": "La referencia se registra sobre half_a/half_b despuÃ©s de inspeccionar original y mitad, antes de mostrar el recorte."
       },
       "CropGeometry": {
         "type": "object",
@@ -4558,7 +4596,7 @@
             },
             "minItems": 4,
             "maxItems": 4,
-            "description": "Formato PÚBLICO [x0,y0,x1,y1], límites superiores exclusivos. x0<x1 e y0<y1. El orden interno del científico es distinto y no se expone."
+            "description": "Formato PÃšBLICO [x0,y0,x1,y1], lÃ­mites superiores exclusivos. x0<x1 e y0<y1. El orden interno del cientÃ­fico es distinto y no se expone."
           },
           "previewShapes": {
             "type": "object",
@@ -4581,7 +4619,7 @@
           "nativeHalfBox",
           "previewShapes"
         ],
-        "description": "Geometría informada por servidor para transformar clics de vista a coordenadas nativas. Nunca reconstruir la caja mediante reglas clínicas en Vue."
+        "description": "GeometrÃ­a informada por servidor para transformar clics de vista a coordenadas nativas. Nunca reconstruir la caja mediante reglas clÃ­nicas en Vue."
       },
       "SourceReferenceSubmission": {
         "type": "object",
@@ -4629,7 +4667,7 @@
           "outcomeBlinded",
           "note"
         ],
-        "description": "Referencia visual explícita del original y la mitad, sellada antes del localizador/ROI. Nunca se utiliza como entrada de geometría.",
+        "description": "Referencia visual explÃ­cita del original y la mitad, sellada antes del localizador/ROI. Nunca se utiliza como entrada de geometrÃ­a.",
         "allOf": [
           {
             "if": {
@@ -4675,7 +4713,7 @@
             ],
             "originalAndHalfInspected": true,
             "outcomeBlinded": true,
-            "note": "Ejemplo ficticio: original y mitad revisados antes de mostrar el recorte automático."
+            "note": "Ejemplo ficticio: original y mitad revisados antes de mostrar el recorte automÃ¡tico."
           },
           {
             "preparationRevisionId": "preparation-revision-fixture-source",
@@ -4684,7 +4722,7 @@
             "centerXY": null,
             "originalAndHalfInspected": true,
             "outcomeBlinded": true,
-            "note": "Ejemplo ficticio: no se pudo resolver el centro; la referencia queda sellada sin aprobación."
+            "note": "Ejemplo ficticio: no se pudo resolver el centro; la referencia queda sellada sin aprobaciÃ³n."
           }
         ]
       },
@@ -4750,7 +4788,7 @@
           "reviewerId",
           "createdAt"
         ],
-        "description": "Registro inmutable. preparationRevisionId identifica la revisión de FUENTE al sellar; puede diferir de la revisión posterior del recorte. Una referencia no resuelta permanece sellada, sin candidato ni aprobación.",
+        "description": "Registro inmutable. preparationRevisionId identifica la revisiÃ³n de FUENTE al sellar; puede diferir de la revisiÃ³n posterior del recorte. Una referencia no resuelta permanece sellada, sin candidato ni aprobaciÃ³n.",
         "allOf": [
           {
             "if": {
@@ -4798,7 +4836,7 @@
             ],
             "originalAndHalfInspected": true,
             "outcomeBlinded": true,
-            "note": "Ejemplo ficticio: original y mitad revisados antes de mostrar el recorte automático.",
+            "note": "Ejemplo ficticio: original y mitad revisados antes de mostrar el recorte automÃ¡tico.",
             "reviewerId": "user-fixture-001",
             "createdAt": "2026-11-07T15:02:00Z"
           },
@@ -4811,7 +4849,7 @@
             "centerXY": null,
             "originalAndHalfInspected": true,
             "outcomeBlinded": true,
-            "note": "Ejemplo ficticio: no se pudo resolver el centro; la referencia queda sellada sin aprobación.",
+            "note": "Ejemplo ficticio: no se pudo resolver el centro; la referencia queda sellada sin aprobaciÃ³n.",
             "reviewerId": "user-fixture-001",
             "createdAt": "2026-11-07T15:02:00Z"
           }
@@ -4961,7 +4999,7 @@
           "ruler_outside_bone",
           "ruler_locations_xy"
         ],
-        "description": "Esquema de observación congelado, sin knee_alias: la identidad la añade el servidor. No es un diagnóstico. El servidor comprueba coherencia de marcas, incertidumbre, centro y posiciones de regla. Los puntos de regla son coordenadas de la MITAD, no del PNG recortado. physical_origin_known=false no excluye por sí solo.",
+        "description": "Esquema de observaciÃ³n congelado, sin knee_alias: la identidad la aÃ±ade el servidor. No es un diagnÃ³stico. El servidor comprueba coherencia de marcas, incertidumbre, centro y posiciones de regla. Los puntos de regla son coordenadas de la MITAD, no del PNG recortado. physical_origin_known=false no excluye por sÃ­ solo.",
         "examples": [
           {
             "side_supported": true,
@@ -4976,7 +5014,7 @@
             "marks": [],
             "mark_effect": "none",
             "physical_origin_known": false,
-            "note": "Ejemplo sintético de observación completa; no corresponde a una imagen clínica real.",
+            "note": "Ejemplo sintÃ©tico de observaciÃ³n completa; no corresponde a una imagen clÃ­nica real.",
             "original_half_inspected": true,
             "both_windows_inspected": true,
             "outcome_blinded": true,
@@ -5135,7 +5173,7 @@
           "ruler_locations_xy",
           "knee_alias"
         ],
-        "description": "Observación normalizada por el servidor, con alias interno opaco sin identidad clínica.",
+        "description": "ObservaciÃ³n normalizada por el servidor, con alias interno opaco sin identidad clÃ­nica.",
         "examples": [
           {
             "side_supported": true,
@@ -5150,7 +5188,7 @@
             "marks": [],
             "mark_effect": "none",
             "physical_origin_known": false,
-            "note": "Ejemplo sintético de observación completa; no corresponde a una imagen clínica real.",
+            "note": "Ejemplo sintÃ©tico de observaciÃ³n completa; no corresponde a una imagen clÃ­nica real.",
             "original_half_inspected": true,
             "both_windows_inspected": true,
             "outcome_blinded": true,
@@ -5198,7 +5236,7 @@
           "reasons",
           "geometryAdequate"
         ],
-        "description": "Evaluación del procedimiento congelado. No acredita precisión anatómica, ausencia de atajos ni validación clínica.",
+        "description": "EvaluaciÃ³n del procedimiento congelado. No acredita precisiÃ³n anatÃ³mica, ausencia de atajos ni validaciÃ³n clÃ­nica.",
         "examples": [
           {
             "accepted": true,
@@ -5217,7 +5255,7 @@
               "marks": [],
               "mark_effect": "none",
               "physical_origin_known": false,
-              "note": "Ejemplo sintético de observación completa; no corresponde a una imagen clínica real.",
+              "note": "Ejemplo sintÃ©tico de observaciÃ³n completa; no corresponde a una imagen clÃ­nica real.",
               "original_half_inspected": true,
               "both_windows_inspected": true,
               "outcome_blinded": true,
@@ -5238,9 +5276,33 @@
         "additionalProperties": false,
         "properties": {},
         "required": [],
-        "description": "Cuerpo JSON vacío. Reintento explícito de failed con la misma fuente y referencia sellada; no autoriza reanotar ni cambiar el algoritmo.",
+        "description": "Cuerpo JSON vacÃ­o. Reintento explÃ­cito de failed con la misma fuente y referencia sellada; no autoriza reanotar ni cambiar el algoritmo.",
         "examples": [
           {}
+        ]
+      },
+      "HealthStatus": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "version"
+        ],
+        "properties": {
+          "status": {
+            "const": "ok"
+          },
+          "version": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          }
+        },
+        "examples": [
+          {
+            "status": "ok",
+            "version": "0.5.0"
+          }
         ]
       }
     }

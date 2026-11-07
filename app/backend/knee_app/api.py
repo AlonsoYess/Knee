@@ -25,6 +25,7 @@ from .preparations import install_preparation_routes
 from .processor import FrozenProcessor
 from .private_files import ApiBodyLimit
 from .frontend_distribution import FrontendDistribution, FrontendDistributionMiddleware
+from . import __version__
 from .security import COOKIE_NAME, COOKIE_PATH, csrf_token, load_secret, new_token, password_hash, token_hash, verify_csrf, verify_password
 
 LOGGER = logging.getLogger("knee_app")
@@ -38,7 +39,7 @@ def create_app(settings: Settings | None = None, *, clock: Callable[[], float] =
     db.interrupt_preparations(float(clock()))
     secret = load_secret(settings.secret_key, settings.database_path)
     dummy_hash = password_hash(new_token())
-    app = FastAPI(title="KneeOAI application API", version="0.4.0", docs_url=None, redoc_url=None, openapi_url=None, redirect_slashes=False)
+    app = FastAPI(title="KneeOAI application API", version=__version__, docs_url=None, redoc_url=None, openapi_url=None, redirect_slashes=False)
     app.state.settings, app.state.db, app.state.clock = settings, db, clock
     app.state.processor = processor if processor is not None else FrozenProcessor(settings)
     # Added before the authentication middleware below, so authenticated mutation checks run first.
@@ -158,6 +159,18 @@ def create_app(settings: Settings | None = None, *, clock: Callable[[], float] =
         return {"id": row["id"], "code": row["code"], "currentRevisionId": row["revision_id"],
                 "clinical": {key: row[key] for key in ("age", "sex", "bmi", "side")},
                 "preparationId": row['preparation_id'], "reviewId": effective_review, "currentExecutionId": None, "updatedAt": row["updated_at"]}
+
+    @app.get('/api/v1/health')
+    def health():
+        try:
+            if not db.path.is_file() or db.path.is_symlink() or getattr(db.path,'is_junction',lambda:False)():
+                raise OSError('Storage is unavailable')
+            with closing(sqlite3.connect(db.path.resolve().as_uri()+'?mode=ro',uri=True,timeout=1.0)) as connection:
+                if connection.execute('SELECT 1').fetchone()!=(1,):
+                    raise sqlite3.DatabaseError('Storage probe failed')
+        except (OSError,sqlite3.Error):
+            raise ApiError(503,'STORAGE_UNAVAILABLE','El almacenamiento no está disponible temporalmente.',retryable=True)
+        return {'status':'ok','version':__version__}
 
     @app.get("/api/v1/session")
     def get_session(request: Request):

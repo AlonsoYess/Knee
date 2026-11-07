@@ -18,10 +18,14 @@ Arranque: `.venv/Scripts/python.exe -m uvicorn knee_app.api:create_app --factory
 | `KNEEOAI_FROZEN_PYTHON` | Intérprete del entorno científico aprobado existente. |
 | `KNEEOAI_FROZEN_CHECKOUT` | Checkout científico con sus registros y activos privados congelados. |
 | `KNEEOAI_FRONTEND_DIST` | Ruta absoluta de una distribución pública compilada; ausente, no sirve interfaz ni PWA. |
+| `KNEEOAI_DATA_DIR` | Directorio persistente explícito en producción; de él se derivan base y archivos cuando no se indican rutas adicionales. |
+| `KNEEOAI_SECRET_KEY_FILE` | Alternativa al secreto en variable: archivo privado con 64 caracteres hexadecimales ASCII; no configurar ambas fuentes. |
 
 Si falta configuración científica, acceso y borradores funcionan pero la preparación queda bloqueada. `app/IniciarServidor.ps1` carga opcionalmente ubicaciones desde el archivo ignorado `runtime/frozen_processor.json`, claves `python` y `checkout`. Las rutas reales no pertenecen a Git. Desarrollo admite solo loopback; producción exige HTTPS y cookies Secure. Una sola instancia con disco privado persistente; no sincronizar la base activa por Drive. La PWA se incorpora en fase 4 y el despliegue público sigue pendiente.
 
 El iniciador `app/IniciarKneeOAI.ps1` conserva una distribución verificada en `runtime/frontend_versions/`, activa su ruta y abre la aplicación en el mismo origen que la API. FastAPI entrega solo archivos públicos permitidos y rutas Vue conocidas: nunca usa el HTML para sustituir una respuesta API. El inventario y los bytes son inmutables por instancia; una versión nueva requiere reiniciar el servicio. Índice, manifiesto, iconos y worker exigen revalidación; solo los assets con nombre hash pueden usar caché pública duradera. Las respuestas API mantienen `no-store`.
+
+La entrada preparada para despliegue es `python -m knee_app.deploy`, con `--check` para comprobar configuración y escritura sin inicializar la base ni iniciar el servidor. Exige producción, origen HTTPS, secreto, directorio de datos y distribución explícitos. Inicia un solo proceso y rechaza activar el adaptador científico en este paquete de aplicación. El uso local de fase 4 mantiene su configuración propia. `GET /api/v1/health` es público, no crea sesión ni devuelve rutas o casos, y no demuestra disponibilidad del predictor. Ver `../deploy/README.md` para almacenamiento, respaldo y ensayo.
 
 ## Preparación y calidad
 

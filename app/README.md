@@ -6,6 +6,8 @@ La versión 0.11 incorpora PWA instalable, actualización explícita, avisos de 
 
 Alcance y comprobaciones: [entrega de fase 4](FASE_4_ENTREGA.md). Publicación HTTPS e integración predictiva conservan sus fases propias.
 
+La preparación de fase 5 se versiona aparte en v0.12/API 0.5: [guía de despliegue](deploy/README.md) y [evidencia y pendientes](FASE_5_PREPARACION.md). Se preparó el paquete y se ensayó HTTPS en el equipo con datos ficticios. **La construcción/ejecución Docker queda pendiente por virtualización desactivada; la aplicación no está publicada en Internet.** No se contrató alojamiento ni dominio. El servicio local existente conserva su versión anterior hasta una actualización expresa.
+
 ```mermaid
 flowchart LR
     U[Médico] --> V[Vue]

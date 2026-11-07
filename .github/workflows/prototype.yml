@@ -43,6 +43,9 @@ jobs:
       - name: Test API with temporary fictional databases
         working-directory: app/backend
         run: .venv/bin/python -m pytest tests -q
+      - name: Audit the application-only deployment context
+        working-directory: .
+        run: app/backend/.venv/bin/python app/deploy/test_packaging.py
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npm run test:contracts
       - run: npm run build
@@ -54,3 +57,31 @@ jobs:
       - run: npm run test:pwa
         env:
           CI: 'true'
+
+  deployment_image:
+    # Explicit manual build verification only. No registry push or hosting deployment.
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12.14'
+      - name: Verify Docker filtering on a synthetic context
+        run: KNEEOAI_TEST_DOCKER_CONTEXT=1 python app/deploy/test_packaging.py
+      - name: Create the audited source-only context
+        run: python app/deploy/build_context.py --output /tmp/kneeoai-context.tar --report /tmp/kneeoai-context.json
+      - name: Build locally on the runner without publishing an image
+        run: docker build --tag kneeoai-app:verification - < /tmp/kneeoai-context.tar
+      - name: Inspect the runtime boundary
+        run: >-
+          docker run --rm --entrypoint python kneeoai-app:verification -c
+          'import importlib.util,os,pathlib;
+          assert os.getuid()==10001;
+          assert importlib.util.find_spec("torch") is None;
+          assert importlib.util.find_spec("numpy") is None;
+          assert pathlib.Path("/opt/kneeoai/frontend/sw.js").is_file();
+          assert not any(pathlib.Path("/var/lib/kneeoai").iterdir())'

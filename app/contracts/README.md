@@ -2,7 +2,7 @@
 
 Estado: **acceso, datos basales, preparación DICOM y QC persistidos; predicción no disponible**. Fecha: 7 de noviembre de 2026.
 
-[openapi.json](openapi.json) contiene OpenAPI 3.1.0 y JSON Schema 2020-12. La versión **1.0.0-phase3** identifica la comunicación de la aplicación, no un modelo ni una aprobación de despliegue. Todos sus ejemplos son ficticios. No incluyen porcentajes predictivos, datos de investigación ni credenciales operativas. Cada operación declara `x-implementation-status`.
+[openapi.json](openapi.json) contiene OpenAPI 3.1.0 y JSON Schema 2020-12. La versión **1.0.0-phase5-preparation** añade disponibilidad operativa; no identifica un modelo ni autoriza una publicación. Todos sus ejemplos son ficticios. No incluyen porcentajes predictivos, datos de investigación ni credenciales operativas. Cada operación declara `x-implementation-status`.
 
 Vue consume la API de `app/backend`. El backend conserva sesiones, casos, referencias y decisiones; los archivos permanecen privados. Un proceso separado utiliza el entorno científico configurado y las funciones congeladas de `src/knee`. El localizador anatómico puede cargar sus pesos locales; los modelos de progresión y la prueba reservada permanecen fuera de este flujo. No se instala el entorno científico dentro del backend ni se modifican sus transformaciones.
 
@@ -12,6 +12,7 @@ Las rutas parten de **/api/v1**, bajo el mismo origen de la SPA.
 
 | Método y ruta | Comportamiento |
 | --- | --- |
+| GET /health | Disponibilidad de la aplicación mediante consulta constante a la base existente; sin sesión ni carga de modelos. |
 | GET /session | Consultar sesión o crear contexto anónimo y entregar CSRF. |
 | POST /session | Autenticar cuenta administrada y rotar sesión y CSRF. |
 | DELETE /session | Revocar sesión y expirar cookie. |
@@ -29,7 +30,7 @@ Las rutas parten de **/api/v1**, bajo el mismo origen de la SPA.
 | POST /evaluations/{evaluationId}/executions | Devolver 503 después de comprobar acceso; no ejecuta predicción. |
 | GET /executions/{executionId} | Contrato futuro, ruta todavía no implementada. |
 
-Las cuentas se administran por CLI. Recuperación por correo, corrección geométrica manual, selección de modelos, entrenamiento, publicación, PWA y sincronización quedan fuera de este contrato implementado. El flujo científico vigente no permite trasladar, redimensionar, reparar o ajustar manualmente la caja del recorte.
+Las cuentas se administran por CLI. Recuperación por correo, corrección geométrica manual, selección de modelos, entrenamiento y sincronización quedan fuera de este contrato implementado. PWA y configuración de publicación se describen fuera del contrato API. El flujo científico vigente no permite trasladar, redimensionar, reparar o ajustar manualmente la caja del recorte.
 
 ## Caso y datos basales
 
