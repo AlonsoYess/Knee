@@ -4,6 +4,8 @@ FastAPI y SQLite conservan usuarios, sesiones, datos basales, DICOM, referencias
 
 La preparación local de fase 6 añade un puente de comprobación con los cinco pliegues clínicos guardados, en otro intérprete. No recibe casos ni produce riesgo: el diagnóstico utiliza únicamente fixtures fijas. El estado autenticado puede confirmar la conexión, manteniendo `not_configured` y `package=null` hasta formalizar el paquete final. Configuración, evidencia y límites: [fase 6, paso 1](../FASE_6_PASO_1_CONEXION_LOCAL.md).
 
+La [preparación neuronal del paso 2](../FASE_6_PASO_2_PREPARACION_NEURAL.md) añade un cliente/worker por trabajo, un entorno CPU separado y metadatos autenticados para radiográfico y multimodal. Los pesos entrenados todavía deben descargarse; no se da su carga por comprobada ni se amplía la API clínica. `requirements-neural-probe.lock` se instala únicamente en el intérprete privado de esa comprobación.
+
 ## Entorno y configuración
 
 Usar Python 3.12.14 con `.venv` exclusivo de aplicación. Instalar `requirements.lock` para ejecución o `requirements-dev.lock` para pruebas. No instalar esos paquetes en entornos científicos. Inicializar con `python -m knee_app.cli init`; crear cuenta con `create-user --email medico@example.invalid --name "Médico"`. La contraseña se solicita privadamente.
