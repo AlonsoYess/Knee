@@ -6,6 +6,8 @@ La versión 0.11 incorpora PWA instalable, actualización explícita, avisos de 
 
 Alcance y comprobaciones: [entrega de fase 4](FASE_4_ENTREGA.md). Publicación HTTPS e integración predictiva conservan sus fases propias.
 
+La fase 6 tiene preparado su [primer paso de conexión técnica local](FASE_6_PASO_1_CONEXION_LOCAL.md): FastAPI puede comprobar modelos clínicos guardados en otro proceso, con diagnóstico ficticio y paridad verificada. La predicción para el médico continúa bloqueada; el paquete científico definitivo todavía no está liberado.
+
 La preparación de fase 5 se versiona aparte en v0.12/API 0.5: [guía de despliegue](deploy/README.md), [estado general](FASE_5_PREPARACION.md) y [verificación Docker del 9 de noviembre](FASE_5_VERIFICACION_DOCKER.md). La construcción Linux, HTTPS, recreación y recuperación desde respaldo externo a otro volumen pasaron con datos ficticios. **La aplicación no está publicada en Internet.** No se contrató alojamiento ni dominio. El ensayo no sustituye ni migra la base local.
 
 ```mermaid

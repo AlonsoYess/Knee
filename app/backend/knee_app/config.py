@@ -83,6 +83,11 @@ class Settings:
     frozen_timeout_seconds: int = 120
     frontend_dist_path: Path | None = None
     data_dir: Path | None = None
+    predictor_python: Path | None = None
+    predictor_checkout: Path | None = None
+    predictor_bundle: Path | None = None
+    predictor_manifest_sha256: str | None = None
+    predictor_timeout_seconds: float = 30
 
     def __post_init__(self):
         if self.environment=='production':
@@ -102,6 +107,16 @@ class Settings:
         if self.frontend_dist_path is not None:
             # Keep the original path until the distribution validator can reject links/junctions.
             object.__setattr__(self,'frontend_dist_path',Path(self.frontend_dist_path).absolute())
+        for key in ('predictor_python', 'predictor_checkout', 'predictor_bundle'):
+            value = getattr(self, key)
+            if value is not None:
+                object.__setattr__(self, key, Path(value).absolute())
+        if self.predictor_manifest_sha256 is not None and (not isinstance(self.predictor_manifest_sha256, str)
+                or not re.fullmatch(r'[0-9a-f]{64}', self.predictor_manifest_sha256)):
+            raise ValueError('A pinned lowercase SHA256 is required for the development probe bundle')
+        if (type(self.predictor_timeout_seconds) not in {int, float}
+                or not 0 < self.predictor_timeout_seconds <= 120):
+            raise ValueError('The development probe timeout must be positive and at most 120 seconds')
         object.__setattr__(self, "allowed_origins", tuple(normalized_origin(v) for v in self.allowed_origins))
         if self.environment not in {"development", "production", "test"}:
             raise ValueError("Unsupported environment")
@@ -149,4 +164,9 @@ class Settings:
             frozen_checkout=Path(source['KNEEOAI_FROZEN_CHECKOUT']) if source.get('KNEEOAI_FROZEN_CHECKOUT') else None,
             frontend_dist_path=Path(source['KNEEOAI_FRONTEND_DIST']) if source.get('KNEEOAI_FRONTEND_DIST') else None,
             data_dir=data_dir,
+            predictor_python=Path(source['KNEEOAI_PREDICTOR_PYTHON']) if source.get('KNEEOAI_PREDICTOR_PYTHON') else None,
+            predictor_checkout=Path(source['KNEEOAI_PREDICTOR_CHECKOUT']) if source.get('KNEEOAI_PREDICTOR_CHECKOUT') else None,
+            predictor_bundle=Path(source['KNEEOAI_PREDICTOR_BUNDLE']) if source.get('KNEEOAI_PREDICTOR_BUNDLE') else None,
+            predictor_manifest_sha256=source.get('KNEEOAI_PREDICTOR_MANIFEST_SHA256'),
+            predictor_timeout_seconds=float(source.get('KNEEOAI_PREDICTOR_TIMEOUT_SECONDS', '30')),
         )

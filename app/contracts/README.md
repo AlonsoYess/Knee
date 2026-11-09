@@ -1,10 +1,10 @@
 # Contrato Vue–FastAPI, v1
 
-Estado: **acceso, datos basales, preparación DICOM y QC persistidos; predicción no disponible**. Fecha: 7 de noviembre de 2026.
+Estado: **acceso, datos basales, preparación DICOM y QC persistidos; predicción no disponible**. Actualización: 9 de noviembre de 2026, con puente técnico de desarrollo opcional y sin cambiar el esquema de respuesta.
 
 [openapi.json](openapi.json) contiene OpenAPI 3.1.0 y JSON Schema 2020-12. La versión **1.0.0-phase5-preparation** añade disponibilidad operativa; no identifica un modelo ni autoriza una publicación. Todos sus ejemplos son ficticios. No incluyen porcentajes predictivos, datos de investigación ni credenciales operativas. Cada operación declara `x-implementation-status`.
 
-Vue consume la API de `app/backend`. El backend conserva sesiones, casos, referencias y decisiones; los archivos permanecen privados. Un proceso separado utiliza el entorno científico configurado y las funciones congeladas de `src/knee`. El localizador anatómico puede cargar sus pesos locales; los modelos de progresión y la prueba reservada permanecen fuera de este flujo. No se instala el entorno científico dentro del backend ni se modifican sus transformaciones.
+Vue consume la API de `app/backend`. El backend conserva sesiones, casos, referencias y decisiones; los archivos permanecen privados. Un proceso separado utiliza el entorno científico configurado y las funciones congeladas de `src/knee`. El localizador anatómico puede cargar sus pesos locales. Otro puente opcional comprueba los pliegues clínicos guardados; sus diagnósticos ficticios solo se invocan por CLI privada y no forman parte de la API de casos. Los resultados predictivos y la prueba reservada permanecen fuera del flujo implementado. No se instala el entorno científico dentro del backend ni se modifican sus transformaciones.
 
 ## Operaciones y alcance actual
 
@@ -26,7 +26,7 @@ Las rutas parten de **/api/v1**, bajo el mismo origen de la SPA.
 | POST /preparations/{preparationId}/reference | Sellar referencia visual previa y, si está resuelta, preparar candidato. |
 | POST /preparations/{preparationId}/retry | Reintentar explícitamente una preparación fallida con la misma fuente y referencia. |
 | POST /preparations/{preparationId}/reviews | Guardar decisión de QC vinculada al candidato exacto. |
-| GET /engine-status | Informar `not_configured` para el motor predictivo. |
+| GET /engine-status | Estado autenticado; puede verificar el puente local de desarrollo y conserva `not_configured`/paquete nulo si pasa, o `unavailable` si falla. No habilita predicción. |
 | POST /evaluations/{evaluationId}/executions | Devolver 503 después de comprobar acceso; no ejecuta predicción. |
 | GET /executions/{executionId} | Contrato futuro, ruta todavía no implementada. |
 

@@ -45,6 +45,12 @@ def test_data_dir_derivation_and_file_secret_are_shared_with_existing_cli_settin
     assert legacy.database_path==DEFAULT_RUNTIME/'application.sqlite3'
 
 
+def test_app_only_deployment_rejects_local_predictor_configuration(production_env):
+    production_env['KNEEOAI_PREDICTOR_BUNDLE'] = '/private/fictional-development-probe'
+    with pytest.raises(ValueError, match='app-only'):
+        deploy.deployment_settings(production_env)
+
+
 @pytest.mark.parametrize('ending',[b'',b'\n',b'\r\n'])
 def test_one_exact_terminal_line_ending_does_not_change_the_stable_secret(production_env,ending):
     Path(production_env['KNEEOAI_SECRET_KEY_FILE']).write_bytes(SECRET.encode('ascii')+ending)

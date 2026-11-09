@@ -23,6 +23,7 @@ from .errors import ApiError
 from .models import Login, CreateEvaluation, UpdateEvaluation
 from .preparations import install_preparation_routes
 from .processor import FrozenProcessor
+from .predictor import FrozenPredictor, MESSAGES, UNAVAILABLE
 from .private_files import ApiBodyLimit
 from .frontend_distribution import FrontendDistribution, FrontendDistributionMiddleware
 from . import __version__
@@ -31,7 +32,7 @@ from .security import COOKIE_NAME, COOKIE_PATH, csrf_token, load_secret, new_tok
 LOGGER = logging.getLogger("knee_app")
 TOKEN_PATTERN = re.compile(r"^[A-Za-z0-9_-]{43}$")
 
-def create_app(settings: Settings | None = None, *, clock: Callable[[], float] = time.time, processor=None) -> FastAPI:
+def create_app(settings: Settings | None = None, *, clock: Callable[[], float] = time.time, processor=None, predictor=None) -> FastAPI:
     settings = settings or Settings.from_env()
     distribution=FrontendDistribution(settings.frontend_dist_path,database_path=settings.database_path,private_files_path=settings.private_files_path) if settings.frontend_dist_path is not None else None
     db = Database(settings.database_path, settings.busy_timeout_ms)
@@ -42,6 +43,7 @@ def create_app(settings: Settings | None = None, *, clock: Callable[[], float] =
     app = FastAPI(title="KneeOAI application API", version=__version__, docs_url=None, redoc_url=None, openapi_url=None, redirect_slashes=False)
     app.state.settings, app.state.db, app.state.clock = settings, db, clock
     app.state.processor = processor if processor is not None else FrozenProcessor(settings)
+    app.state.predictor = predictor if predictor is not None else FrozenPredictor(settings)
     # Added before the authentication middleware below, so authenticated mutation checks run first.
     app.add_middleware(ApiBodyLimit,max_bytes=settings.max_request_bytes)
     if distribution is not None:
@@ -339,7 +341,15 @@ def create_app(settings: Settings | None = None, *, clock: Callable[[], float] =
     @app.get("/api/v1/engine-status")
     def engine_status(request: Request):
         require_session(request)
-        return {"status": "not_configured", "package": None, "message": "Motor predictivo pendiente de formalización."}
+        try:
+            status = app.state.predictor.engine_status()
+            if (not isinstance(status, dict) or set(status) != {'status', 'package', 'message'}
+                    or status['status'] not in {'not_configured', 'unavailable'} or status['package'] is not None
+                    or not isinstance(status['message'], str) or status['message'] not in MESSAGES):
+                raise ValueError('A development probe cannot activate clinical predictions')
+            return status
+        except Exception:
+            return {'status': 'unavailable', 'package': None, 'message': UNAVAILABLE}
 
     @app.post("/api/v1/evaluations/{evaluationId}/executions")
     def disabled_prediction(evaluationId: str, request: Request):

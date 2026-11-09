@@ -32,7 +32,7 @@ def deployment_settings(environ=None):
         raise ValueError('Deployment requires explicit production configuration')
     if not source.get('KNEEOAI_DATA_DIR') or not source.get('KNEEOAI_FRONTEND_DIST') or not source.get('KNEEOAI_ALLOWED_ORIGINS'):
         raise ValueError('Deployment requires explicit data, frontend and HTTPS origin settings')
-    if any(key.startswith('KNEEOAI_FROZEN_') for key in source):
+    if any(key.startswith(('KNEEOAI_FROZEN_', 'KNEEOAI_PREDICTOR_')) for key in source):
         raise ValueError('This deployment is app-only and cannot enable a scientific adapter')
     if any(key.startswith('UVICORN_') for key in source) or 'FORWARDED_ALLOW_IPS' in source:
         raise ValueError('Use the explicit deployment entrypoint settings')
