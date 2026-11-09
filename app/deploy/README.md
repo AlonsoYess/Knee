@@ -1,15 +1,15 @@
 # Preparación del despliegue — aplicación 0.12.0
 
-Esta entrega prepara la aplicación para un servidor con HTTPS y almacenamiento persistente. No crea servicios externos, no compra dominio, no publica la web y no incluye datos o activos científicos. La ejecución Linux/Docker está pendiente: en el equipo de ensayo la virtualización está desactivada. El ensayo HTTPS descrito abajo se ejecutó en Windows y no sustituye esa comprobación.
+Esta entrega prepara la aplicación para un servidor con HTTPS y almacenamiento persistente. No crea servicios externos, no compra dominio, no publica la web y no incluye datos o activos científicos. La construcción Linux y el ensayo Docker/HTTPS quedaron comprobados el 9 de noviembre de 2026, después de que el investigador habilitara la virtualización. Ver [evidencia y límites](../FASE_5_VERIFICACION_DOCKER.md). Se conserva también el ensayo HTTPS nativo anterior, que tiene un alcance separado.
 
 ## Archivos y límites
 
 - `../Dockerfile`: compilación Vue con Node 22.17.0 y ejecución Python 3.12.14, imágenes oficiales fijadas por digest; runtime sin Node ni dependencias de pruebas. Proceso con usuario 10001 y un worker.
 - `../.dockerignore` y `build_context.py`: lista cerrada de código público y recursos de interfaz. Excluyen runtime, claves, bases, DICOM, matrices, pesos, notebooks y entornos científicos.
 - `compose.yml`: aplicación sin puerto público, volumen de datos explícito y secreto externo. Espera un ingreso HTTPS del proveedor; no lo contrata.
-- `compose.rehearsal.yml` y `Caddyfile.rehearsal`: proxy únicamente para el ensayo local. Publica solo `127.0.0.1:18443`, usando un certificado de prueba y puerto interno 8443. Receta declarada validada por Compose; proxy no ejecutado todavía.
+- `compose.rehearsal.yml` y `Caddyfile.rehearsal`: proxy únicamente para el ensayo local. Publica solo `127.0.0.1:18443`, usando un certificado de prueba y puerto interno 8443. Declaración y ejecución verificadas; `default_sni localhost` permite al cliente por IP recibir el certificado con SAN local manteniendo su verificación.
 - `production.env.example`: nombres y rutas de ejemplo; no contiene una clave ni una dirección contratada.
-- `rehearse_host.py` y `smoke_https.py`: ensayo reproducible con base nueva, cuenta ficticia y DICOM generado en memoria. No leen imágenes o evaluaciones del investigador.
+- `rehearse_host.py`, `rehearse_docker.py` y `smoke_https.py`: ensayos reproducibles con base nueva, cuenta ficticia y DICOM generado en memoria. No leen imágenes o evaluaciones del investigador.
 
 La imagen de esta etapa incluye acceso, guardado, interfaz y comprobación operativa. No contiene el checkout/entorno científico ni pesos: su entrada estricta rechaza variables `KNEEOAI_FROZEN_*`. Preparación radiográfica y predicción quedan bloqueadas expresamente en este paquete. La copia local aprobada conserva su configuración propia. No se usa un modelo ficticio como sustituto; integrar el paquete científico corresponde a la fase 6, con runtime Linux compatible y recursos medidos.
 
@@ -40,7 +40,7 @@ app/backend/.venv/Scripts/python.exe app/deploy/test_packaging.py
 app/backend/.venv/Scripts/python.exe app/deploy/build_context.py --output RUTA_NUEVA/application-context.tar --report RUTA_NUEVA/context.json
 ```
 
-El segundo comando ejecuta ocho comprobaciones sintéticas; su comprobación opcional con Docker aparece omitida cuando no hay motor. No contabilizarla como aprobada. El tercero crea exclusivamente un TAR nuevo con el contexto público y su huella; nunca sobrescribe el destino ni visita los directorios privados excluidos.
+El segundo comando ejecuta ocho comprobaciones sintéticas; su novena comprobación con Docker necesita la activación explícita indicada abajo. Sin ella aparece omitida; no contabilizarla como aprobada. Las nueve se ejecutaron correctamente el 9 de noviembre. El tercero crea exclusivamente un TAR nuevo con el contexto público y su huella; nunca sobrescribe el destino ni visita los directorios privados excluidos.
 
 Ensayo HTTPS sin Docker, con OpenSSL disponible, desde la raíz:
 
@@ -52,7 +52,7 @@ Compilar previamente la interfaz con `npm run build` en `app/frontend`. Linux us
 
 El ensayo crea una CA y un certificado localhost de dos días, comprobando cadena, propósito y nombre. Confía esa CA solo en sus clientes de prueba: no modifica el almacén de certificados del sistema ni desactiva su validación. Inicia y detiene únicamente sus propios procesos; hace acceso/guardado, reinicio con la misma clave y restauración en un directorio distinto. Guarda informes sin tokens ni contenido de casos. Su archivo de cookies separado contiene solo la sesión ficticia y permanece fuera de Git.
 
-## Cuando esté habilitado Docker
+## Construcción y ensayo Docker
 
 Primero comprobar que `docker version` devuelve servidor Linux. La instalación Windows de Docker exige virtualización habilitada; no la cambia esta entrega. [Requisitos oficiales](https://docs.docker.com/desktop/setup/install/windows-install/#system-requirements).
 
@@ -68,7 +68,19 @@ Para construir desde el TAR auditado en Linux/Bash o CI puede utilizarse `docker
 
 Antes de ejecutar Compose hay que elegir una etiqueta de imagen ya comprobada y un nombre de proyecto nuevo, preparar un archivo de secreto privado y establecer los valores del ejemplo. Para el ensayo usar un origen local HTTPS y las rutas de certificado/clave generadas por el helper. Validar primero con `docker compose -f app/deploy/compose.yml -f app/deploy/compose.rehearsal.yml config --quiet`; este comando no prueba ejecución ni crea contenedores. El proxy no es necesario cuando el proveedor gestiona HTTPS.
 
-Quedan por ejecutar: construcción Linux, inspección de capas y filesystem, usuario/permisos del volumen, arranque HTTPS por proxy, recreación con sesiones/datos conservados, respaldo/restauración en otro volumen y recursos máximos de la imagen. Los artefactos binarios Linux del lock se pudieron descargar; eso no acredita instalación, importación o ejecución dentro de la imagen.
+Para repetir el recorrido completo desde la raíz, eligiendo una imagen local ya construida y una carpeta privada nueva:
+
+```powershell
+app/backend/.venv/Scripts/python.exe app/deploy/rehearse_docker.py --output RUTA_PRIVADA_NUEVA --image kneeoai-app:0.12.0-preparation --openssl "C:/Program Files/Git/usr/bin/openssl.exe"
+```
+
+El helper usa un proyecto y volúmenes nuevos, genera certificados y clave propios y provisiona únicamente la cuenta ficticia del ensayo. Verifica HTTPS, 23 comprobaciones de API, los recursos públicos PWA, recreación real del contenedor y conservación de sesión/caso. Exporta un respaldo completo al equipo y lo monta solo para lectura durante la recuperación en otro volumen; la restauración trabaja sobre una copia temporal y un destino inexistente. Comprueba los bytes recuperados y que las sesiones antiguas estén revocadas. Al terminar retira solo los contenedores y red del proyecto de prueba; conserva imagen, informes, respaldo y volúmenes ficticios. No usa limpieza global de Docker.
+
+La construcción, las importaciones Linux, las capas, los permisos efectivos y este recorrido pasaron sobre Docker Desktop con anfitrión Windows. Los recursos se registran como muestras con un caso pequeño, sin afirmar máximos ni capacidad del predictor. La comprobación de archivos PWA no equivale a instalarla o ejecutar su service worker en un navegador.
+
+El helper contempla archivos de secretos de Compose en POSIX: los montajes individuales de sesión y TLS son legibles por los UID de los contenedores dentro de una carpeta anfitriona del propietario con permisos 700; la clave privada de la CA conserva 600. No es una política general de secretos de producción. No cambia ACL de Windows y la ejecución completa del helper sobre un anfitrión Linux no se ha comprobado. La ejecución Linux dentro de la imagen sí quedó verificada.
+
+Siguen pendientes acceso externo, persistencia y recuperación en el proveedor elegido, capacidad del motor científico y retorno entre versiones de esquema. No se ha contratado ni publicado un servicio por ejecutar este ensayo.
 
 ## Persistencia, respaldo y retorno
 
@@ -78,7 +90,7 @@ El respaldo utiliza `python -m knee_app.cli backup --package --destination DESTI
 
 Para restaurar: detener el servicio que vaya a utilizar el destino, ejecutar `python -m knee_app.cli restore --package --source PAQUETE --destination DIRECTORIO_NUEVO`, verificar archivos/configuración y adoptar esa carpeta como nuevo `DATA_DIR`. No sobrescribir una base abierta. Las sesiones copiadas se revocan expresamente: hay que volver a iniciar sesión, aunque el secreto sea el mismo.
 
-Para volver a una versión anterior conservar conjuntamente su imagen/digest, configuración y respaldo de datos compatible. No bajar manualmente `PRAGMA user_version`; no hay un downgrade implementado. Si una migración futura no es compatible hacia atrás, restaurar el respaldo anterior en otro volumen implica volver a su punto de recuperación. El rollback con imágenes sigue pendiente del ensayo Docker.
+Para volver a una versión anterior conservar conjuntamente su imagen/digest, configuración y respaldo de datos compatible. No bajar manualmente `PRAGMA user_version`; no hay un downgrade implementado. Si una migración futura no es compatible hacia atrás, restaurar el respaldo anterior en otro volumen implica volver a su punto de recuperación. El ensayo Docker comprueba recuperación con la misma imagen y esquema; no demuestra un retorno entre versiones distintas.
 
 ## Publicación y dominio posteriores
 

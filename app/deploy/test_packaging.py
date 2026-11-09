@@ -167,7 +167,8 @@ class PackagingTests(unittest.TestCase):
         # No base image download, no network, no real application data: just COPY into scratch.
         write(self.app, 'Dockerfile', b'FROM scratch\nCOPY . /context/\n')
         export = self.temp / 'export'
-        command = ['docker', '--context', 'desktop-linux', 'build', '--progress=plain',
+        # Use the caller's selected Docker engine on Desktop or a Linux CI runner.
+        command = ['docker', 'build', '--progress=plain',
                    '--network=none', '--output', f'type=local,dest={export}', str(self.app)]
         result = subprocess.run(command, capture_output=True, text=True, timeout=90)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

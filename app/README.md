@@ -6,7 +6,7 @@ La versión 0.11 incorpora PWA instalable, actualización explícita, avisos de 
 
 Alcance y comprobaciones: [entrega de fase 4](FASE_4_ENTREGA.md). Publicación HTTPS e integración predictiva conservan sus fases propias.
 
-La preparación de fase 5 se versiona aparte en v0.12/API 0.5: [guía de despliegue](deploy/README.md) y [evidencia y pendientes](FASE_5_PREPARACION.md). Se preparó el paquete y se ensayó HTTPS en el equipo con datos ficticios. **La construcción/ejecución Docker queda pendiente por virtualización desactivada; la aplicación no está publicada en Internet.** No se contrató alojamiento ni dominio. El servicio local existente conserva su versión anterior hasta una actualización expresa.
+La preparación de fase 5 se versiona aparte en v0.12/API 0.5: [guía de despliegue](deploy/README.md), [estado general](FASE_5_PREPARACION.md) y [verificación Docker del 9 de noviembre](FASE_5_VERIFICACION_DOCKER.md). La construcción Linux, HTTPS, recreación y recuperación desde respaldo externo a otro volumen pasaron con datos ficticios. **La aplicación no está publicada en Internet.** No se contrató alojamiento ni dominio. El ensayo no sustituye ni migra la base local.
 
 ```mermaid
 flowchart LR
@@ -142,4 +142,4 @@ GitHub Actions tiene preparado el mismo flujo de contrato, compilación y prueba
 - `frontend/src/views/` y `components/`: pantallas y componentes Vue.
 - `contracts/`: contrato versionado y ejemplos sintéticos.
 
-El código público se mantiene en el repositorio Knee. Los datos de investigación, modelos, credenciales y artefactos privados conservan su almacenamiento restringido. La siguiente fase añadirá carga y preparación de imagen manteniendo el procedimiento científico autorizado.
+El código público se mantiene en el repositorio Knee. Los datos de investigación, modelos, credenciales y artefactos privados conservan su almacenamiento restringido. Queda pendiente la publicación de fase 5 y, en fase 6, integrar el motor científico aprobado; la imagen de despliegue actual conserva preparación y predicción bloqueadas.
